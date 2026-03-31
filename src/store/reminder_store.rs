@@ -1,0 +1,246 @@
+// Rust guideline compliant 2026-02-21
+//! `SQLite` implementation of the [`Reminders`] repository trait.
+//!
+//! Phase 2+: this store is not yet wired into the CLI binary.
+
+use std::sync::{Arc, Mutex};
+
+use chrono::Utc;
+use rusqlite::{Connection, params};
+
+use crate::domain::{NewReminder, ProjectId, Reminder, ReminderId, Reminders, TaskId};
+use crate::store::project_store::{parse_dt, parse_dt_opt};
+
+// Phase 2+: items below unused in the binary until Phase 2.
+#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
+const SELECT_COLS: &str =
+    "id, slug, project_id, task_id, remind_at, message, fired, archived_at, created_at";
+
+struct RawRow {
+    id: i64,
+    slug: String,
+    project_id: i64,
+    task_id: Option<i64>,
+    remind_at: String,
+    message: Option<String>,
+    fired: bool,
+    archived_at: Option<String>,
+    created_at: String,
+}
+
+fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
+    Ok(RawRow {
+        id: row.get(0)?,
+        slug: row.get(1)?,
+        project_id: row.get(2)?,
+        task_id: row.get(3)?,
+        remind_at: row.get(4)?,
+        message: row.get(5)?,
+        fired: row.get::<_, i64>(6)? != 0,
+        archived_at: row.get(7)?,
+        created_at: row.get(8)?,
+    })
+}
+
+impl RawRow {
+    fn into_reminder(self) -> anyhow::Result<Reminder> {
+        Ok(Reminder {
+            id: ReminderId(self.id),
+            slug: self.slug,
+            project_id: ProjectId(self.project_id),
+            task_id: self.task_id.map(TaskId),
+            remind_at: parse_dt(&self.remind_at)?,
+            message: self.message,
+            fired: self.fired,
+            archived_at: parse_dt_opt(self.archived_at)?,
+            created_at: parse_dt(&self.created_at)?,
+        })
+    }
+}
+
+/// `SQLite`-backed implementation of the [`Reminders`] repository trait.
+///
+/// Cloning creates a new handle to the same underlying connection.
+// Phase 2+: not yet constructed in the CLI binary.
+#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
+#[derive(Clone, Debug)]
+pub struct SqliteReminders {
+    conn: Arc<Mutex<Connection>>,
+}
+
+impl SqliteReminders {
+    /// Creates a new [`SqliteReminders`] wrapping the given shared connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::sync::{Arc, Mutex};
+    /// # use scribe::store::SqliteReminders;
+    /// # use scribe::db::open_in_memory;
+    /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
+    /// let store = SqliteReminders::new(conn);
+    /// ```
+    #[must_use]
+    pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
+        Self { conn }
+    }
+
+    fn lock(&self) -> anyhow::Result<std::sync::MutexGuard<'_, Connection>> {
+        self.conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("DB lock poisoned: {e}"))
+    }
+
+    fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Reminder>> {
+        let sql = format!("SELECT {SELECT_COLS} FROM reminders WHERE slug = ?1");
+        let mut stmt = conn.prepare(&sql)?;
+        let mut iter = stmt.query_map(params![slug], map_row)?;
+        iter.next()
+            .transpose()
+            .map_err(anyhow::Error::from)?
+            .map(RawRow::into_reminder)
+            .transpose()
+    }
+}
+
+impl Reminders for SqliteReminders {
+    fn create(&self, reminder: NewReminder) -> anyhow::Result<Reminder> {
+        let conn = self.lock()?;
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO reminders \
+             (slug, project_id, task_id, remind_at, message, fired, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
+            params![
+                reminder.slug,
+                reminder.project_id.0,
+                reminder.task_id.map(|t| t.0),
+                reminder.remind_at.to_rfc3339(),
+                reminder.message,
+                now,
+            ],
+        )?;
+        Self::fetch_one(&conn, &reminder.slug)?
+            .ok_or_else(|| anyhow::anyhow!("reminder '{}' not found after insert", reminder.slug))
+    }
+
+    fn find_by_slug(&self, slug: &str) -> anyhow::Result<Option<Reminder>> {
+        let conn = self.lock()?;
+        Self::fetch_one(&conn, slug)
+    }
+
+    fn list(
+        &self,
+        project_id: Option<ProjectId>,
+        include_archived: bool,
+    ) -> anyhow::Result<Vec<Reminder>> {
+        let conn = self.lock()?;
+        let mut conditions: Vec<String> = Vec::new();
+        if !include_archived {
+            conditions.push("archived_at IS NULL".to_owned());
+        }
+        if let Some(pid) = project_id {
+            conditions.push(format!("project_id = {}", pid.0));
+        }
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+        let sql = format!("SELECT {SELECT_COLS} FROM reminders {where_clause} ORDER BY remind_at");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder())
+            .collect()
+    }
+
+    fn archive(&self, slug: &str) -> anyhow::Result<Reminder> {
+        let conn = self.lock()?;
+        let now = Utc::now().to_rfc3339();
+        let rows = conn.execute(
+            "UPDATE reminders SET archived_at = ?1 WHERE slug = ?2",
+            params![now, slug],
+        )?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("reminder '{slug}' not found"));
+        }
+        Self::fetch_one(&conn, slug)?
+            .ok_or_else(|| anyhow::anyhow!("reminder '{slug}' not found after archive"))
+    }
+
+    fn restore(&self, slug: &str) -> anyhow::Result<Reminder> {
+        let conn = self.lock()?;
+        let rows = conn.execute(
+            "UPDATE reminders SET archived_at = NULL WHERE slug = ?1",
+            params![slug],
+        )?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("reminder '{slug}' not found"));
+        }
+        Self::fetch_one(&conn, slug)?
+            .ok_or_else(|| anyhow::anyhow!("reminder '{slug}' not found after restore"))
+    }
+
+    fn delete(&self, slug: &str) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        let rows = conn.execute("DELETE FROM reminders WHERE slug = ?1", params![slug])?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("reminder '{slug}' not found"));
+        }
+        Ok(())
+    }
+
+    fn archive_all_for_project(&self, project_id: ProjectId) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE reminders SET archived_at = ?1 \
+             WHERE project_id = ?2 AND archived_at IS NULL",
+            params![now, project_id.0],
+        )?;
+        Ok(())
+    }
+}
+
+// ── tests ──────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::open_in_memory;
+
+    fn store() -> SqliteReminders {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteReminders::new(Arc::new(Mutex::new(conn)))
+    }
+
+    fn new_reminder(slug: &str) -> NewReminder {
+        NewReminder {
+            slug: slug.to_owned(),
+            project_id: ProjectId(1),
+            task_id: None,
+            remind_at: Utc::now(),
+            message: Some("Reminder message".to_owned()),
+        }
+    }
+
+    #[test]
+    fn test_create_and_find() {
+        let s = store();
+        let r = s.create(new_reminder("r1")).expect("create");
+        assert_eq!(r.slug, "r1");
+        assert!(!r.fired);
+    }
+
+    #[test]
+    fn test_archive_and_restore() {
+        let s = store();
+        s.create(new_reminder("r2")).expect("create");
+        s.archive("r2").expect("archive");
+        let items = s.list(None, false).expect("list");
+        assert!(!items.iter().any(|r| r.slug == "r2"));
+        s.restore("r2").expect("restore");
+        let items = s.list(None, false).expect("list");
+        assert!(items.iter().any(|r| r.slug == "r2"));
+    }
+}
