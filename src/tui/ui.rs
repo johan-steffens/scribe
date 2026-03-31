@@ -21,7 +21,8 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 use crate::tui::app::{App, View};
 use crate::tui::components::status_bar;
-use crate::tui::views::{dashboard, placeholder, projects, tasks};
+use crate::tui::types::Modal;
+use crate::tui::views::{dashboard, inbox, projects, reminders, tasks, todos, tracker};
 
 // ── public entry point ─────────────────────────────────────────────────────
 
@@ -102,12 +103,31 @@ fn render_tab_bar(frame: &mut Frame, area: Rect, app: &App) {
 fn render_main(frame: &mut Frame, area: Rect, app: &App) {
     match app.active_view {
         View::Dashboard => dashboard::render(frame, area, app),
-        View::Projects => projects::render(frame, area, app),
-        View::Tasks => tasks::render(frame, area, app),
-        View::Todos => placeholder::render_placeholder(frame, area, "Todos"),
-        View::Tracker => placeholder::render_placeholder(frame, area, "Tracker"),
-        View::Inbox => placeholder::render_placeholder(frame, area, "Inbox"),
-        View::Reminders => placeholder::render_placeholder(frame, area, "Reminders"),
+        View::Projects => {
+            projects::render(frame, area, app);
+            // Render any active modal on top.
+            render_modal(frame, area, app);
+        }
+        View::Tasks => {
+            tasks::render(frame, area, app);
+            render_modal(frame, area, app);
+        }
+        View::Todos => todos::render(frame, area, app),
+        View::Tracker => tracker::render(frame, area, app),
+        View::Inbox => inbox::render(frame, area, app),
+        View::Reminders => reminders::render(frame, area, app),
+    }
+}
+
+/// Renders any active modal overlay (form or confirm dialog).
+///
+/// Used for views (projects, tasks) that don't handle modal rendering
+/// themselves.
+fn render_modal(frame: &mut Frame, area: Rect, app: &App) {
+    match &app.modal {
+        Modal::Form(form, _) => form.render(frame, area),
+        Modal::Confirm(dialog, _) => dialog.render(frame, area),
+        Modal::None => {}
     }
 }
 
@@ -138,18 +158,21 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         ("d", "Dashboard"),
         ("p", "Projects"),
         ("t", "Tasks"),
-        ("o", "Todos (Phase 4)"),
-        ("r", "Tracker (Phase 4)"),
-        ("i", "Inbox (Phase 4)"),
-        ("m", "Reminders (Phase 4)"),
+        ("o", "Todos"),
+        ("r", "Tracker"),
+        ("i", "Inbox"),
+        ("m", "Reminders"),
         ("j / ↓", "Move selection down"),
         ("k / ↑", "Move selection up"),
+        ("n", "New item"),
+        ("e", "Edit selected"),
+        ("D", "Delete/archive selected"),
+        ("Space", "Toggle done / start-stop timer"),
+        ("Enter", "Process inbox item"),
+        ("v", "Move todo to different project"),
         ("/", "Enter filter mode"),
-        ("Esc", "Clear filter / dismiss error"),
-        ("Enter", "Open detail (Phase 4)"),
-        ("n", "New item (Phase 4)"),
-        ("e", "Edit selected (Phase 4)"),
-        ("D", "Delete selected (Phase 4)"),
+        ("Esc", "Clear filter / close modal / dismiss error"),
+        ("Tab", "Next form field (in form)"),
         ("?", "Toggle this help"),
         ("q", "Quit"),
     ];
@@ -158,7 +181,7 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         .iter()
         .map(|(key, desc)| {
             Line::from(vec![
-                Span::styled(format!("  {key:<12}"), key_style),
+                Span::styled(format!("  {key:<14}"), key_style),
                 Span::styled(*desc, desc_style),
             ])
         })

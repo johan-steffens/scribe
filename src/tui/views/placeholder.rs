@@ -1,20 +1,20 @@
 // Rust guideline compliant 2026-02-21
-//! Phase 4 placeholder view renderer.
+//! Placeholder view renderer for unimplemented views.
 //!
-//! Views not yet implemented (Todos, Tracker, Inbox, Reminders) display a
-//! centred "Coming in Phase 4" message. This module provides a single
-//! [`render_placeholder`] function used for all four views.
-//!
-//! The real implementations will replace calls to this function in Phase 4.
+//! This module is retained for potential Phase 5+ views that are not yet
+//! implemented. The four Phase 4 views (Todos, Tracker, Inbox, Reminders)
+//! now have real implementations and no longer use this placeholder.
 
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 
-/// Renders a centred "Coming in Phase 4" placeholder into `area`.
+/// Renders a centred placeholder message into `area`.
 ///
-/// `view_name` is the display name shown in the heading, e.g. `"Todos"`.
+/// `view_name` is the display name shown in the heading. Retained for any
+/// future Phase 5+ views before they are fully implemented.
+#[expect(dead_code, reason = "kept for future Phase 5+ placeholder views")]
 pub fn render_placeholder(frame: &mut Frame, area: Rect, view_name: &str) {
     // Vertically centre the two-line message.
     let vertical = Layout::vertical([
@@ -33,7 +33,7 @@ pub fn render_placeholder(frame: &mut Frame, area: Rect, view_name: &str) {
                 .add_modifier(Modifier::BOLD),
         );
 
-    let subtext = Paragraph::new("Coming in Phase 4")
+    let subtext = Paragraph::new("Coming in a future phase")
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::DarkGray));
 

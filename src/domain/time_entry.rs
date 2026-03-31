@@ -78,8 +78,6 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error on database failure.
-    // Used in Phase 3+ TUI and tab-completion subcommands.
-    #[expect(dead_code, reason = "used in Phase 3+ TUI and completion paths")]
     fn list(
         &self,
         project_id: Option<ProjectId>,
@@ -98,8 +96,6 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
-    // Used in Phase 3+ TUI and cleanup flows.
-    #[expect(dead_code, reason = "used in Phase 3+ TUI cleanup flows")]
     fn archive(&self, slug: &str) -> anyhow::Result<TimeEntry>;
 
     /// Restores an archived entry.
@@ -107,8 +103,11 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
-    // Used in Phase 3+ TUI restore flows.
-    #[expect(dead_code, reason = "used in Phase 3+ TUI restore flows")]
+    // Reserved for Phase 5 restore flows.
+    #[expect(
+        dead_code,
+        reason = "reserved for Phase 5 restore and archive management flows"
+    )]
     fn restore(&self, slug: &str) -> anyhow::Result<TimeEntry>;
 
     /// Archives all time entries belonging to the given project.
@@ -123,9 +122,19 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
-    // Used in Phase 3+ TUI hard-delete flows.
-    #[expect(dead_code, reason = "used in Phase 3+ TUI hard-delete flows")]
+    // Reserved for Phase 5 hard-delete administrative flows.
+    #[expect(
+        dead_code,
+        reason = "reserved for Phase 5 hard-delete administrative flows"
+    )]
     fn delete(&self, slug: &str) -> anyhow::Result<()>;
+
+    /// Updates mutable fields of an existing time entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry does not exist or a database error occurs.
+    fn update(&self, slug: &str, patch: TimeEntryPatch) -> anyhow::Result<TimeEntry>;
 
     /// Returns completed entries (non-archived, `ended_at` set) within a time window.
     ///
@@ -157,5 +166,12 @@ pub struct NewTimeEntry {
     /// Timer start time.
     pub started_at: DateTime<Utc>,
     /// Optional note.
+    pub note: Option<String>,
+}
+
+/// Partial update for mutable time-entry fields.
+#[derive(Debug, Clone, Default)]
+pub struct TimeEntryPatch {
+    /// New note text, if changing.
     pub note: Option<String>,
 }

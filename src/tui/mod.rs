@@ -28,6 +28,7 @@
 
 pub mod app;
 pub mod components;
+#[path = "keys/mod.rs"]
 pub(crate) mod keys;
 pub(crate) mod types;
 pub mod ui;

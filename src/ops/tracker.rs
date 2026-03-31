@@ -20,7 +20,9 @@ use chrono::{DateTime, Duration, Utc};
 use rusqlite::Connection;
 
 use crate::domain::Projects;
-use crate::domain::{NewTimeEntry, ProjectId, TaskId, TimeEntries, TimeEntry, slug};
+use crate::domain::{
+    NewTimeEntry, ProjectId, TaskId, TimeEntries, TimeEntry, TimeEntryPatch, slug,
+};
 use crate::store::{SqliteProjects, SqliteTimeEntries};
 
 /// Parameters for starting a new timer via [`TrackerOps`].
@@ -204,6 +206,40 @@ impl TrackerOps {
 
         Ok((project.slug, project.id))
     }
+
+    /// Lists recent time entries (most-recent-first, up to `limit`).
+    ///
+    /// Only non-archived entries are returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on database failure.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "reserved for Phase 5 report views")
+    )]
+    pub fn list_recent(&self, limit: usize) -> anyhow::Result<Vec<TimeEntry>> {
+        let all = self.entries.list(None, false)?;
+        Ok(all.into_iter().take(limit).collect())
+    }
+
+    /// Updates the note on an existing time entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry does not exist or a database error occurs.
+    pub fn update_note(&self, entry_slug: &str, note: Option<String>) -> anyhow::Result<TimeEntry> {
+        self.entries.update(entry_slug, TimeEntryPatch { note })
+    }
+
+    /// Archives a time entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry does not exist or a database error occurs.
+    pub fn archive_entry(&self, entry_slug: &str) -> anyhow::Result<TimeEntry> {
+        self.entries.archive(entry_slug)
+    }
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────
@@ -294,5 +330,53 @@ mod tests {
         .expect("start");
         let (_, elapsed) = ops.timer_status().expect("status").expect("running");
         assert!(elapsed.num_seconds() >= 0);
+    }
+
+    #[test]
+    fn test_list_recent_returns_entries() {
+        let ops = ops();
+        ops.start_timer(StartTimer {
+            project_slug: "quick-capture".to_owned(),
+            project_id: ProjectId(1),
+            task_id: None,
+            note: None,
+        })
+        .expect("start");
+        ops.stop_timer().expect("stop");
+        let recent = ops.list_recent(10).expect("list_recent");
+        assert!(!recent.is_empty());
+    }
+
+    #[test]
+    fn test_update_note_changes_note() {
+        let ops = ops();
+        let entry = ops
+            .start_timer(StartTimer {
+                project_slug: "quick-capture".to_owned(),
+                project_id: ProjectId(1),
+                task_id: None,
+                note: None,
+            })
+            .expect("start");
+        let updated = ops
+            .update_note(&entry.slug, Some("My note".to_owned()))
+            .expect("update note");
+        assert_eq!(updated.note.as_deref(), Some("My note"));
+    }
+
+    #[test]
+    fn test_archive_entry_archives() {
+        let ops = ops();
+        let entry = ops
+            .start_timer(StartTimer {
+                project_slug: "quick-capture".to_owned(),
+                project_id: ProjectId(1),
+                task_id: None,
+                note: None,
+            })
+            .expect("start");
+        ops.stop_timer().expect("stop");
+        let archived = ops.archive_entry(&entry.slug).expect("archive entry");
+        assert!(archived.archived_at.is_some());
     }
 }

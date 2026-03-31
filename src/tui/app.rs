@@ -5,6 +5,7 @@
 //! rendering functions that accept `&App` — they never mutate state.
 //!
 //! Key-event dispatching lives in [`super::keys`] to keep this file concise.
+//! Data-refresh helpers live in the `refresh` sub-module.
 //!
 //! # Error handling
 //!
@@ -23,16 +24,21 @@
 //! assert!(!app.should_quit);
 //! ```
 
+#[path = "app/refresh.rs"]
+mod refresh;
+
 use std::sync::{Arc, Mutex};
 
 use chrono::Duration;
 use crossterm::event::KeyEvent;
 use rusqlite::Connection;
 
-use crate::domain::{Projects, Tasks, TimeEntry};
+use crate::domain::TimeEntry;
 use crate::ops::TrackerOps;
-use crate::store::{SqliteProjects, SqliteTasks};
-use crate::tui::types::{ProjectViewState, TaskViewState, ViewState};
+use crate::tui::types::{
+    CaptureViewState, EntryViewState, Modal, ProjectViewState, ReminderViewState, TaskViewState,
+    TodoViewState, ViewState,
+};
 
 // Re-export types so downstream modules can `use crate::tui::app::{App, View, InputMode}`.
 #[doc(inline)]
@@ -70,10 +76,20 @@ pub struct App {
     pub show_help: bool,
     /// Current input mode (normal navigation or filter entry).
     pub input_mode: InputMode,
+    /// Active modal overlay (form, confirm dialog, or none).
+    pub modal: Modal,
     /// Per-view list state for projects.
     pub projects: ProjectViewState,
     /// Per-view list state for tasks.
     pub tasks: TaskViewState,
+    /// Per-view list state for todos.
+    pub todos: TodoViewState,
+    /// Per-view list state for time entries (tracker).
+    pub entries: EntryViewState,
+    /// Per-view list state for capture items (inbox).
+    pub captures: CaptureViewState,
+    /// Per-view list state for reminders.
+    pub reminders: ReminderViewState,
     /// Shared database connection used to refresh data.
     pub(super) db: Arc<Mutex<Connection>>,
 }
@@ -105,47 +121,30 @@ impl App {
             active_timer: None,
             show_help: false,
             input_mode: InputMode::Normal,
+            modal: Modal::None,
             projects: ViewState::new(),
             tasks: ViewState::new(),
+            todos: ViewState::new(),
+            entries: ViewState::new(),
+            captures: ViewState::new(),
+            reminders: ViewState::new(),
             db,
         };
         app.refresh();
         app
     }
 
-    /// Reloads projects and tasks from the database.
+    /// Reloads all view data from the database.
     ///
-    /// Called at startup and after any mutating operation (Phase 4+). Errors
-    /// are stored in [`App::last_error`]; the app never panics on DB failure.
+    /// Called at startup and after any mutating operation. Errors are stored
+    /// in [`App::last_error`]; the app never panics on DB failure.
     pub fn refresh(&mut self) {
-        let projects_store = SqliteProjects::new(Arc::clone(&self.db));
-        match projects_store.list(None, false) {
-            Ok(items) => {
-                self.projects.items = items;
-                // Clamp selection to valid range after reload.
-                let max = self.projects.items.len().saturating_sub(1);
-                if self.projects.selected > max {
-                    self.projects.selected = max;
-                }
-            }
-            Err(e) => {
-                self.last_error = Some(format!("failed to load projects: {e}"));
-            }
-        }
-
-        let tasks_store = SqliteTasks::new(Arc::clone(&self.db));
-        match tasks_store.list(None, None, None, false) {
-            Ok(items) => {
-                self.tasks.items = items;
-                let max = self.tasks.items.len().saturating_sub(1);
-                if self.tasks.selected > max {
-                    self.tasks.selected = max;
-                }
-            }
-            Err(e) => {
-                self.last_error = Some(format!("failed to load tasks: {e}"));
-            }
-        }
+        refresh::refresh_projects(self);
+        refresh::refresh_tasks(self);
+        refresh::refresh_todos(self);
+        refresh::refresh_entries(self);
+        refresh::refresh_captures(self);
+        refresh::refresh_reminders(self);
     }
 
     /// Refreshes the active timer status from the database.
@@ -166,8 +165,8 @@ impl App {
 
     /// Dispatches a key event to the appropriate handler.
     ///
-    /// Global keys are handled regardless of the active view. When in filter
-    /// mode (`/`), most keystrokes are forwarded to the filter string.
+    /// Active modals receive key events first. When no modal is open, the
+    /// event is forwarded to the view-level key handler.
     /// Key dispatch logic lives in [`crate::tui::keys`].
     pub fn handle_key(&mut self, key: KeyEvent) {
         crate::tui::keys::handle_key(self, key);
@@ -178,35 +177,62 @@ impl App {
     /// Used by [`crate::tui::keys`] to clamp cursor positions.
     pub(super) fn filtered_len(&self) -> usize {
         match self.active_view {
-            View::Projects => {
-                if self.projects.filter.is_empty() {
-                    self.projects.items.len()
-                } else {
-                    let f = self.projects.filter.to_lowercase();
-                    self.projects
-                        .items
-                        .iter()
-                        .filter(|p| {
-                            p.slug.to_lowercase().contains(&f) || p.name.to_lowercase().contains(&f)
-                        })
-                        .count()
-                }
-            }
-            View::Tasks | View::Dashboard => {
-                if self.tasks.filter.is_empty() {
-                    self.tasks.items.len()
-                } else {
-                    let f = self.tasks.filter.to_lowercase();
-                    self.tasks
-                        .items
-                        .iter()
-                        .filter(|t| t.title.to_lowercase().contains(&f))
-                        .count()
-                }
-            }
-            // Phase 4 views have no list state yet.
-            View::Todos | View::Tracker | View::Inbox | View::Reminders => 0,
+            View::Projects => Self::filter_count(
+                &self.projects.filter,
+                self.projects.items.len(),
+                self.projects
+                    .items
+                    .iter()
+                    .map(|p| format!("{} {}", p.slug, p.name)),
+            ),
+            View::Tasks | View::Dashboard => Self::filter_count(
+                &self.tasks.filter,
+                self.tasks.items.len(),
+                self.tasks.items.iter().map(|t| t.title.clone()),
+            ),
+            View::Todos => Self::filter_count(
+                &self.todos.filter,
+                self.todos.items.len(),
+                self.todos.items.iter().map(|t| t.title.clone()),
+            ),
+            View::Tracker => self.entries.items.len(),
+            View::Inbox => Self::filter_count(
+                &self.captures.filter,
+                self.captures.items.len(),
+                self.captures.items.iter().map(|c| c.body.clone()),
+            ),
+            View::Reminders => Self::filter_count(
+                &self.reminders.filter,
+                self.reminders.items.len(),
+                self.reminders
+                    .items
+                    .iter()
+                    .map(|r| r.message.as_deref().unwrap_or("").to_owned()),
+            ),
         }
+    }
+
+    /// Returns a mutable reference to the `selected` cursor for the active view.
+    ///
+    /// Used by the key handler to move the list cursor.
+    pub(super) fn selected_mut(&mut self) -> &mut usize {
+        match self.active_view {
+            View::Projects => &mut self.projects.selected,
+            View::Tasks | View::Dashboard => &mut self.tasks.selected,
+            View::Todos => &mut self.todos.selected,
+            View::Tracker => &mut self.entries.selected,
+            View::Inbox => &mut self.captures.selected,
+            View::Reminders => &mut self.reminders.selected,
+        }
+    }
+
+    /// Counts items whose searchable text contains the filter string.
+    fn filter_count(filter: &str, total: usize, texts: impl Iterator<Item = String>) -> usize {
+        if filter.is_empty() {
+            return total;
+        }
+        let f = filter.to_lowercase();
+        texts.filter(|t| t.to_lowercase().contains(&f)).count()
     }
 }
 
@@ -272,13 +298,6 @@ mod tests {
     }
 
     #[test]
-    fn test_enter_sets_last_error_in_phase3() {
-        let mut app = make_app();
-        app.handle_key(key(KeyCode::Enter));
-        assert!(app.last_error.is_some());
-    }
-
-    #[test]
     fn test_filter_mode_entry_and_exit() {
         let mut app = make_app();
         app.handle_key(key(KeyCode::Char('p')));
@@ -289,5 +308,12 @@ mod tests {
         app.handle_key(key(KeyCode::Esc));
         assert_eq!(app.input_mode, InputMode::Normal);
         assert!(app.projects.filter.is_empty());
+    }
+
+    #[test]
+    fn test_refresh_loads_data() {
+        let app = make_app();
+        // quick-capture project should always be present.
+        assert!(!app.projects.items.is_empty());
     }
 }

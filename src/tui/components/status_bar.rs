@@ -78,7 +78,13 @@ fn render_hint_line(frame: &mut Frame, area: Rect, app: &App) {
     } else if app.input_mode == InputMode::Filter {
         let filter_text = match app.active_view {
             crate::tui::app::View::Projects => app.projects.filter.as_str(),
-            _ => app.tasks.filter.as_str(),
+            crate::tui::app::View::Tasks | crate::tui::app::View::Dashboard => {
+                app.tasks.filter.as_str()
+            }
+            crate::tui::app::View::Todos => app.todos.filter.as_str(),
+            crate::tui::app::View::Tracker => app.entries.filter.as_str(),
+            crate::tui::app::View::Inbox => app.captures.filter.as_str(),
+            crate::tui::app::View::Reminders => app.reminders.filter.as_str(),
         };
         let line = Line::from(vec![
             Span::styled(

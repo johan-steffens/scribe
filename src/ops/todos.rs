@@ -137,6 +137,36 @@ impl TodoOps {
         )
     }
 
+    /// Marks a previously-done todo as undone.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the todo does not exist or a database error occurs.
+    pub fn mark_undone(&self, todo_slug: &str) -> anyhow::Result<Todo> {
+        self.todos.update(
+            todo_slug,
+            TodoPatch {
+                done: Some(false),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// Updates the title of an existing todo.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the todo does not exist or a database error occurs.
+    pub fn update_title(&self, todo_slug: &str, new_title: &str) -> anyhow::Result<Todo> {
+        self.todos.update(
+            todo_slug,
+            TodoPatch {
+                title: Some(new_title.to_owned()),
+                ..Default::default()
+            },
+        )
+    }
+
     /// Moves a todo to a different project.
     ///
     /// The destination project must exist and not be archived.
@@ -292,5 +322,24 @@ mod tests {
         ops.archive(&todo.slug).expect("archive");
         ops.delete(&todo.slug).expect("delete");
         assert!(ops.get(&todo.slug).expect("get").is_none());
+    }
+
+    #[test]
+    fn test_mark_undone() {
+        let ops = ops();
+        let todo = ops.create("quick-capture", "Mark undone").expect("create");
+        ops.mark_done(&todo.slug).expect("mark done");
+        let undone = ops.mark_undone(&todo.slug).expect("mark undone");
+        assert!(!undone.done);
+    }
+
+    #[test]
+    fn test_update_title() {
+        let ops = ops();
+        let todo = ops.create("quick-capture", "Old title").expect("create");
+        let updated = ops
+            .update_title(&todo.slug, "New title")
+            .expect("update title");
+        assert_eq!(updated.title, "New title");
     }
 }

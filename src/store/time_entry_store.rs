@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 
-use crate::domain::{NewTimeEntry, ProjectId, TaskId, TimeEntries, TimeEntry, TimeEntryId};
+use crate::domain::{
+    NewTimeEntry, ProjectId, TaskId, TimeEntries, TimeEntry, TimeEntryId, TimeEntryPatch,
+};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
 const SELECT_COLS: &str = "id, slug, project_id, task_id, started_at, ended_at, \
@@ -222,6 +224,20 @@ impl TimeEntries for SqliteTimeEntries {
             return Err(anyhow::anyhow!("time entry '{slug}' not found"));
         }
         Ok(())
+    }
+
+    fn update(&self, slug: &str, patch: TimeEntryPatch) -> anyhow::Result<TimeEntry> {
+        let conn = self.lock()?;
+        // Only the note field is mutable via the patch for now.
+        let rows = conn.execute(
+            "UPDATE time_entries SET note = ?1 WHERE slug = ?2",
+            params![patch.note, slug],
+        )?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("time entry '{slug}' not found"));
+        }
+        Self::fetch_one(&conn, slug)?
+            .ok_or_else(|| anyhow::anyhow!("entry '{slug}' not found after update"))
     }
 
     fn list_completed_in_range(

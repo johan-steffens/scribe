@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 
-use crate::domain::{NewReminder, ProjectId, Reminder, ReminderId, Reminders, TaskId};
+use crate::domain::{
+    NewReminder, ProjectId, Reminder, ReminderId, ReminderPatch, Reminders, TaskId,
+};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
 const SELECT_COLS: &str =
@@ -195,6 +197,45 @@ impl Reminders for SqliteReminders {
             params![now, project_id.0],
         )?;
         Ok(())
+    }
+
+    fn update(&self, slug: &str, patch: ReminderPatch) -> anyhow::Result<Reminder> {
+        let conn = self.lock()?;
+        let mut sets: Vec<String> = Vec::new();
+        let mut values: Vec<String> = Vec::new();
+
+        if let Some(ref dt) = patch.remind_at {
+            sets.push(format!("remind_at = ?{}", sets.len() + 1));
+            values.push(dt.to_rfc3339());
+        }
+        if let Some(ref msg) = patch.message {
+            sets.push(format!("message = ?{}", sets.len() + 1));
+            values.push(msg.clone());
+        }
+
+        if sets.is_empty() {
+            // Nothing to update — reload and return.
+            return Self::fetch_one(&conn, slug)?
+                .ok_or_else(|| anyhow::anyhow!("reminder '{slug}' not found"));
+        }
+
+        let where_i = sets.len() + 1;
+        let sql = format!(
+            "UPDATE reminders SET {} WHERE slug = ?{where_i}",
+            sets.join(", ")
+        );
+        let mut all: Vec<&dyn rusqlite::types::ToSql> = values
+            .iter()
+            .map(|v| v as &dyn rusqlite::types::ToSql)
+            .collect();
+        all.push(&slug);
+
+        let rows = conn.execute(&sql, all.as_slice())?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("reminder '{slug}' not found"));
+        }
+        Self::fetch_one(&conn, slug)?
+            .ok_or_else(|| anyhow::anyhow!("reminder '{slug}' not found after update"))
     }
 
     fn list_due(&self, before: DateTime<Utc>) -> anyhow::Result<Vec<Reminder>> {

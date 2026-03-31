@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 
-use crate::domain::{NewReminder, Projects, Reminder, Reminders, Tasks, slug};
+use crate::domain::{NewReminder, Projects, Reminder, ReminderPatch, Reminders, Tasks, slug};
 use crate::store::{SqliteProjects, SqliteReminders, SqliteTasks};
 
 /// Parameters for creating a new reminder via [`ReminderOps`].
@@ -172,6 +172,15 @@ impl ReminderOps {
         Ok(fired)
     }
 
+    /// Updates mutable fields of an existing reminder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reminder does not exist or a database error occurs.
+    pub fn update(&self, reminder_slug: &str, patch: ReminderPatch) -> anyhow::Result<Reminder> {
+        self.reminders.update(reminder_slug, patch)
+    }
+
     /// Archives a reminder.
     ///
     /// # Errors
@@ -292,5 +301,28 @@ mod tests {
             .expect("create");
         let err = ops.delete(&r.slug).unwrap_err();
         assert!(err.to_string().contains("archived"));
+    }
+
+    #[test]
+    fn test_update_changes_message() {
+        let ops = ops();
+        let r = ops
+            .create(CreateReminder {
+                project_slug: "quick-capture".to_owned(),
+                task_slug: None,
+                remind_at: future(),
+                message: Some("Original".to_owned()),
+            })
+            .expect("create");
+        let updated = ops
+            .update(
+                &r.slug,
+                crate::domain::ReminderPatch {
+                    remind_at: None,
+                    message: Some("Updated".to_owned()),
+                },
+            )
+            .expect("update");
+        assert_eq!(updated.message.as_deref(), Some("Updated"));
     }
 }

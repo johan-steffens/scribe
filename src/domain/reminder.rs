@@ -120,6 +120,13 @@ pub trait Reminders {
     ///
     /// Returns an error on database failure.
     fn archive_all_for_project(&self, project_id: ProjectId) -> anyhow::Result<()>;
+
+    /// Updates mutable fields of an existing reminder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reminder does not exist or a database error occurs.
+    fn update(&self, slug: &str, patch: ReminderPatch) -> anyhow::Result<Reminder>;
 }
 
 // ── input types ────────────────────────────────────────────────────────────
@@ -136,5 +143,14 @@ pub struct NewReminder {
     /// When the reminder should fire.
     pub remind_at: DateTime<Utc>,
     /// Optional message text.
+    pub message: Option<String>,
+}
+
+/// Partial update for mutable reminder fields.
+#[derive(Debug, Clone, Default)]
+pub struct ReminderPatch {
+    /// New fire time, if changing.
+    pub remind_at: Option<DateTime<Utc>>,
+    /// New message text, if changing.
     pub message: Option<String>,
 }

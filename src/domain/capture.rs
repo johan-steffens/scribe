@@ -73,8 +73,6 @@ pub trait CaptureItems {
     /// # Errors
     ///
     /// Returns an error if the item does not exist or a database error occurs.
-    // Used in Phase 3+ TUI hard-delete flows.
-    #[expect(dead_code, reason = "used in Phase 3+ TUI hard-delete flows")]
     fn delete(&self, slug: &str) -> anyhow::Result<()>;
 }
 

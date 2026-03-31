@@ -57,10 +57,10 @@ pub use capture::{CaptureItem, CaptureItems, NewCaptureItem};
 #[doc(inline)]
 pub use project::{NewProject, Project, ProjectPatch, ProjectStatus, Projects};
 #[doc(inline)]
-pub use reminder::{NewReminder, Reminder, Reminders};
+pub use reminder::{NewReminder, Reminder, ReminderPatch, Reminders};
 #[doc(inline)]
 pub use task::{NewTask, Task, TaskPatch, TaskPriority, TaskStatus, Tasks};
 #[doc(inline)]
-pub use time_entry::{NewTimeEntry, TimeEntries, TimeEntry};
+pub use time_entry::{NewTimeEntry, TimeEntries, TimeEntry, TimeEntryPatch};
 #[doc(inline)]
 pub use todo::{NewTodo, Todo, TodoPatch, Todos};

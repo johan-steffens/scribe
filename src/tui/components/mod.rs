@@ -10,6 +10,10 @@
 //! |---|---|
 //! | [`status_bar`] | Two-line bottom status bar (timer + hints/errors) |
 //! | [`table`] | Stateful highlighted table widget |
+//! | [`dialog`] | Yes/No confirmation modal |
+//! | [`form`] | Generic inline create/edit form popup |
 
+pub mod dialog;
+pub mod form;
 pub mod status_bar;
 pub mod table;

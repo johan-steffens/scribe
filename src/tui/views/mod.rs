@@ -4,20 +4,23 @@
 //! Each view is a pure rendering function that accepts `&App` and writes to a
 //! [`ratatui::Frame`]. No view holds mutable state.
 //!
-//! # Phase 3 views
+//! # Views
 //!
 //! | Module | View |
 //! |---|---|
 //! | [`dashboard`] | Home: today's tasks + active timer |
-//! | [`projects`] | Full project list with live filter |
-//! | [`tasks`] | Full task list with live filter |
-//!
-//! # Phase 4 placeholders
-//!
-//! [`placeholder`] renders a centred "Coming in Phase 4" message for the
-//! Todos, Tracker, Inbox, and Reminders views.
+//! | [`projects`] | Full project list with live filter and CRUD |
+//! | [`tasks`] | Full task list with live filter and CRUD |
+//! | [`todos`] | Todo list with done-toggle and CRUD |
+//! | [`tracker`] | Time-entry history and active timer |
+//! | [`inbox`] | Quick-capture inbox with process dialog |
+//! | [`reminders`] | Active reminders with CRUD |
 
 pub mod dashboard;
+pub mod inbox;
 pub mod placeholder;
 pub mod projects;
+pub mod reminders;
 pub mod tasks;
+pub mod todos;
+pub mod tracker;
