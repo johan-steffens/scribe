@@ -35,26 +35,18 @@ pub struct ProjectId(pub i64);
 pub struct TaskId(pub i64);
 
 /// Strongly-typed primary key for a [`todo::Todo`].
-// Phase 2+: constructed by SqliteTodos in test code only for now.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TodoId(pub i64);
 
 /// Strongly-typed primary key for a [`time_entry::TimeEntry`].
-// Phase 2+: constructed by SqliteTimeEntries in test code only for now.
-#[allow(dead_code, reason = "used in Phase 2 time tracking feature")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntryId(pub i64);
 
 /// Strongly-typed primary key for a [`capture::CaptureItem`].
-// Phase 2+: constructed by SqliteCaptureItems in test code only for now.
-#[allow(dead_code, reason = "used in Phase 2 inbox feature")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CaptureItemId(pub i64);
 
 /// Strongly-typed primary key for a [`reminder::Reminder`].
-// Phase 2+: constructed by SqliteReminders in test code only for now.
-#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ReminderId(pub i64);
 

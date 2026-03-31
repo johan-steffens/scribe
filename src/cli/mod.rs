@@ -14,15 +14,31 @@
 //! let cli = Cli::parse();
 //! ```
 
+pub mod capture;
+pub mod inbox;
+pub mod parse;
 pub mod project;
+pub mod reminder;
 pub mod task;
+pub mod todo;
+pub mod track;
 
 use clap::{Parser, Subcommand};
 
 #[doc(inline)]
+pub use capture::CaptureCommand;
+#[doc(inline)]
+pub use inbox::InboxCommand;
+#[doc(inline)]
 pub use project::ProjectCommand;
 #[doc(inline)]
+pub use reminder::ReminderCommand;
+#[doc(inline)]
 pub use task::TaskCommand;
+#[doc(inline)]
+pub use todo::TodoCommand;
+#[doc(inline)]
+pub use track::TrackCommand;
 
 /// Scribe — personal productivity CLI/TUI tool.
 ///
@@ -47,4 +63,14 @@ pub enum Commands {
     Project(ProjectCommand),
     /// Manage tasks.
     Task(TaskCommand),
+    /// Manage todos.
+    Todo(TodoCommand),
+    /// Time tracking.
+    Track(TrackCommand),
+    /// Quickly capture a thought into the inbox.
+    Capture(CaptureCommand),
+    /// Manage the quick-capture inbox.
+    Inbox(InboxCommand),
+    /// Manage reminders.
+    Reminder(ReminderCommand),
 }

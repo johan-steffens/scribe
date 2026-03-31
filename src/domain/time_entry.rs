@@ -5,6 +5,11 @@
 //! optionally a task. A running timer has `ended_at = None`.
 //! Slugs are auto-generated from the project and start time,
 //! e.g. `payments-entry-20260331-143000`.
+//!
+//! # Phase 2 additions
+//!
+//! [`TimeEntries::delete`] and [`TimeEntries::list_completed_in_range`] are
+//! added here to support the `ops::tracker` report workflow.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -16,8 +21,6 @@ use crate::domain::{ProjectId, TaskId, TimeEntryId};
 /// A time-entry record as stored in the database.
 ///
 /// `ended_at` is `None` while the timer is still running.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 time tracking feature")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TimeEntry {
     /// Internal numeric primary key (not exposed to users).
@@ -43,8 +46,7 @@ pub struct TimeEntry {
 // ── repository trait ───────────────────────────────────────────────────────
 
 /// Data-access operations for the `time_entries` table.
-// Phase 2+: not yet used in production paths.
-#[allow(dead_code, reason = "used in Phase 2 time tracking feature")]
+// TODO(phase3): migrate to domain error structs per M-ERRORS-CANONICAL-STRUCTS
 pub trait TimeEntries {
     /// Inserts a new time entry and returns the persisted record.
     ///
@@ -76,6 +78,8 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error on database failure.
+    // Used in Phase 3+ TUI and tab-completion subcommands.
+    #[expect(dead_code, reason = "used in Phase 3+ TUI and completion paths")]
     fn list(
         &self,
         project_id: Option<ProjectId>,
@@ -94,6 +98,8 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
+    // Used in Phase 3+ TUI and cleanup flows.
+    #[expect(dead_code, reason = "used in Phase 3+ TUI cleanup flows")]
     fn archive(&self, slug: &str) -> anyhow::Result<TimeEntry>;
 
     /// Restores an archived entry.
@@ -101,6 +107,8 @@ pub trait TimeEntries {
     /// # Errors
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
+    // Used in Phase 3+ TUI restore flows.
+    #[expect(dead_code, reason = "used in Phase 3+ TUI restore flows")]
     fn restore(&self, slug: &str) -> anyhow::Result<TimeEntry>;
 
     /// Archives all time entries belonging to the given project.
@@ -109,13 +117,35 @@ pub trait TimeEntries {
     ///
     /// Returns an error on database failure.
     fn archive_all_for_project(&self, project_id: ProjectId) -> anyhow::Result<()>;
+
+    /// Permanently deletes the time entry row from the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry does not exist or a database error occurs.
+    // Used in Phase 3+ TUI hard-delete flows.
+    #[expect(dead_code, reason = "used in Phase 3+ TUI hard-delete flows")]
+    fn delete(&self, slug: &str) -> anyhow::Result<()>;
+
+    /// Returns completed entries (non-archived, `ended_at` set) within a time window.
+    ///
+    /// Only entries where `started_at >= since` and `started_at < until` are
+    /// returned. Optionally filtered to a single project.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on database failure.
+    fn list_completed_in_range(
+        &self,
+        project_id: Option<ProjectId>,
+        since: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> anyhow::Result<Vec<TimeEntry>>;
 }
 
 // ── input types ────────────────────────────────────────────────────────────
 
 /// Parameters required to create a new time entry.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 time tracking feature")]
 #[derive(Debug, Clone)]
 pub struct NewTimeEntry {
     /// Pre-generated unique slug.

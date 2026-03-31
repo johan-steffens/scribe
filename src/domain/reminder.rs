@@ -4,6 +4,11 @@
 //! Reminders are scheduled notifications linked to a project and optionally a
 //! task. Slugs are auto-generated from project and title,
 //! e.g. `payments-reminder-deploy-friday`.
+//!
+//! # Phase 2 additions
+//!
+//! [`Reminders::list_due`] and [`Reminders::mark_fired`] are added here to
+//! support the `ops::reminders::check_due` workflow.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -13,8 +18,6 @@ use crate::domain::{ProjectId, ReminderId, TaskId};
 // ── entity struct ──────────────────────────────────────────────────────────
 
 /// A reminder record as stored in the database.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Reminder {
     /// Internal numeric primary key (not exposed to users).
@@ -40,8 +43,7 @@ pub struct Reminder {
 // ── repository trait ───────────────────────────────────────────────────────
 
 /// Data-access operations for the `reminders` table.
-// Phase 2+: not yet used in production paths.
-#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
+// TODO(phase3): migrate to domain error structs per M-ERRORS-CANONICAL-STRUCTS
 pub trait Reminders {
     /// Inserts a new reminder and returns the persisted record.
     ///
@@ -94,6 +96,24 @@ pub trait Reminders {
     /// occurs.
     fn delete(&self, slug: &str) -> anyhow::Result<()>;
 
+    /// Returns all unfired, non-archived reminders with `remind_at <= before`.
+    ///
+    /// Used by [`crate::ops::reminders::ReminderOps::check_due`] to surface
+    /// notifications on startup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on database failure.
+    fn list_due(&self, before: DateTime<Utc>) -> anyhow::Result<Vec<Reminder>>;
+
+    /// Marks the reminder as fired by setting `fired = 1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reminder does not exist or a database error
+    /// occurs.
+    fn mark_fired(&self, slug: &str) -> anyhow::Result<Reminder>;
+
     /// Archives all reminders belonging to the given project.
     ///
     /// # Errors
@@ -105,8 +125,6 @@ pub trait Reminders {
 // ── input types ────────────────────────────────────────────────────────────
 
 /// Parameters required to create a new reminder.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
 #[derive(Debug, Clone)]
 pub struct NewReminder {
     /// Pre-generated unique slug.

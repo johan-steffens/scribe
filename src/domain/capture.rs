@@ -16,8 +16,6 @@ use crate::domain::CaptureItemId;
 ///
 /// Unlike other entities, capture items have no `project_id` or `archived_at`
 /// — they are either unprocessed or processed.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 inbox feature")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CaptureItem {
     /// Internal numeric primary key (not exposed to users).
@@ -35,8 +33,7 @@ pub struct CaptureItem {
 // ── repository trait ───────────────────────────────────────────────────────
 
 /// Data-access operations for the `capture_items` table.
-// Phase 2+: not yet used in production paths.
-#[allow(dead_code, reason = "used in Phase 2 inbox feature")]
+// TODO(phase3): migrate to domain error structs per M-ERRORS-CANONICAL-STRUCTS
 pub trait CaptureItems {
     /// Inserts a new capture item and returns the persisted record.
     ///
@@ -76,14 +73,14 @@ pub trait CaptureItems {
     /// # Errors
     ///
     /// Returns an error if the item does not exist or a database error occurs.
+    // Used in Phase 3+ TUI hard-delete flows.
+    #[expect(dead_code, reason = "used in Phase 3+ TUI hard-delete flows")]
     fn delete(&self, slug: &str) -> anyhow::Result<()>;
 }
 
 // ── input types ────────────────────────────────────────────────────────────
 
 /// Parameters required to create a new capture item.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 inbox feature")]
 #[derive(Debug, Clone)]
 pub struct NewCaptureItem {
     /// Pre-generated unique slug.

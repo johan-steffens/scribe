@@ -22,7 +22,7 @@ mod ops;
 mod store;
 
 use cli::{Cli, Commands};
-use ops::{ProjectOps, TaskOps};
+use ops::{InboxOps, ProjectOps, ReminderOps, TaskOps, TodoOps, TrackerOps};
 
 /// Global allocator — provides significant performance gains (M-MIMALLOC-APPS).
 // DOCUMENTED-MAGIC: MiMalloc replaces the system allocator for up to ~25%
@@ -61,6 +61,17 @@ fn run() -> anyhow::Result<()> {
 
     let project_ops = ProjectOps::new(&conn);
     let task_ops = TaskOps::new(Arc::clone(&conn));
+    let todo_ops = TodoOps::new(Arc::clone(&conn));
+    let tracker_ops = TrackerOps::new(Arc::clone(&conn));
+    let inbox_ops = InboxOps::new(&conn);
+    let reminder_ops = ReminderOps::new(Arc::clone(&conn));
+
+    // Fire any due reminders on startup. Actual delivery is Phase 5.
+    if let Ok(due) = reminder_ops.check_due() {
+        for r in &due {
+            tracing::info!(reminder.slug = %r.slug, "reminder fired");
+        }
+    }
 
     match cli.command {
         None => {
@@ -73,6 +84,21 @@ fn run() -> anyhow::Result<()> {
         }
         Some(Commands::Task(cmd)) => {
             cli::task::run(&cmd, &task_ops, &project_ops)?;
+        }
+        Some(Commands::Todo(cmd)) => {
+            cli::todo::run(&cmd, &todo_ops, &project_ops)?;
+        }
+        Some(Commands::Track(cmd)) => {
+            cli::track::run(&cmd, &tracker_ops, &project_ops, &task_ops)?;
+        }
+        Some(Commands::Capture(cmd)) => {
+            cli::capture::run(&cmd, &inbox_ops)?;
+        }
+        Some(Commands::Inbox(cmd)) => {
+            cli::inbox::run(&cmd, &inbox_ops)?;
+        }
+        Some(Commands::Reminder(cmd)) => {
+            cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
     }
 

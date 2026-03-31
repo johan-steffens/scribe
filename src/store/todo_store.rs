@@ -1,7 +1,7 @@
 // Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`Todos`] repository trait.
 //!
-//! Phase 2+: this store is not yet wired into the CLI binary.
+//! Wired into the CLI via [`crate::ops::TodoOps`].
 
 use std::sync::{Arc, Mutex};
 
@@ -12,8 +12,6 @@ use rusqlite::{Connection, params};
 use crate::domain::{NewTodo, ProjectId, Todo, TodoId, TodoPatch, Todos};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
-// Phase 2+: items below unused in the binary until Phase 2.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
 const SELECT_COLS: &str = "id, slug, project_id, title, done, archived_at, created_at, updated_at";
 
 struct RawRow {
@@ -58,8 +56,6 @@ impl RawRow {
 /// `SQLite`-backed implementation of the [`Todos`] repository trait.
 ///
 /// Cloning creates a new handle to the same underlying connection.
-// Phase 2+: not yet constructed in the CLI binary.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
 #[derive(Clone, Debug)]
 pub struct SqliteTodos {
     conn: Arc<Mutex<Connection>>,

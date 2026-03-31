@@ -13,8 +13,6 @@ use crate::domain::{ProjectId, TodoId};
 // ── entity struct ──────────────────────────────────────────────────────────
 
 /// A todo record as stored in the database.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Todo {
     /// Internal numeric primary key (not exposed to users).
@@ -38,8 +36,7 @@ pub struct Todo {
 // ── repository trait ───────────────────────────────────────────────────────
 
 /// Data-access operations for the `todos` table.
-// Phase 2+: not yet used in production paths.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
+// TODO(phase3): migrate to domain error structs per M-ERRORS-CANONICAL-STRUCTS
 pub trait Todos {
     /// Inserts a new todo and returns the persisted record.
     ///
@@ -108,8 +105,6 @@ pub trait Todos {
 // ── input types ────────────────────────────────────────────────────────────
 
 /// Parameters required to create a new todo.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
 #[derive(Debug, Clone)]
 pub struct NewTodo {
     /// Pre-generated unique slug.
@@ -121,8 +116,6 @@ pub struct NewTodo {
 }
 
 /// Partial update for mutable todo fields.
-// Phase 2+: not yet constructed in production code paths.
-#[allow(dead_code, reason = "used in Phase 2 todo feature")]
 #[derive(Debug, Clone, Default)]
 pub struct TodoPatch {
     /// New title, if changing.

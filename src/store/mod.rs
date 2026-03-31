@@ -22,17 +22,12 @@ pub use project_store::SqliteProjects;
 #[doc(inline)]
 pub use task_store::SqliteTasks;
 
-// Phase 2+ stores — available as module-level exports but not yet used by
-// the binary directly.  Re-exported here for documentation completeness.
+// Phase 2 stores — wired into the CLI.
 #[doc(inline)]
-#[allow(unused_imports, reason = "used in Phase 2 inbox feature")]
 pub use capture_store::SqliteCaptureItems;
 #[doc(inline)]
-#[allow(unused_imports, reason = "used in Phase 2 reminders feature")]
 pub use reminder_store::SqliteReminders;
 #[doc(inline)]
-#[allow(unused_imports, reason = "used in Phase 2 time tracking feature")]
 pub use time_entry_store::SqliteTimeEntries;
 #[doc(inline)]
-#[allow(unused_imports, reason = "used in Phase 2 todo feature")]
 pub use todo_store::SqliteTodos;

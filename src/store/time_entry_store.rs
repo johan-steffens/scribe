@@ -1,7 +1,7 @@
 // Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`TimeEntries`] repository trait.
 //!
-//! Phase 2+: this store is not yet wired into the CLI binary.
+//! Wired into the CLI via [`crate::ops::TrackerOps`].
 
 use std::sync::{Arc, Mutex};
 
@@ -11,8 +11,6 @@ use rusqlite::{Connection, params};
 use crate::domain::{NewTimeEntry, ProjectId, TaskId, TimeEntries, TimeEntry, TimeEntryId};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
-// Phase 2+: items below unused in the binary until Phase 2.
-#[allow(dead_code, reason = "used in Phase 2 time tracking feature")]
 const SELECT_COLS: &str = "id, slug, project_id, task_id, started_at, ended_at, \
      note, archived_at, created_at";
 
@@ -61,8 +59,6 @@ impl RawRow {
 /// `SQLite`-backed implementation of the [`TimeEntries`] repository trait.
 ///
 /// Cloning creates a new handle to the same underlying connection.
-// Phase 2+: not yet constructed in the CLI binary.
-#[allow(dead_code, reason = "used in Phase 2 time tracking feature")]
 #[derive(Clone, Debug)]
 pub struct SqliteTimeEntries {
     conn: Arc<Mutex<Connection>>,
@@ -217,6 +213,40 @@ impl TimeEntries for SqliteTimeEntries {
             params![now, project_id.0],
         )?;
         Ok(())
+    }
+
+    fn delete(&self, slug: &str) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        let rows = conn.execute("DELETE FROM time_entries WHERE slug = ?1", params![slug])?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("time entry '{slug}' not found"));
+        }
+        Ok(())
+    }
+
+    fn list_completed_in_range(
+        &self,
+        project_id: Option<ProjectId>,
+        since: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> anyhow::Result<Vec<TimeEntry>> {
+        let conn = self.lock()?;
+        let mut conditions: Vec<String> = vec![
+            "ended_at IS NOT NULL".to_owned(),
+            "archived_at IS NULL".to_owned(),
+            format!("started_at >= '{}'", since.to_rfc3339()),
+            format!("started_at < '{}'", until.to_rfc3339()),
+        ];
+        if let Some(pid) = project_id {
+            conditions.push(format!("project_id = {}", pid.0));
+        }
+        let where_clause = format!("WHERE {}", conditions.join(" AND "));
+        let sql =
+            format!("SELECT {SELECT_COLS} FROM time_entries {where_clause} ORDER BY started_at");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_entry())
+            .collect()
     }
 }
 

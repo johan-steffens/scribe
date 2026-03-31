@@ -1,18 +1,16 @@
 // Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`Reminders`] repository trait.
 //!
-//! Phase 2+: this store is not yet wired into the CLI binary.
+//! Wired into the CLI via [`crate::ops::ReminderOps`].
 
 use std::sync::{Arc, Mutex};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 
 use crate::domain::{NewReminder, ProjectId, Reminder, ReminderId, Reminders, TaskId};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
-// Phase 2+: items below unused in the binary until Phase 2.
-#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
 const SELECT_COLS: &str =
     "id, slug, project_id, task_id, remind_at, message, fired, archived_at, created_at";
 
@@ -61,8 +59,6 @@ impl RawRow {
 /// `SQLite`-backed implementation of the [`Reminders`] repository trait.
 ///
 /// Cloning creates a new handle to the same underlying connection.
-// Phase 2+: not yet constructed in the CLI binary.
-#[allow(dead_code, reason = "used in Phase 2 reminders feature")]
 #[derive(Clone, Debug)]
 pub struct SqliteReminders {
     conn: Arc<Mutex<Connection>>,
@@ -199,6 +195,33 @@ impl Reminders for SqliteReminders {
             params![now, project_id.0],
         )?;
         Ok(())
+    }
+
+    fn list_due(&self, before: DateTime<Utc>) -> anyhow::Result<Vec<Reminder>> {
+        let conn = self.lock()?;
+        let before_str = before.to_rfc3339();
+        let sql = format!(
+            "SELECT {SELECT_COLS} FROM reminders \
+             WHERE fired = 0 AND archived_at IS NULL AND remind_at <= ?1 \
+             ORDER BY remind_at"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![before_str], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder())
+            .collect()
+    }
+
+    fn mark_fired(&self, slug: &str) -> anyhow::Result<Reminder> {
+        let conn = self.lock()?;
+        let rows = conn.execute(
+            "UPDATE reminders SET fired = 1 WHERE slug = ?1",
+            params![slug],
+        )?;
+        if rows == 0 {
+            return Err(anyhow::anyhow!("reminder '{slug}' not found"));
+        }
+        Self::fetch_one(&conn, slug)?
+            .ok_or_else(|| anyhow::anyhow!("reminder '{slug}' not found after mark_fired"))
     }
 }
 

@@ -1,8 +1,7 @@
 // Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`CaptureItems`] repository trait.
 //!
-//! Phase 2+: this store is not yet wired into the CLI. The struct and trait
-//! implementation are fully tested via the in-memory DB.
+//! Wired into the CLI via [`crate::ops::InboxOps`].
 
 use std::sync::{Arc, Mutex};
 
@@ -11,8 +10,6 @@ use rusqlite::{Connection, params};
 use crate::domain::{CaptureItem, CaptureItemId, CaptureItems, NewCaptureItem};
 use crate::store::project_store::parse_dt;
 
-// Phase 2+: all items below are unused in the CLI binary until Phase 2.
-#[allow(dead_code, reason = "used in Phase 2 inbox feature")]
 const SELECT_COLS: &str = "id, slug, body, processed, created_at";
 
 struct RawRow {
@@ -48,8 +45,6 @@ impl RawRow {
 /// `SQLite`-backed implementation of the [`CaptureItems`] repository trait.
 ///
 /// Cloning creates a new handle to the same underlying connection.
-// Phase 2+: not yet constructed in the CLI binary.
-#[allow(dead_code, reason = "used in Phase 2 inbox feature")]
 #[derive(Clone, Debug)]
 pub struct SqliteCaptureItems {
     conn: Arc<Mutex<Connection>>,
@@ -67,7 +62,6 @@ impl SqliteCaptureItems {
     /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
     /// let store = SqliteCaptureItems::new(conn);
     /// ```
-    #[allow(dead_code, reason = "used in Phase 2 inbox feature")]
     #[must_use]
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
         Self { conn }
