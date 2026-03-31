@@ -17,6 +17,8 @@ mod cli;
 mod config;
 mod db;
 mod domain;
+#[cfg(feature = "mcp")]
+mod mcp;
 mod ops;
 mod store;
 mod tui;
@@ -80,6 +82,14 @@ fn run() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // `scribe agent install` also needs no DB access.
+    if let Some(Commands::Agent {
+        command: cli::AgentCommand::Install(ref args),
+    }) = cli.command
+    {
+        return cli::agent::run(args);
+    }
+
     let config = config::Config::load()?;
     // Allow integration tests to inject an isolated DB path without modifying
     // the user's real database. SCRIBE_TEST_DB is read only when present.
@@ -132,8 +142,14 @@ fn run() -> anyhow::Result<()> {
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
+        // Agent install is handled above before the DB opens.
+        Some(Commands::Agent { .. }) => {}
         // Completions is handled above before the DB opens.
         Some(Commands::Completions { .. }) => {}
+        #[cfg(feature = "mcp")]
+        Some(Commands::Mcp) => {
+            mcp::run(&conn, &config)?;
+        }
     }
 
     Ok(())

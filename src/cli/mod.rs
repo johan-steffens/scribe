@@ -14,6 +14,7 @@
 //! let cli = Cli::parse();
 //! ```
 
+pub mod agent;
 pub mod capture;
 pub mod complete;
 pub mod inbox;
@@ -26,6 +27,8 @@ pub mod track;
 
 use clap::{Parser, Subcommand};
 
+#[doc(inline)]
+pub use agent::AgentCommand;
 #[doc(inline)]
 pub use capture::CaptureCommand;
 #[doc(inline)]
@@ -76,9 +79,21 @@ pub enum Commands {
     Inbox(InboxCommand),
     /// Manage reminders.
     Reminder(ReminderCommand),
+    /// Install skill files for AI coding agents.
+    Agent {
+        /// Agent subcommand.
+        #[command(subcommand)]
+        command: AgentCommand,
+    },
     /// Print a shell completion script for the given shell.
     Completions {
         /// Shell to generate completions for.
         shell: CompletionShell,
     },
+    /// Run the Scribe MCP stdio server (requires the `mcp` feature).
+    ///
+    /// Connect your AI agent to this process.  Stdout is the MCP wire
+    /// protocol — do NOT run this in a plain terminal.
+    #[cfg(feature = "mcp")]
+    Mcp,
 }

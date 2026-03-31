@@ -834,6 +834,122 @@ scribe task list --project payments --output json
 
 ---
 
+## Agent Integration
+
+Scribe integrates with AI coding agents in two ways: a skill file (plain
+Markdown that teaches the agent the full Scribe command surface) and an MCP
+server (a real-time protocol bridge that lets agents read and write Scribe data
+without spawning a subprocess for every operation).
+
+### `scribe agent install`
+
+Running `scribe agent install` detects which AI agent tool directories are
+present on the machine and writes a `scribe.md` skill file to each one:
+
+| Agent | Skill directory | File written |
+|---|---|---|
+| Claude Code / OpenCode | `~/.claude/skills/` | `scribe.md` |
+| Cursor | `~/.cursor/rules/` | `scribe.md` |
+| Codex | `~/.codex/` | `scribe.md` |
+| Windsurf | `~/.windsurf/rules/` | `scribe.md` |
+
+Directories that do not exist on the machine are silently skipped and reported
+as `Skipped`.  Only directories that already exist receive the skill file —
+`scribe agent install` never creates new directories.
+
+After the install summary, the command prints ready-to-paste MCP configuration
+snippets for Claude Code and OpenCode (see below).
+
+### MCP server
+
+The MCP server requires building with the `mcp` Cargo feature:
+
+```sh
+cargo install --path . --features mcp
+```
+
+The server uses the stdio transport.  **Do not run `scribe mcp` in a plain
+terminal** — stdout is the MCP wire protocol (JSON-RPC 2.0).  Instead,
+configure your agent to spawn `scribe mcp` as a child process.
+
+#### Claude Code configuration
+
+Append to `~/.claude/settings.json` (or create it):
+
+```json
+{
+  "mcpServers": {
+    "scribe": {
+      "command": "scribe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### OpenCode configuration
+
+Add to your `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "scribe": {
+      "type": "local",
+      "command": ["scribe", "mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+### MCP tools exposed
+
+| Group | Tool | What it does |
+|---|---|---|
+| Projects | `project_list` | List active projects |
+| | `project_create` | Create a project |
+| | `project_archive` | Archive a project (cascades to items) |
+| | `project_restore` | Restore an archived project |
+| Tasks | `task_list` | List active tasks (optional filters) |
+| | `task_create` | Create a task |
+| | `task_done` | Mark a task done |
+| | `task_archive` | Archive a task |
+| Todos | `todo_list` | List active todos |
+| | `todo_create` | Create a todo |
+| | `todo_done` | Mark a todo done |
+| | `todo_archive` | Archive a todo |
+| Time tracking | `timer_start` | Start a timer |
+| | `timer_stop` | Stop the running timer |
+| | `timer_status` | Get running timer and elapsed seconds |
+| | `track_report` | Generate a time report (`today`, `week`, or all-time) |
+| Capture / inbox | `capture` | Quick-capture a thought |
+| | `inbox_list` | List unprocessed inbox items |
+| | `inbox_process` | Process an inbox item (task / todo / assign / discard) |
+| Reminders | `reminder_list` | List active reminders |
+| | `reminder_create` | Create a reminder |
+| | `reminder_archive` | Archive a reminder |
+
+### MCP resources exposed
+
+| URI | Contents |
+|---|---|
+| `scribe://projects` | All active projects (JSON array) |
+| `scribe://tasks/active` | All active non-archived tasks (JSON array) |
+| `scribe://todos/active` | All active non-done todos (JSON array) |
+| `scribe://timer/active` | Running timer JSON object, or `null` |
+| `scribe://inbox` | Unprocessed capture items (JSON array) |
+| `scribe://reminders/pending` | Active unfired reminders (JSON array) |
+
+### A note on `scribe mcp` and stdout
+
+The MCP wire protocol runs over stdout.  Any output that is not valid
+JSON-RPC will break the connection.  Scribe prints its startup message to
+**stderr** (`Scribe MCP server running on stdio. Connect your agent to this
+process.`) to keep stdout clean.
+
+---
+
 ## Tips and workflows
 
 ### 1. Morning planning session in the TUI

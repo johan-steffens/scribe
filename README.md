@@ -247,6 +247,23 @@ Running `scribe` with no subcommand opens the TUI.
 
 ---
 
+## Agent integration
+
+Scribe integrates with AI coding agents (Claude Code, OpenCode, Cursor, etc.)
+in two ways:
+
+**Skill file** — teaches the agent Scribe's commands and workflows:
+
+    scribe agent install
+
+**MCP server** — exposes all Scribe data as tools and resources the agent can
+call directly (requires building with the `mcp` feature):
+
+    cargo install --path . --features mcp
+    # Then add the printed config snippet to your agent's MCP configuration.
+
+---
+
 ## Contributing / Development
 
 ```sh
