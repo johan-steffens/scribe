@@ -11,7 +11,7 @@
 //! | [`slug`] | Slug generation and collision resolution |
 //! | [`project`] | [`Project`], [`ProjectStatus`], [`Projects`] trait |
 //! | [`task`] | [`Task`], [`TaskStatus`], [`TaskPriority`], [`Tasks`] trait |
-//! | [`todo`] | [`Todo`], [`Todos`] trait |
+//! | [`mod@todo`] | [`Todo`], [`Todos`] trait |
 //! | [`time_entry`] | [`TimeEntry`], [`TimeEntries`] trait |
 //! | [`capture`] | [`CaptureItem`], [`CaptureItems`] trait |
 //! | [`reminder`] | [`Reminder`], [`Reminders`] trait |

@@ -14,8 +14,10 @@ anyhow        = "1"
 chrono        = { version = "0.4", features = ["serde"] }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"
+crossterm     = { version = "0.28", features = ["event-stream"] }
 directories   = "6"
 mimalloc      = "0.1"
+ratatui       = "0.29"
 rusqlite      = { version = "0.32", features = ["bundled"] }
 rusqlite_migration = "1"
 serde         = { version = "1", features = ["derive"] }
@@ -70,3 +72,8 @@ unnecessary_safety_doc            = "warn"
 unneeded_field_pattern            = "warn"
 unused_result_ok                  = "warn"
 literal_string_with_formatting_args = "allow"
+# multiple_crate_versions is allowed because ratatui/crossterm/rusqlite bring
+# incompatible transitive versions of hashbrown, unicode-width, and windows-sys
+# that are outside our control (M-LINT-OVERRIDE-EXPECT is for code; Cargo.toml
+# uses allow for workspace-level lint suppressions).
+multiple_crate_versions             = "allow"

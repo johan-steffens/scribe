@@ -2,9 +2,8 @@
 //! Scribe application entry point.
 //!
 //! Sets the `mimalloc` global allocator, initialises structured tracing,
-//! loads configuration, opens the database, and dispatches CLI subcommands.
-//!
-//! Running with no subcommand currently prints help; the TUI is Phase 3.
+//! loads configuration, opens the database, and dispatches to either the TUI
+//! (no subcommand) or a CLI subcommand.
 
 use std::process;
 use std::sync::{Arc, Mutex};
@@ -20,6 +19,7 @@ mod db;
 mod domain;
 mod ops;
 mod store;
+mod tui;
 
 use cli::{Cli, Commands};
 use ops::{InboxOps, ProjectOps, ReminderOps, TaskOps, TodoOps, TrackerOps};
@@ -75,9 +75,8 @@ fn run() -> anyhow::Result<()> {
 
     match cli.command {
         None => {
-            // No subcommand — print help.
-            // In Phase 3 this will launch the TUI instead.
-            Cli::parse_from(["scribe", "--help"]);
+            // No subcommand — launch the TUI.
+            tui::run(Arc::clone(&conn), &config)?;
         }
         Some(Commands::Project(cmd)) => {
             cli::project::run(&cmd, &project_ops)?;
