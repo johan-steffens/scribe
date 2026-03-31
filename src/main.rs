@@ -45,7 +45,40 @@ fn main() {
 }
 
 fn run() -> anyhow::Result<()> {
+    // Intercept `scribe __complete <entity>` before clap parsing.
+    //
+    // The double-underscore prefix in `__complete` confuses the bash
+    // completion generator inside `clap_complete` (it uses `__` as a path
+    // separator internally), causing a panic when generating bash completions.
+    // By handling `__complete` here — from raw OS args — we keep it out of
+    // the clap `Cli` command tree entirely, so all five shells work correctly.
+    let mut args = std::env::args_os();
+    let _bin = args.next(); // skip argv[0]
+    if let Some(first) = args.next()
+        && first == "__complete"
+    {
+        let entity_os = args
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("__complete requires an entity argument"))?;
+        let entity_str = entity_os.to_string_lossy();
+        let entity =
+            clap::ValueEnum::from_str(&entity_str, true /* case-insensitive */).map_err(
+                |_ignored| {
+                    anyhow::anyhow!(
+                        "unknown entity '{entity_str}'; valid values: projects, tasks, todos, reminders, captures, entries",
+                    )
+                },
+            )?;
+        return cli::complete::run_complete(entity);
+    }
+
     let cli = Cli::parse();
+
+    // Handle `completions` before opening the DB — no database access needed.
+    if let Some(Commands::Completions { shell }) = &cli.command {
+        cli::complete::run_completions(*shell);
+        return Ok(());
+    }
 
     let config = config::Config::load()?;
     // Allow integration tests to inject an isolated DB path without modifying
@@ -99,6 +132,8 @@ fn run() -> anyhow::Result<()> {
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
+        // Completions is handled above before the DB opens.
+        Some(Commands::Completions { .. }) => {}
     }
 
     Ok(())

@@ -15,6 +15,7 @@
 //! ```
 
 pub mod capture;
+pub mod complete;
 pub mod inbox;
 pub mod parse;
 pub mod project;
@@ -27,6 +28,8 @@ use clap::{Parser, Subcommand};
 
 #[doc(inline)]
 pub use capture::CaptureCommand;
+#[doc(inline)]
+pub use complete::CompletionShell;
 #[doc(inline)]
 pub use inbox::InboxCommand;
 #[doc(inline)]
@@ -73,4 +76,9 @@ pub enum Commands {
     Inbox(InboxCommand),
     /// Manage reminders.
     Reminder(ReminderCommand),
+    /// Print a shell completion script for the given shell.
+    Completions {
+        /// Shell to generate completions for.
+        shell: CompletionShell,
+    },
 }
