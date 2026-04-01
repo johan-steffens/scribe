@@ -23,9 +23,10 @@ services.
   weekly reports.
 - **Quick capture** — dump a thought into the inbox with one command; process
   it later.
-- **Reminders** — scheduled reminders with OS desktop notifications; delivered
+- **Reminders** — scheduled reminders with desktop notifications; delivered
   on startup, in real time while the TUI is open, and via `scribe daemon` for
-  continuous background delivery.
+  continuous background delivery. On macOS notifications appear via Script
+  Editor (System Settings → Notifications → Script Editor to configure).
 - **TUI** — full-screen keyboard-driven interface (`scribe` with no arguments).
 - **CLI** — every operation is also a scriptable subcommand.
 - **Tab completion** — static (subcommands, flags, enum values) and dynamic
@@ -42,11 +43,14 @@ services.
 #    or install from source:
 cargo install --path .
 
-# 2. Create a project and a task
+# 2. Run the setup wizard (optional but recommended)
+scribe setup
+
+# 3. Create a project and a task
 scribe project add payments --name "Payments Integration"
 scribe task add "Fix login bug" --project payments --priority high
 
-# 3. Open the TUI
+# 4. Open the TUI
 scribe
 ```
 
@@ -273,13 +277,20 @@ scribe
 ├── inbox
 │   ├── list    [--all] [--output json]
 │   └── process <slug> [--output json]
-└── reminder
-    ├── add     --project <slug> --at <datetime> [--task <slug>] [--message <text>] [--output json]
-    ├── list    [--project <slug>] [--archived] [--output json]
-    ├── show    <slug> [--output json]
-    ├── archive <slug> [--output json]
-    ├── restore <slug> [--output json]
-    └── delete  <slug> [--output json]
+├── reminder
+│   ├── add     --project <slug> --at <datetime> [--task <slug>] [--message <text>] [--output json]
+│   ├── list    [--project <slug>] [--archived] [--output json]
+│   ├── show    <slug> [--output json]
+│   ├── archive <slug> [--output json]
+│   ├── restore <slug> [--output json]
+│   └── delete  <slug> [--output json]
+├── setup       [--wizard] [--status]
+├── service
+│   ├── install
+│   ├── uninstall
+│   └── status
+└── agent
+    └── install [--output json]
 ```
 
 Running `scribe` with no subcommand opens the TUI.
@@ -291,7 +302,8 @@ Running `scribe` with no subcommand opens the TUI.
 Scribe integrates with AI coding agents (Claude Code, OpenCode, Cursor, etc.)
 in two ways:
 
-**Skill file** — teaches the agent Scribe's commands and workflows:
+**Skill file** — teaches the agent Scribe's commands and workflows. The setup
+wizard installs this automatically, or run it manually:
 
     scribe agent install
 

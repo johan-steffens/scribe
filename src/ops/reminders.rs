@@ -25,6 +25,8 @@ pub struct CreateReminder {
     pub remind_at: DateTime<Utc>,
     /// Optional free-text message to display.
     pub message: Option<String>,
+    /// When `true`, the notification blocks until the user dismisses it.
+    pub persistent: bool,
 }
 
 /// High-level reminder operations with project and task validation.
@@ -129,6 +131,7 @@ impl ReminderOps {
             task_id,
             remind_at: params.remind_at,
             message: params.message,
+            persistent: params.persistent,
         })
     }
 
@@ -248,6 +251,7 @@ mod tests {
                 task_slug: None,
                 remind_at: future(),
                 message: Some("Deploy on Friday".to_owned()),
+                persistent: false,
             })
             .expect("create");
         assert!(r.slug.starts_with("quick-capture-reminder-"));
@@ -263,6 +267,7 @@ mod tests {
                 task_slug: None,
                 remind_at: future(),
                 message: None,
+                persistent: false,
             })
             .unwrap_err();
         assert!(err.to_string().contains("not found"));
@@ -280,6 +285,7 @@ mod tests {
                 task_id: None,
                 remind_at: past,
                 message: Some("Past".to_owned()),
+                persistent: false,
             })
             .expect("create past reminder");
 
@@ -297,6 +303,7 @@ mod tests {
                 task_slug: None,
                 remind_at: future(),
                 message: Some("Active".to_owned()),
+                persistent: false,
             })
             .expect("create");
         let err = ops.delete(&r.slug).unwrap_err();
@@ -312,6 +319,7 @@ mod tests {
                 task_slug: None,
                 remind_at: future(),
                 message: Some("Original".to_owned()),
+                persistent: false,
             })
             .expect("create");
         let updated = ops
@@ -320,6 +328,7 @@ mod tests {
                 crate::domain::ReminderPatch {
                     remind_at: None,
                     message: Some("Updated".to_owned()),
+                    persistent: None,
                 },
             )
             .expect("update");

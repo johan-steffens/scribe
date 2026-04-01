@@ -20,14 +20,23 @@ pub(super) fn handle_add(args: &ReminderAdd, ops: &ReminderOps) -> anyhow::Resul
         task_slug: args.task.clone(),
         remind_at,
         message: args.message.clone(),
+        persistent: args.persistent,
     })?;
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&reminder)?),
-        OutputFormat::Text => println!(
-            "Created reminder: {} (fires at {})",
-            reminder.slug,
-            reminder.remind_at.format("%Y-%m-%d %H:%M UTC"),
-        ),
+        OutputFormat::Text => {
+            let persistent_note = if reminder.persistent {
+                " [persistent]"
+            } else {
+                ""
+            };
+            println!(
+                "Created reminder: {} (fires at {}{})",
+                reminder.slug,
+                reminder.remind_at.format("%Y-%m-%d %H:%M UTC"),
+                persistent_note,
+            );
+        }
     }
     Ok(())
 }
@@ -57,16 +66,18 @@ pub(super) fn handle_list(
             } else {
                 for r in &reminders {
                     let fired = if r.fired { " [fired]" } else { "" };
+                    let persistent = if r.persistent { " [P]" } else { "" };
                     let archived = if r.archived_at.is_some() {
                         " [archived]"
                     } else {
                         ""
                     };
                     println!(
-                        "{:<45} {}  {}{}{}",
+                        "{:<45} {}  {}{}{}{}",
                         r.slug,
                         r.remind_at.format("%Y-%m-%d %H:%M"),
                         r.message.as_deref().unwrap_or(""),
+                        persistent,
                         fired,
                         archived,
                     );
@@ -84,19 +95,20 @@ pub(super) fn handle_show(args: &ReminderShow, ops: &ReminderOps) -> anyhow::Res
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&reminder)?),
         OutputFormat::Text => {
-            println!("slug:      {}", reminder.slug);
+            println!("slug:       {}", reminder.slug);
             println!(
-                "remind_at: {}",
+                "remind_at:  {}",
                 reminder.remind_at.format("%Y-%m-%d %H:%M UTC")
             );
-            println!("fired:     {}", reminder.fired);
-            println!("message:   {}", reminder.message.as_deref().unwrap_or("—"));
+            println!("fired:      {}", reminder.fired);
+            println!("persistent: {}", reminder.persistent);
+            println!("message:    {}", reminder.message.as_deref().unwrap_or("—"));
             println!(
-                "created:   {}",
+                "created:    {}",
                 reminder.created_at.format("%Y-%m-%d %H:%M UTC")
             );
             if let Some(at) = reminder.archived_at {
-                println!("archived:  {}", at.format("%Y-%m-%d %H:%M UTC"));
+                println!("archived:   {}", at.format("%Y-%m-%d %H:%M UTC"));
             }
         }
     }

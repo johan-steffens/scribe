@@ -9,6 +9,7 @@
 //!
 //! - **M1** — creates all six core tables and seeds the reserved
 //!   `quick-capture` project.
+//! - **M2** — adds the `persistent` column to the `reminders` table.
 
 use rusqlite_migration::M;
 
@@ -112,6 +113,18 @@ VALUES ('quick-capture', 'Quick Capture', 'active', 1,
         datetime('now'), datetime('now'));
 ";
 
+// ── migrations ─────────────────────────────────────────────────────────────
+
+// ── migrations ─────────────────────────────────────────────────────────────
+
+/// M2 — adds the `persistent` column to `reminders`.
+///
+/// `persistent = 1` causes the notification to use a blocking `display alert`
+/// on macOS (stays until the user clicks Dismiss) rather than a self-dismissing
+/// banner. Existing rows default to `0` (non-persistent).
+pub(super) const M2: &str =
+    "ALTER TABLE reminders ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0;";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -122,5 +135,5 @@ VALUES ('quick-capture', 'Quick Capture', 'active', 1,
 /// let migrations = rusqlite_migration::Migrations::new(scribe::db::migrations::all());
 /// ```
 pub(super) fn all() -> Vec<M<'static>> {
-    vec![M::up(M1)]
+    vec![M::up(M1), M::up(M2)]
 }

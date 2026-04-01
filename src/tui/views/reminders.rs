@@ -75,7 +75,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
                 let remind_at = r.remind_at.format("%Y-%m-%d %H:%M").to_string();
 
-                let message = r.message.as_deref().unwrap_or("").to_owned();
+                let message = {
+                    let raw = r.message.as_deref().unwrap_or("");
+                    if r.persistent {
+                        format!("[P] {raw}")
+                    } else {
+                        raw.to_owned()
+                    }
+                };
 
                 vec![r.slug.clone(), project_slug, task_slug, remind_at, message]
             })

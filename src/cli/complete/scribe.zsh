@@ -145,6 +145,7 @@ _scribe() {
         '--at=[When to fire]:at: ' \
         '--task=[Task slug]:task:_scribe_complete_tasks' \
         '--message=[Message]:message: ' \
+        '--persistent[Stay until dismissed (blocking alert)]' \
         '--output=[Output format]:format:(text json)' ;;
     (list)
       _arguments \
@@ -222,6 +223,9 @@ _scribe() {
     'capture:Quickly capture a thought into the inbox'
     'inbox:Manage the quick-capture inbox'
     'reminder:Manage reminders'
+    'setup:First-run wizard and setup status'
+    'service:Manage the background daemon service'
+    'daemon:Run the background reminder daemon'
     'agent:Install skill files for AI coding agents'
     'completions:Print a shell completion script'
     'help:Print help'
@@ -289,6 +293,21 @@ _scribe() {
       fi ;;
     (agent)
       _arguments '--output=[Output format]:format:(text json)' ;;
+    (setup)
+      _arguments \
+        '--wizard[Always run the interactive wizard]' \
+        '--status[Show setup status and exit]' ;;
+    (service)
+      if (( CURRENT == 1 )); then
+        local -a s; s=(
+          'install:Install and start the background daemon service'
+          'uninstall:Stop and remove the background daemon service'
+          'status:Show whether the daemon service is installed'
+        )
+        _describe -t commands 'service subcommands' s
+      fi ;;
+    (daemon)
+      _arguments '--interval=[Polling interval in seconds]:seconds: ' ;;
     (completions)
       _values 'shell' bash zsh fish elvish powershell ;;
     esac ;;

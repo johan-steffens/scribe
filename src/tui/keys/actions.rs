@@ -161,6 +161,9 @@ fn exec_create_reminder(app: &App, form: &Form) -> anyhow::Result<()> {
     } else {
         Some(message_raw.to_owned())
     };
+    // DOCUMENTED-MAGIC: field 3 is the "Notification style" Select:
+    // index 0 = Banner (persistent = false), index 1 = Alert (persistent = true).
+    let persistent = form.select_index(3) == 1;
     let remind_at = super::helpers::parse_datetime(&remind_at_raw)?;
     ReminderOps::new(Arc::clone(&app.db))
         .create(CreateReminder {
@@ -168,6 +171,7 @@ fn exec_create_reminder(app: &App, form: &Form) -> anyhow::Result<()> {
             task_slug: None,
             remind_at,
             message,
+            persistent,
         })
         .map(|_| ())
 }
@@ -185,8 +189,17 @@ fn exec_edit_reminder(app: &App, form: &Form, slug: &str) -> anyhow::Result<()> 
     } else {
         Some(super::helpers::parse_datetime(&remind_at_raw)?)
     };
+    // DOCUMENTED-MAGIC: field 2 is "Notification style": 0=Banner, 1=Alert.
+    let persistent = Some(form.select_index(2) == 1);
     ReminderOps::new(Arc::clone(&app.db))
-        .update(slug, crate::domain::ReminderPatch { remind_at, message })
+        .update(
+            slug,
+            crate::domain::ReminderPatch {
+                remind_at,
+                message,
+                persistent,
+            },
+        )
         .map(|_| ())
 }
 

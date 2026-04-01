@@ -6,25 +6,31 @@
 complete -c scribe -f
 
 # ── top-level subcommands ─────────────────────────────────────────────────────
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a project    -d 'Manage projects'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a task       -d 'Manage tasks'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a todo       -d 'Manage todos'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a track      -d 'Time tracking'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a capture    -d 'Quickly capture a thought into the inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a inbox      -d 'Manage the quick-capture inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a reminder   -d 'Manage reminders'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
+  -a setup      -d 'First-run wizard and setup status'
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
+  -a service    -d 'Manage the background daemon service'
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
+  -a daemon     -d 'Run the background reminder daemon'
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a agent      -d 'Install skill files for AI coding agents'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a completions -d 'Print a shell completion script for the given shell'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon agent completions help' \
   -a help       -d 'Print this message or the help of the given subcommand(s)'
 
 # ── global flags ──────────────────────────────────────────────────────────────
@@ -347,6 +353,8 @@ complete -c scribe -n '__fish_seen_subcommand_from reminder; and __fish_seen_sub
 complete -c scribe -n '__fish_seen_subcommand_from reminder; and __fish_seen_subcommand_from add' \
   -l message -d 'Optional message text' -r
 complete -c scribe -n '__fish_seen_subcommand_from reminder; and __fish_seen_subcommand_from add' \
+  -l persistent -d 'Stay until dismissed (blocking alert on macOS)'
+complete -c scribe -n '__fish_seen_subcommand_from reminder; and __fish_seen_subcommand_from add' \
   -l output  -d 'Output format' -r -a 'text json'
 
 # reminder list
@@ -387,6 +395,24 @@ complete -c scribe -n '__fish_seen_subcommand_from agent; and not __fish_seen_su
 
 complete -c scribe -n '__fish_seen_subcommand_from agent; and __fish_seen_subcommand_from install' \
   -l output -d 'Output format' -r -a 'text json'
+
+# ── setup ─────────────────────────────────────────────────────────────────────
+complete -c scribe -n '__fish_seen_subcommand_from setup' \
+  -l wizard  -d 'Always run the interactive wizard'
+complete -c scribe -n '__fish_seen_subcommand_from setup' \
+  -l status  -d 'Show setup status and exit'
+
+# ── service subcommands ───────────────────────────────────────────────────────
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status help' \
+  -a install   -d 'Install and start the background daemon service'
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status help' \
+  -a uninstall -d 'Stop and remove the background daemon service'
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status help' \
+  -a status    -d 'Show whether the daemon service is installed'
+
+# ── daemon ────────────────────────────────────────────────────────────────────
+complete -c scribe -n '__fish_seen_subcommand_from daemon' \
+  -l interval -s i -d 'Polling interval in seconds' -r
 
 # ── completions ───────────────────────────────────────────────────────────────
 complete -c scribe -n '__fish_seen_subcommand_from completions' \

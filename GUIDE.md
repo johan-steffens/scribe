@@ -520,15 +520,23 @@ Reminders are delivered as OS desktop notifications in three situations:
 
 1. **On any `scribe` invocation** — at startup Scribe runs `check_due`, which
    queries for all reminders with `remind_at <= now` and `fired = false`,
-   marks them `fired = true`, and sends an OS desktop notification for each
-   one.
+   marks them `fired = true`, and sends a desktop notification for each one.
 
 2. **While the TUI is open** — a background thread polls `check_due` every
    30 seconds and fires notifications in real time without requiring a restart.
 
-3. **Via `scribe daemon`** — a long-running background process (suitable for
-   launchd on macOS or systemd on Linux) that polls every 30 seconds
-   continuously, even when the TUI is not open.
+3. **Via `scribe daemon`** — a long-running background process that polls
+   every 30 seconds continuously, even when the TUI is not open.
+
+On **macOS** notifications are delivered via `osascript` and appear attributed
+to **Script Editor** in Notification Centre. To ensure they are visible, go to
+**System Settings → Notifications → Script Editor** and set the alert style to
+Banners or Alerts.
+
+On **Linux** notifications are delivered over D-Bus (requires a notification
+daemon such as `dunst`, which ships with most desktop environments).
+
+On **Windows** notifications are delivered via WinRT.
 
 Fired reminders remain visible in `scribe reminder list` until archived.
 
@@ -545,57 +553,37 @@ scribe reminder delete payments-reminder-deploy-the-stripe-integration
 
 ### Running the background daemon
 
-`scribe daemon` is a long-running process that polls for due reminders and
-fires OS desktop notifications, independent of the TUI.
+For automatic notification delivery, install the daemon as a system service
+using `scribe setup` (recommended) or `scribe service install`:
 
 ```sh
-# Start with the default 30-second polling interval
+# First-run wizard — offers daemon service and agent integration
+scribe setup
+
+# Or install the daemon service directly
+scribe service install
+
+# Check current service status
+scribe service status
+
+# Remove the service
+scribe service uninstall
+```
+
+`scribe service install` writes a launchd user agent (macOS) or systemd user
+unit (Linux), loads it immediately, and records the installation in
+`~/.config/scribe/config.toml` so `scribe setup` can report it. No `sudo` is
+required on either platform.
+
+You can also run the daemon manually in a terminal (useful for testing):
+
+```sh
+# Default 30-second polling interval
 scribe daemon
 
-# Use a custom interval (seconds)
-scribe daemon --interval 60
+# Shorter interval for testing
+scribe daemon --interval 10
 ```
-
-**launchd (macOS)**
-
-Create `~/Library/LaunchAgents/com.scribe.daemon.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>             <string>com.scribe.daemon</string>
-  <key>ProgramArguments</key>  <array>
-                                 <string>/path/to/scribe</string>
-                                 <string>daemon</string>
-                               </array>
-  <key>RunAtLoad</key>         <true/>
-  <key>KeepAlive</key>         <true/>
-</dict>
-</plist>
-```
-
-Load it with `launchctl load ~/Library/LaunchAgents/com.scribe.daemon.plist`.
-
-**systemd (Linux)**
-
-Create `~/.config/systemd/user/scribe-daemon.service`:
-
-```ini
-[Unit]
-Description=Scribe reminder daemon
-
-[Service]
-ExecStart=/path/to/scribe daemon
-Restart=always
-
-[Install]
-WantedBy=default.target
-```
-
-Enable with `systemctl --user enable --now scribe-daemon`.
 
 ---
 

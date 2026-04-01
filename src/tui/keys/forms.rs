@@ -97,6 +97,14 @@ pub(super) fn build_create_form(app: &App) -> Option<(Form, FormContext)> {
                         placeholder: "Reminder message…".into(),
                         cursor: 0,
                     },
+                    FormField::Select {
+                        label: "Notification style".into(),
+                        options: vec![
+                            "Banner (auto-dismiss)".into(),
+                            "Alert (stay until dismissed)".into(),
+                        ],
+                        selected: 0,
+                    },
                 ],
             ),
             FormContext::CreateReminder,
@@ -214,6 +222,8 @@ pub(super) fn build_edit_form(app: &App) -> Option<(Form, FormContext)> {
             let remind_at = reminder.remind_at.format("%Y-%m-%d %H:%M").to_string();
             let message = reminder.message.clone().unwrap_or_default();
             let cursor = remind_at.len();
+            // DOCUMENTED-MAGIC: persistent index 1 = "Alert (stay until dismissed)".
+            let persistent_selected = usize::from(reminder.persistent);
             Some((
                 Form::new(
                     "Edit Reminder",
@@ -229,6 +239,14 @@ pub(super) fn build_edit_form(app: &App) -> Option<(Form, FormContext)> {
                             value: message.clone(),
                             placeholder: String::new(),
                             cursor: message.len(),
+                        },
+                        FormField::Select {
+                            label: "Notification style".into(),
+                            options: vec![
+                                "Banner (auto-dismiss)".into(),
+                                "Alert (stay until dismissed)".into(),
+                            ],
+                            selected: persistent_selected,
                         },
                     ],
                 ),

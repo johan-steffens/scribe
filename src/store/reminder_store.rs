@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 
 use crate::domain::{
     NewReminder, ProjectId, Reminder, ReminderId, ReminderPatch, Reminders, TaskId,
@@ -14,7 +14,7 @@ use crate::domain::{
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
 const SELECT_COLS: &str =
-    "id, slug, project_id, task_id, remind_at, message, fired, archived_at, created_at";
+    "id, slug, project_id, task_id, remind_at, message, fired, persistent, archived_at, created_at";
 
 struct RawRow {
     id: i64,
@@ -24,6 +24,7 @@ struct RawRow {
     remind_at: String,
     message: Option<String>,
     fired: bool,
+    persistent: bool,
     archived_at: Option<String>,
     created_at: String,
 }
@@ -37,8 +38,9 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
         remind_at: row.get(4)?,
         message: row.get(5)?,
         fired: row.get::<_, i64>(6)? != 0,
-        archived_at: row.get(7)?,
-        created_at: row.get(8)?,
+        persistent: row.get::<_, i64>(7)? != 0,
+        archived_at: row.get(8)?,
+        created_at: row.get(9)?,
     })
 }
 
@@ -52,6 +54,7 @@ impl RawRow {
             remind_at: parse_dt(&self.remind_at)?,
             message: self.message,
             fired: self.fired,
+            persistent: self.persistent,
             archived_at: parse_dt_opt(self.archived_at)?,
             created_at: parse_dt(&self.created_at)?,
         })
@@ -107,14 +110,15 @@ impl Reminders for SqliteReminders {
         let now = Utc::now().to_rfc3339();
         conn.execute(
             "INSERT INTO reminders \
-             (slug, project_id, task_id, remind_at, message, fired, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
+             (slug, project_id, task_id, remind_at, message, fired, persistent, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7)",
             params![
                 reminder.slug,
                 reminder.project_id.0,
                 reminder.task_id.map(|t| t.0),
                 reminder.remind_at.to_rfc3339(),
                 reminder.message,
+                reminder.persistent as i64,
                 now,
             ],
         )?;
@@ -212,6 +216,10 @@ impl Reminders for SqliteReminders {
             sets.push(format!("message = ?{}", sets.len() + 1));
             values.push(msg.clone());
         }
+        if let Some(p) = patch.persistent {
+            sets.push(format!("persistent = ?{}", sets.len() + 1));
+            values.push((p as i64).to_string());
+        }
 
         if sets.is_empty() {
             // Nothing to update — reload and return.
@@ -285,6 +293,7 @@ mod tests {
             task_id: None,
             remind_at: Utc::now(),
             message: Some("Reminder message".to_owned()),
+            persistent: false,
         }
     }
 

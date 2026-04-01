@@ -34,6 +34,12 @@ pub struct Reminder {
     pub message: Option<String>,
     /// Whether the reminder has already fired.
     pub fired: bool,
+    /// When `true`, the notification blocks until the user dismisses it.
+    ///
+    /// On macOS this uses `display alert` (modal) instead of
+    /// `display notification` (banner). On other platforms `notify-rust`
+    /// is used regardless — persistent has no effect there yet.
+    pub persistent: bool,
     /// Timestamp when archived; `None` means the reminder is active.
     pub archived_at: Option<DateTime<Utc>>,
     /// Creation timestamp (UTC).
@@ -144,6 +150,8 @@ pub struct NewReminder {
     pub remind_at: DateTime<Utc>,
     /// Optional message text.
     pub message: Option<String>,
+    /// Whether the notification should block until dismissed.
+    pub persistent: bool,
 }
 
 /// Partial update for mutable reminder fields.
@@ -153,4 +161,6 @@ pub struct ReminderPatch {
     pub remind_at: Option<DateTime<Utc>>,
     /// New message text, if changing.
     pub message: Option<String>,
+    /// Change the persistent flag, if desired.
+    pub persistent: Option<bool>,
 }

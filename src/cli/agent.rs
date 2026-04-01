@@ -14,12 +14,13 @@
 //! | Codex | `~/.codex/` |
 //! | Windsurf | `~/.windsurf/rules/` |
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
 
 use crate::cli::project::OutputFormat;
+use crate::cli::service::home_dir;
 
 // ── Clap argument structs ──────────────────────────────────────────────────
 
@@ -372,29 +373,20 @@ fn opencode_mcp_snippet() -> &'static str {
 
 // ── Runner ─────────────────────────────────────────────────────────────────
 
-/// Resolves the home directory, returning an error when it cannot be found.
-///
-/// # Errors
-///
-/// Returns an error when the home directory cannot be determined (e.g. no
-/// `HOME` environment variable set).
-fn home_dir() -> anyhow::Result<PathBuf> {
-    directories::UserDirs::new()
-        .map(|u| u.home_dir().to_owned())
-        .ok_or_else(|| anyhow::anyhow!("could not determine home directory"))
-}
-
 /// Executes `scribe agent install` and prints results to stdout.
 ///
 /// Iterates over [`AGENT_TARGETS`], checks whether each skill directory
 /// exists, writes the skill file when it does, and prints a summary line.
 /// With `--output json` emits a JSON array instead.
 ///
+/// `config` is mutated to record that agent install completed so that
+/// `scribe setup` can reflect the state.
+///
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be found or if a file-system
 /// write fails.
-pub fn run(args: &AgentInstallArgs) -> anyhow::Result<()> {
+pub fn run(args: &AgentInstallArgs, config: &mut crate::config::Config) -> anyhow::Result<()> {
     let home = home_dir()?;
     let content = skill_content();
 
@@ -414,6 +406,14 @@ pub fn run(args: &AgentInstallArgs) -> anyhow::Result<()> {
             print_text_results(&results);
             print_mcp_snippets();
         }
+    }
+
+    // Mark agent as installed in config (at least one install succeeded).
+    let any_installed = results.iter().any(|r| r.status == "installed");
+    if any_installed {
+        config.setup.agent_installed = true;
+        // Best-effort save — failure is non-fatal.
+        let _ = config.save();
     }
 
     Ok(())

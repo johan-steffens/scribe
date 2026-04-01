@@ -83,15 +83,27 @@ fn run() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // `scribe agent install` also needs no DB access.
+    // Load config — needed by setup, service, and agent commands.
+    let mut config = config::Config::load()?;
+
+    // `scribe setup` — wizard / status, no DB access needed.
+    if let Some(Commands::Setup(ref args)) = cli.command {
+        return cli::setup::run(args, &mut config);
+    }
+
+    // `scribe service <cmd>` — no DB access needed.
+    if let Some(Commands::Service { command: ref cmd }) = cli.command {
+        return cli::service::run(cmd, &mut config);
+    }
+
+    // `scribe agent install` — no DB access needed.
     if let Some(Commands::Agent {
         command: cli::AgentCommand::Install(ref args),
     }) = cli.command
     {
-        return cli::agent::run(args);
+        return cli::agent::run(args, &mut config);
     }
 
-    let config = config::Config::load()?;
     // Allow integration tests to inject an isolated DB path without modifying
     // the user's real database. SCRIBE_TEST_DB is read only when present.
     let db_path = if let Ok(p) = std::env::var("SCRIBE_TEST_DB") {
@@ -147,10 +159,11 @@ fn run() -> anyhow::Result<()> {
         Some(Commands::Daemon { interval }) => {
             cli::daemon::run(Arc::clone(&conn), interval)?;
         }
-        // Agent install is handled above before the DB opens.
-        Some(Commands::Agent { .. }) => {}
-        // Completions is handled above before the DB opens.
-        Some(Commands::Completions { .. }) => {}
+        // Handled above before the DB opens.
+        Some(Commands::Setup(_))
+        | Some(Commands::Service { .. })
+        | Some(Commands::Agent { .. })
+        | Some(Commands::Completions { .. }) => {}
         #[cfg(feature = "mcp")]
         Some(Commands::Mcp) => {
             mcp::run(&conn, &config)?;

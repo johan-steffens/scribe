@@ -184,6 +184,10 @@ pub struct ReminderCreateParams {
     pub task_slug: Option<String>,
     /// Optional message text.
     pub message: Option<String>,
+    /// When `true`, the notification blocks until the user dismisses it.
+    ///
+    /// On macOS uses `display alert` (modal). Defaults to `false` (banner).
+    pub persistent: Option<bool>,
 }
 
 /// Parameters for `reminder_archive`.
@@ -698,6 +702,7 @@ impl ScribeMcpServer {
             task_slug: p.task_slug,
             remind_at,
             message: p.message,
+            persistent: p.persistent.unwrap_or(false),
         }) {
             Ok(reminder) => to_json(&reminder),
             Err(e) => err_json(e),

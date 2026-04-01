@@ -22,6 +22,8 @@ pub mod inbox;
 pub mod parse;
 pub mod project;
 pub mod reminder;
+pub mod service;
+pub mod setup;
 pub mod task;
 pub mod todo;
 pub mod track;
@@ -40,6 +42,10 @@ pub use inbox::InboxCommand;
 pub use project::ProjectCommand;
 #[doc(inline)]
 pub use reminder::ReminderCommand;
+#[doc(inline)]
+pub use service::ServiceCommand;
+#[doc(inline)]
+pub use setup::SetupArgs;
 #[doc(inline)]
 pub use task::TaskCommand;
 #[doc(inline)]
@@ -88,6 +94,18 @@ pub enum Commands {
         /// Polling interval in seconds (default: 30).
         #[arg(long, short = 'i')]
         interval: Option<u64>,
+    },
+    /// Configure Scribe features interactively (first-run wizard).
+    ///
+    /// On first run, presents a wizard to set up optional features such as
+    /// the background notification daemon and AI agent integration.
+    /// On subsequent runs, shows the current setup status.
+    Setup(SetupArgs),
+    /// Manage the background reminder notification daemon service.
+    Service {
+        /// Service subcommand.
+        #[command(subcommand)]
+        command: ServiceCommand,
     },
     /// Install skill files for AI coding agents.
     Agent {

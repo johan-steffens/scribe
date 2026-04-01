@@ -55,6 +55,11 @@ pub struct ReminderAdd {
     /// Optional message text.
     #[arg(long)]
     pub message: Option<String>,
+    /// Use a blocking alert that stays until dismissed (macOS: `display alert`).
+    ///
+    /// Without this flag the notification auto-dismisses after a few seconds.
+    #[arg(long)]
+    pub persistent: bool,
     /// Output format.
     #[arg(long, default_value = "text")]
     pub output: OutputFormat,

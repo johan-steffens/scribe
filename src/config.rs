@@ -1,9 +1,10 @@
 // Rust guideline compliant 2026-02-21
-//! Configuration loading from XDG-compliant paths.
+//! Configuration loading and saving from XDG-compliant paths.
 //!
-//! This module reads `config.toml` from `$XDG_CONFIG_HOME/scribe/` (falling
-//! back to `~/.config/scribe/`) and provides helpers for resolving runtime
-//! paths such as the database file location.
+//! This module reads and writes `config.toml` from
+//! `$XDG_CONFIG_HOME/scribe/` (falling back to `~/.config/scribe/`) and
+//! provides helpers for resolving runtime paths such as the database file
+//! location.
 //!
 //! # Example
 //!
@@ -59,6 +60,20 @@ impl Default for DisplayConfig {
     }
 }
 
+/// Raw `[setup]` section as it appears in `config.toml`.
+///
+/// Tracks which optional setup steps the user has completed so that
+/// `scribe setup` can report status and skip already-done steps.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub(crate) struct SetupConfig {
+    /// Whether the background daemon service has been installed.
+    #[serde(default)]
+    pub daemon_service_installed: bool,
+    /// Whether the agent skill files have been installed.
+    #[serde(default)]
+    pub agent_installed: bool,
+}
+
 /// Raw top-level structure parsed from `config.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct RawConfig {
@@ -68,6 +83,8 @@ struct RawConfig {
     notifications: NotificationsConfig,
     #[serde(default)]
     display: DisplayConfig,
+    #[serde(default)]
+    setup: SetupConfig,
 }
 
 // ── public Config ──────────────────────────────────────────────────────────
@@ -75,7 +92,8 @@ struct RawConfig {
 /// Application configuration loaded from `$XDG_CONFIG_HOME/scribe/config.toml`.
 ///
 /// All fields have sensible defaults so the config file is entirely optional.
-/// Call [`Config::load`] to obtain an instance.
+/// Call [`Config::load`] to obtain an instance, and [`Config::save`] to
+/// persist changes back to disk.
 ///
 /// # Examples
 ///
@@ -90,17 +108,16 @@ pub struct Config {
     /// Explicit database path override from the config file, if any.
     pub db_path: Option<PathBuf>,
     /// Whether desktop notifications are enabled.
-    // Phase 2+: used by the notification subsystem (not yet implemented).
     #[allow(dead_code, reason = "used in Phase 2 notification subsystem")]
     pub notifications_enabled: bool,
     /// `strftime`-compatible date format string (e.g. `"%Y-%m-%d"`).
-    // Phase 2+: used by TUI/CLI display formatting.
     #[allow(dead_code, reason = "used in Phase 2 display formatting")]
     pub date_format: String,
     /// `strftime`-compatible time format string (e.g. `"%H:%M"`).
-    // Phase 2+: used by TUI/CLI display formatting.
     #[allow(dead_code, reason = "used in Phase 2 display formatting")]
     pub time_format: String,
+    /// Setup completion state — written by `scribe setup` and `scribe service`.
+    pub setup: SetupConfig,
 }
 
 impl Default for Config {
@@ -114,13 +131,14 @@ impl Config {
     /// Loads configuration from disk, returning defaults when the file is absent.
     ///
     /// The config file is looked up at `$XDG_CONFIG_HOME/scribe/config.toml`,
-    /// falling back to `~/.config/scribe/config.toml` when the env var is unset.
-    /// If the file does not exist, all values revert to their defaults — this is
-    /// not treated as an error.
+    /// falling back to `~/.config/scribe/config.toml` when the env var is
+    /// unset. If the file does not exist, all values revert to their defaults
+    /// — this is not treated as an error.
     ///
     /// # Errors
     ///
-    /// Returns an error if the file exists but cannot be read or contains invalid TOML.
+    /// Returns an error if the file exists but cannot be read or contains
+    /// invalid TOML.
     ///
     /// # Examples
     ///
@@ -147,6 +165,41 @@ impl Config {
             "config loaded",
         );
         Ok(Self::from_raw(raw))
+    }
+
+    /// Persists the current configuration to disk.
+    ///
+    /// Creates the parent directory if it does not exist. The file is written
+    /// atomically: a complete TOML document is serialised and written in one
+    /// `fs::write` call.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created, the TOML cannot
+    /// be serialised, or the file cannot be written.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use scribe::config::Config;
+    ///
+    /// let mut cfg = Config::load().unwrap();
+    /// cfg.setup.daemon_service_installed = true;
+    /// cfg.save().unwrap();
+    /// ```
+    pub fn save(&self) -> anyhow::Result<()> {
+        let path = config_file_path();
+
+        // Ensure parent directory exists.
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let raw = self.to_raw();
+        let text = toml::to_string_pretty(&raw)?;
+        std::fs::write(&path, text)?;
+        tracing::debug!(config.path = %path.display(), "config saved");
+        Ok(())
     }
 
     /// Returns the effective database file path.
@@ -184,6 +237,26 @@ impl Config {
             notifications_enabled: raw.notifications.enabled,
             date_format: raw.display.date_format,
             time_format: raw.display.time_format,
+            setup: raw.setup,
+        }
+    }
+
+    fn to_raw(&self) -> RawConfig {
+        RawConfig {
+            data: DataConfig {
+                db_path: self
+                    .db_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().into_owned()),
+            },
+            notifications: NotificationsConfig {
+                enabled: self.notifications_enabled,
+            },
+            display: DisplayConfig {
+                date_format: self.date_format.clone(),
+                time_format: self.time_format.clone(),
+            },
+            setup: self.setup.clone(),
         }
     }
 }
@@ -191,7 +264,7 @@ impl Config {
 // ── path helpers ───────────────────────────────────────────────────────────
 
 /// Returns `$XDG_CONFIG_HOME/scribe/config.toml`.
-fn config_file_path() -> PathBuf {
+pub(crate) fn config_file_path() -> PathBuf {
     if let Some(dirs) = ProjectDirs::from("", "", "scribe") {
         dirs.config_dir().join("config.toml")
     } else {
@@ -222,6 +295,8 @@ mod tests {
         assert!(cfg.notifications_enabled);
         assert_eq!(cfg.date_format, "%Y-%m-%d");
         assert_eq!(cfg.time_format, "%H:%M");
+        assert!(!cfg.setup.daemon_service_installed);
+        assert!(!cfg.setup.agent_installed);
     }
 
     #[test]
@@ -231,6 +306,7 @@ mod tests {
             notifications_enabled: true,
             date_format: "%Y-%m-%d".to_owned(),
             time_format: "%H:%M".to_owned(),
+            setup: SetupConfig::default(),
         };
         assert_eq!(cfg.db_path(), PathBuf::from("/tmp/test.db"));
     }
@@ -239,7 +315,6 @@ mod tests {
     fn test_db_path_returns_xdg_default_when_unset() {
         let cfg = Config::default();
         let db = cfg.db_path();
-        // Must end with scribe.db
         assert_eq!(db.file_name().and_then(|n| n.to_str()), Some("scribe.db"));
     }
 
@@ -249,5 +324,16 @@ mod tests {
         raw.data.db_path = Some(String::new());
         let cfg = Config::from_raw(raw);
         assert!(cfg.db_path.is_none());
+    }
+
+    #[test]
+    fn test_round_trip_preserves_setup_state() {
+        let mut cfg = Config::default();
+        cfg.setup.daemon_service_installed = true;
+        cfg.setup.agent_installed = true;
+        let raw = cfg.to_raw();
+        let restored = Config::from_raw(raw);
+        assert!(restored.setup.daemon_service_installed);
+        assert!(restored.setup.agent_installed);
     }
 }
