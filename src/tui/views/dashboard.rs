@@ -10,11 +10,11 @@
 //! This is a pure rendering function; no state is mutated here.
 
 use chrono::{Duration, Local};
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::Frame;
 
 use crate::domain::task::TaskPriority;
 use crate::domain::task::TaskStatus;

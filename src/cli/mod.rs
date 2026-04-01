@@ -17,6 +17,7 @@
 pub mod agent;
 pub mod capture;
 pub mod complete;
+pub mod daemon;
 pub mod inbox;
 pub mod parse;
 pub mod project;
@@ -79,6 +80,15 @@ pub enum Commands {
     Inbox(InboxCommand),
     /// Manage reminders.
     Reminder(ReminderCommand),
+    /// Run the background reminder notification daemon.
+    ///
+    /// Polls for due reminders and fires OS desktop notifications.
+    /// Intended to be registered with launchd (macOS) or systemd (Linux).
+    Daemon {
+        /// Polling interval in seconds (default: 30).
+        #[arg(long, short = 'i')]
+        interval: Option<u64>,
+    },
     /// Install skill files for AI coding agents.
     Agent {
         /// Agent subcommand.

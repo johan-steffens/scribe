@@ -27,11 +27,11 @@
 mod render;
 
 use crossterm::event::{KeyCode, KeyModifiers};
-use ratatui::Frame;
 use ratatui::layout::{Margin, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::Frame;
 
 use render::{build_field_layout, centred_form_rect, handle_text_key, render_field};
 

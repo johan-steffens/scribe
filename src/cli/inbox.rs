@@ -8,8 +8,8 @@
 use clap::{Args, Subcommand};
 
 use crate::cli::project::OutputFormat;
-use crate::ops::InboxOps;
 use crate::ops::inbox::ProcessAction;
+use crate::ops::InboxOps;
 
 use std::io::{BufRead, Write};
 

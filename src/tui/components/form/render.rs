@@ -5,11 +5,11 @@
 //! manageable. All functions operate on ratatui primitives.
 
 use crossterm::event::KeyCode;
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, ListState, Paragraph};
+use ratatui::Frame;
 
 use super::FormField;
 

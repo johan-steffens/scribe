@@ -8,11 +8,11 @@
 //! This is a pure rendering function; it holds no state.
 
 use chrono::Duration;
-use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use ratatui::Frame;
 
 use crate::domain::TimeEntry;
 use crate::tui::app::{App, InputMode};

@@ -138,7 +138,11 @@ fn next_weekday(weekday: Weekday) -> NaiveDate {
     let days_ahead = {
         let diff =
             i64::from(weekday.num_days_from_monday()) - i64::from(today_wd.num_days_from_monday());
-        if diff <= 0 { diff + 7 } else { diff }
+        if diff <= 0 {
+            diff + 7
+        } else {
+            diff
+        }
     };
     today + Duration::days(days_ahead)
 }

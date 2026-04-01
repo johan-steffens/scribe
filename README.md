@@ -1,7 +1,7 @@
 # Scribe
 
 <p align="center">
-  <img src=".github/assets/scribe-logo.png" alt="Scribe logo" width="250" />
+  <img src=".github/assets/scribe-logo.png" alt="Scribe logo" width="400" />
 </p>
 
 Scribe is a personal productivity tool for the terminal. It keeps projects,
@@ -23,8 +23,9 @@ services.
   weekly reports.
 - **Quick capture** — dump a thought into the inbox with one command; process
   it later.
-- **Reminders** — scheduled reminders checked on every startup, with flexible
-  datetime input.
+- **Reminders** — scheduled reminders with OS desktop notifications; delivered
+  on startup, in real time while the TUI is open, and via `scribe daemon` for
+  continuous background delivery.
 - **TUI** — full-screen keyboard-driven interface (`scribe` with no arguments).
 - **CLI** — every operation is also a scriptable subcommand.
 - **Tab completion** — static (subcommands, flags, enum values) and dynamic
@@ -37,7 +38,8 @@ services.
 ## Quick Start
 
 ```sh
-# 1. Install from source
+# 1. Download the binary for your platform (see Installation below)
+#    or install from source:
 cargo install --path .
 
 # 2. Create a project and a task
@@ -52,15 +54,50 @@ scribe
 
 ## Installation
 
-### From source
+### Pre-built binary (recommended)
+
+Download the latest binary from the
+[Releases page](https://github.com/JohanSteffens_capitec/scribe/releases/latest),
+make it executable, and move it onto your `$PATH`:
 
 ```sh
-git clone https://github.com/your-org/scribe.git
+# macOS (Apple Silicon)
+curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-macos-aarch64
+chmod +x scribe && sudo mv scribe /usr/local/bin/
+
+# macOS (Intel)
+curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-macos-x86_64
+chmod +x scribe && sudo mv scribe /usr/local/bin/
+
+# Linux (x86_64)
+curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-linux-x86_64
+chmod +x scribe && sudo mv scribe /usr/local/bin/
+```
+
+Pre-built binaries include the MCP server feature (`scribe mcp`).
+
+Verify the download against the published checksums:
+
+```sh
+curl -Lo SHA256SUMS.txt https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/SHA256SUMS.txt
+sha256sum --check --ignore-missing SHA256SUMS.txt
+```
+
+### From source
+
+Requires Rust 1.85 or later (stable, edition 2024).
+
+```sh
+git clone https://github.com/JohanSteffens_capitec/scribe.git
 cd scribe
 cargo install --path .
 ```
 
-Requires Rust 1.77 or later (stable).
+To include the MCP server:
+
+```sh
+cargo install --path . --features mcp
+```
 
 ### Shell completions
 
@@ -112,7 +149,7 @@ not exist all defaults apply.
 db_path = ""
 
 [notifications]
-# Whether to fire desktop notifications for due reminders (Phase 5).
+# Whether to fire desktop notifications for due reminders.
 enabled = true
 
 [display]

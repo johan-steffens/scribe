@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.0.0)"
+        required: true
+        type: string
+
+# Only allow this workflow to run against main.
+# The job-level `if` below provides the enforcement with a clear failure
+# message rather than a silent no-op.
+jobs:
+  preflight:
+    name: Preflight checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - name: Enforce main branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::This workflow may only be run from the main branch (got ${{ github.ref }})."
+          exit 1
+
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version must be in MAJOR.MINOR.PATCH format (got '$VERSION')."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build — ${{ matrix.target }}
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 (static musl — no glibc dependency)
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: scribe-linux-x86_64
+
+          # macOS Apple Silicon
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: scribe-macos-aarch64
+
+          # macOS Intel
+          - target: x86_64-apple-darwin
+            os: macos-13
+            artifact: scribe-macos-x86_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl tools (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y musl-tools
+
+      - name: Cache Cargo registry and build artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ matrix.target }}-cargo-
+
+      - name: Set version in Cargo.toml
+        # Stamps the release version into the manifest so the binary reports
+        # the correct version via `scribe --version`.
+        run: |
+          sed -i.bak 's/^version = ".*"/version = "${{ needs.preflight.outputs.version }}"/' Cargo.toml
+          rm -f Cargo.toml.bak
+
+      - name: Build release binary (with MCP feature)
+        run: |
+          cargo build \
+            --release \
+            --locked \
+            --features mcp \
+            --target ${{ matrix.target }}
+
+      - name: Rename binary
+        run: |
+          cp target/${{ matrix.target }}/release/scribe ${{ matrix.artifact }}
+
+      - name: Upload binary artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          retention-days: 1
+
+  release:
+    name: Create GitHub Release
+    needs: [preflight, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main (for release notes context)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download all build artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Flatten artefact directories
+        # download-artifact@v4 creates one subdirectory per artefact name.
+        run: |
+          find dist/ -type f -exec mv {} dist/ \;
+          find dist/ -type d -empty -delete
+          ls -lh dist/
+
+      - name: Generate SHA-256 checksums
+        working-directory: dist
+        run: |
+          sha256sum scribe-linux-x86_64 scribe-macos-aarch64 scribe-macos-x86_64 \
+            > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.preflight.outputs.version }}
+          name: v${{ needs.preflight.outputs.version }}
+          body: |
+            ## Installation
+
+            Download the binary for your platform, make it executable, and move it onto your `$PATH`.
+
+            ```sh
+            # macOS (Apple Silicon)
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-macos-aarch64
+            chmod +x scribe && sudo mv scribe /usr/local/bin/
+
+            # macOS (Intel)
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-macos-x86_64
+            chmod +x scribe && sudo mv scribe /usr/local/bin/
+
+            # Linux (x86_64)
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-linux-x86_64
+            chmod +x scribe && sudo mv scribe /usr/local/bin/
+            ```
+
+            ## Shell completions
+
+            ```sh
+            # zsh
+            scribe completions zsh > ~/.zfunc/_scribe
+
+            # zsh with Zim
+            scribe completions zsh >! ~/.zim/modules/zsh-completions/src/_scribe
+            rm -f ~/.zcompdump ~/.zcompdump.dat ~/.zcompdump.zwc && zimfw build
+
+            # fish
+            scribe completions fish > ~/.config/fish/completions/scribe.fish
+
+            # bash
+            scribe completions bash >> ~/.bash_completion
+            ```
+
+            ## MCP server
+
+            This binary is built with the `mcp` feature. Run `scribe mcp` to start the
+            MCP stdio server and connect it to your AI agent.
+
+            ## Checksums
+
+            See `SHA256SUMS.txt` attached below.
+          files: |
+            dist/scribe-linux-x86_64
+            dist/scribe-macos-aarch64
+            dist/scribe-macos-x86_64
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          make_latest: true

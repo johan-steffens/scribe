@@ -1,7 +1,9 @@
 # Scribe User Guide
 
 This guide walks through every feature of Scribe in depth. It assumes you have
-Scribe installed (`cargo install --path .`) and a terminal open.
+Scribe installed (see the
+[README](README.md#installation) for binary download and source build
+instructions) and a terminal open.
 
 ---
 
@@ -514,10 +516,21 @@ scribe reminder show payments-reminder-deploy-the-stripe-integration
 
 ### How firing works
 
-On every startup Scribe runs `check_due`: it queries for all reminders with
-`remind_at <= now` and `fired = false`, marks them `fired = true`, and logs
-them. Desktop notification delivery is planned for a future phase. Fired
-reminders remain visible in `scribe reminder list` until archived.
+Reminders are delivered as OS desktop notifications in three situations:
+
+1. **On any `scribe` invocation** — at startup Scribe runs `check_due`, which
+   queries for all reminders with `remind_at <= now` and `fired = false`,
+   marks them `fired = true`, and sends an OS desktop notification for each
+   one.
+
+2. **While the TUI is open** — a background thread polls `check_due` every
+   30 seconds and fires notifications in real time without requiring a restart.
+
+3. **Via `scribe daemon`** — a long-running background process (suitable for
+   launchd on macOS or systemd on Linux) that polls every 30 seconds
+   continuously, even when the TUI is not open.
+
+Fired reminders remain visible in `scribe reminder list` until archived.
 
 ### Archiving and deleting
 
@@ -529,6 +542,60 @@ scribe reminder restore payments-reminder-deploy-the-stripe-integration
 scribe reminder archive payments-reminder-deploy-the-stripe-integration
 scribe reminder delete payments-reminder-deploy-the-stripe-integration
 ```
+
+### Running the background daemon
+
+`scribe daemon` is a long-running process that polls for due reminders and
+fires OS desktop notifications, independent of the TUI.
+
+```sh
+# Start with the default 30-second polling interval
+scribe daemon
+
+# Use a custom interval (seconds)
+scribe daemon --interval 60
+```
+
+**launchd (macOS)**
+
+Create `~/Library/LaunchAgents/com.scribe.daemon.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>             <string>com.scribe.daemon</string>
+  <key>ProgramArguments</key>  <array>
+                                 <string>/path/to/scribe</string>
+                                 <string>daemon</string>
+                               </array>
+  <key>RunAtLoad</key>         <true/>
+  <key>KeepAlive</key>         <true/>
+</dict>
+</plist>
+```
+
+Load it with `launchctl load ~/Library/LaunchAgents/com.scribe.daemon.plist`.
+
+**systemd (Linux)**
+
+Create `~/.config/systemd/user/scribe-daemon.service`:
+
+```ini
+[Unit]
+Description=Scribe reminder daemon
+
+[Service]
+ExecStart=/path/to/scribe daemon
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+
+Enable with `systemctl --user enable --now scribe-daemon`.
 
 ---
 
@@ -882,7 +949,8 @@ snippets for Claude Code and OpenCode (see below).
 
 ### MCP server
 
-The MCP server requires building with the `mcp` Cargo feature:
+The MCP server is included in pre-built binaries. If building from source,
+add the `mcp` feature:
 
 ```sh
 cargo install --path . --features mcp

@@ -9,8 +9,8 @@
 
 use std::sync::Arc;
 
-use crate::domain::TaskPatch;
 use crate::domain::task::TaskStatus;
+use crate::domain::TaskPatch;
 use crate::ops::tasks::TaskOps;
 use crate::ops::todos::TodoOps;
 use crate::ops::tracker::TrackerOps;

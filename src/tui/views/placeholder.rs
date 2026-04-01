@@ -5,10 +5,10 @@
 //! implemented. The four Phase 4 views (Todos, Tracker, Inbox, Reminders)
 //! now have real implementations and no longer use this placeholder.
 
-use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
+use ratatui::Frame;
 
 /// Renders a centred placeholder message into `area`.
 ///

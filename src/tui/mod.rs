@@ -4,8 +4,10 @@
 //! The [`run`] function is the sole public API of this module. It:
 //! 1. Sets up the crossterm raw-mode alternate screen terminal.
 //! 2. Constructs [`App`] and populates initial data.
-//! 3. Runs the event loop, polling crossterm for key events every 250 ms.
-//! 4. Restores the terminal unconditionally on exit (even on error).
+//! 3. Spawns a background thread that polls for due reminders and fires OS
+//!    desktop notifications (via [`crate::notify`]).
+//! 4. Runs the event loop, polling crossterm for key events every 250 ms.
+//! 5. Restores the terminal unconditionally on exit (even on error).
 //!
 //! # Error handling
 //!
@@ -35,28 +37,37 @@ pub mod ui;
 pub mod views;
 
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use anyhow::Context;
 use crossterm::event::{self, Event, KeyEventKind};
 use crossterm::terminal::{
-    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crossterm::{ExecutableCommand, execute};
-use ratatui::Terminal;
+use crossterm::{execute, ExecutableCommand};
 use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
 use rusqlite::Connection;
 
 use crate::config::Config;
+use crate::ops::ReminderOps;
 use crate::tui::app::App;
 
 // DOCUMENTED-MAGIC: 250 ms poll timeout gives a smooth 4 Hz refresh rate for
 // the timer display while keeping CPU usage negligible.
 const POLL_TIMEOUT_MS: u64 = 250;
 
+// DOCUMENTED-MAGIC: 30 s reminder-check interval in the TUI background thread
+// mirrors the daemon default so reminders fire within one interval of their
+// due time. Shorter values increase DB reads with diminishing accuracy gains.
+const REMINDER_CHECK_INTERVAL_SECS: u64 = 30;
+
 /// Launches the Scribe TUI, blocking until the user quits.
 ///
-/// Sets up a raw-mode alternate-screen terminal, runs the event loop, and
-/// restores the terminal on exit — even when an error occurs.
+/// Sets up a raw-mode alternate-screen terminal, spawns a background reminder
+/// thread, runs the event loop, and restores the terminal on exit — even when
+/// an error occurs.
 ///
 /// `db` is the shared `SQLite` connection. `config` is currently unused in
 /// Phase 3 but is threaded through for Phase 4+.
@@ -74,6 +85,12 @@ pub fn run(db: Arc<Mutex<Connection>>, _config: &Config) -> anyhow::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).context("create terminal")?;
 
+    // ── spawn background reminder-notification thread ──────────────────────
+    // The thread owns a clone of the DB Arc and runs independently; it is
+    // intentionally leaked (detached) because the TUI process exits when the
+    // user quits, which terminates all threads automatically.
+    spawn_reminder_thread(Arc::clone(&db));
+
     // ── run the event loop ─────────────────────────────────────────────────
     let result = event_loop(&mut terminal, db);
 
@@ -86,6 +103,36 @@ pub fn run(db: Arc<Mutex<Connection>>, _config: &Config) -> anyhow::Result<()> {
 }
 
 // ── private helpers ────────────────────────────────────────────────────────
+
+/// Spawns a background thread that polls for due reminders every
+/// [`REMINDER_CHECK_INTERVAL_SECS`] seconds and fires OS notifications.
+///
+/// The thread is detached — it will be terminated when the process exits.
+fn spawn_reminder_thread(db: Arc<Mutex<Connection>>) {
+    let _handle = thread::Builder::new()
+        .name("scribe-reminder-poll".to_owned())
+        .spawn(move || {
+            let ops = ReminderOps::new(db);
+            loop {
+                thread::sleep(Duration::from_secs(REMINDER_CHECK_INTERVAL_SECS));
+                match ops.check_due() {
+                    Ok(fired) => {
+                        for reminder in &fired {
+                            tracing::info!(
+                                reminder.slug = %reminder.slug,
+                                "tui.reminder.fired",
+                            );
+                            crate::notify::fire(reminder);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "tui.reminder.poll.error");
+                    }
+                }
+            }
+        });
+    // Ignore the JoinHandle — the thread is intentionally detached.
+}
 
 /// Runs the main event loop until `app.should_quit` is true.
 fn event_loop(

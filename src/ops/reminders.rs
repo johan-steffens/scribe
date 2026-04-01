@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 
-use crate::domain::{NewReminder, Projects, Reminder, ReminderPatch, Reminders, Tasks, slug};
+use crate::domain::{slug, NewReminder, Projects, Reminder, ReminderPatch, Reminders, Tasks};
 use crate::store::{SqliteProjects, SqliteReminders, SqliteTasks};
 
 /// Parameters for creating a new reminder via [`ReminderOps`].
@@ -156,8 +156,8 @@ impl ReminderOps {
 
     /// Checks for due reminders and marks each one as fired.
     ///
-    /// Returns the list of reminders that were fired. Actual notification
-    /// delivery is deferred to Phase 5.
+    /// Returns the list of reminders that were fired. Callers are responsible
+    /// for sending OS desktop notifications via [`crate::notify::fire`].
     ///
     /// # Errors
     ///

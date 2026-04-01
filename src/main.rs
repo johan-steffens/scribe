@@ -19,6 +19,7 @@ mod db;
 mod domain;
 #[cfg(feature = "mcp")]
 mod mcp;
+mod notify;
 mod ops;
 mod store;
 mod tui;
@@ -109,10 +110,11 @@ fn run() -> anyhow::Result<()> {
     let inbox_ops = InboxOps::new(&conn);
     let reminder_ops = ReminderOps::new(Arc::clone(&conn));
 
-    // Fire any due reminders on startup. Actual delivery is Phase 5.
+    // Fire any due reminders on startup and send OS notifications.
     if let Ok(due) = reminder_ops.check_due() {
         for r in &due {
             tracing::info!(reminder.slug = %r.slug, "reminder fired");
+            notify::fire(r);
         }
     }
 
@@ -141,6 +143,9 @@ fn run() -> anyhow::Result<()> {
         }
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
+        }
+        Some(Commands::Daemon { interval }) => {
+            cli::daemon::run(Arc::clone(&conn), interval)?;
         }
         // Agent install is handled above before the DB opens.
         Some(Commands::Agent { .. }) => {}
