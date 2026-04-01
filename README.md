@@ -78,10 +78,12 @@ echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc
 echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
 # Reload your shell or run: source ~/.zshrc
 
-# zsh with Zim — place the file in your Zim completions directory
-scribe completions zsh > ~/.zim/completions/_scribe
-# Zim's completion module calls compinit automatically; no further setup needed.
-# Restart your shell or run: zimfw build
+# zsh with Zim — place the file in the zsh-completions src directory (already in fpath)
+# Use >! to overwrite if the file already exists (zsh noclobber)
+scribe completions zsh >! ~/.zim/modules/zsh-completions/src/_scribe
+rm -f ~/.zcompdump ~/.zcompdump.dat ~/.zcompdump.zwc
+zimfw build
+# Open a new terminal for changes to take effect
 
 # bash — append to the bash completion file
 scribe completions bash >> ~/.bash_completion

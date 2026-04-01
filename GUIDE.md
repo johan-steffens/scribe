@@ -706,6 +706,7 @@ hints; see limitation note below).
 
 ```sh
 # 1. Generate and install the completion script
+# Use > on first install; use >! on subsequent updates (zsh noclobber)
 scribe completions zsh > ~/.zfunc/_scribe
 
 # 2. Ensure ~/.zfunc is on your fpath (add to ~/.zshrc if not already there)
@@ -716,9 +717,28 @@ echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-The script bundles both the static clap-generated completions and a
-`_scribe_dynamic_complete()` helper that patches slug-valued argument positions
-to call `scribe __complete <entity>`.
+#### zsh with Zim
+
+Zim's `zsh-completions` module directory is already on `fpath` — write the
+file there directly, then clear the completion cache and rebuild:
+
+```sh
+scribe completions zsh >! ~/.zim/modules/zsh-completions/src/_scribe
+rm -f ~/.zcompdump ~/.zcompdump.dat ~/.zcompdump.zwc
+zimfw build
+```
+
+Use `>!` to force-overwrite the file — zsh's `noclobber` option (set by Zim)
+blocks plain `>` if the file already exists. Deleting the `zcompdump` files
+ensures zsh reloads the updated script rather than serving the old cached
+version. Open a new terminal after running these commands.
+
+No changes to `.zshrc` are needed; Zim's `completion` module calls `compinit`
+automatically.
+
+The completion script provides both static completions (subcommand names, flag
+names, enum values such as `--status` and `--priority`) and dynamic completions
+that query your live database for slug candidates via `scribe __complete <entity>`.
 
 #### bash
 
