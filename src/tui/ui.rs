@@ -13,11 +13,11 @@
 //!
 //! This module is entirely pure — no state is mutated during a draw call.
 
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Margin, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use ratatui::Frame;
 
 use crate::tui::app::{App, View};
 use crate::tui::components::status_bar;

@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 use crate::domain::{
     NewReminder, ProjectId, Reminder, ReminderId, ReminderPatch, Reminders, TaskId,
@@ -118,7 +118,7 @@ impl Reminders for SqliteReminders {
                 reminder.task_id.map(|t| t.0),
                 reminder.remind_at.to_rfc3339(),
                 reminder.message,
-                reminder.persistent as i64,
+                i64::from(reminder.persistent),
                 now,
             ],
         )?;
@@ -218,7 +218,7 @@ impl Reminders for SqliteReminders {
         }
         if let Some(p) = patch.persistent {
             sets.push(format!("persistent = ?{}", sets.len() + 1));
-            values.push((p as i64).to_string());
+            values.push(i64::from(p).to_string());
         }
 
         if sets.is_empty() {

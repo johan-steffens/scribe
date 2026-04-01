@@ -11,10 +11,10 @@
 //! [`crate::tui::types::ViewState`]. This keeps the rendering path pure and
 //! allocation-efficient.
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Cell, Row, Table, TableState};
-use ratatui::Frame;
 
 /// Renders a stateful table into `area`.
 ///

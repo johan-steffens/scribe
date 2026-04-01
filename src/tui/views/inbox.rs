@@ -16,11 +16,11 @@
 //!
 //! This is a pure rendering function; no state is mutated here.
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 
 use crate::domain::CaptureItem;
 use crate::tui::app::App;

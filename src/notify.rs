@@ -9,7 +9,7 @@
 //!   non-functional on macOS 26+, so we use `osascript` which works on every
 //!   Mac without any bundle or permission setup.
 //! - **Linux / BSD** — uses `notify-rust` over D-Bus / XDG.
-//! - **Windows** — uses `notify-rust` over WinRT.
+//! - **Windows** — uses `notify-rust` over `WinRT`.
 //!
 //! Failures are logged at `WARN` level and never propagated — a missed
 //! notification is a minor annoyance, not a fatal error.

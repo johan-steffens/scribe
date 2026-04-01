@@ -21,6 +21,7 @@ pub mod daemon;
 pub mod inbox;
 pub mod parse;
 pub mod project;
+pub mod prompt;
 pub mod reminder;
 pub mod service;
 pub mod setup;

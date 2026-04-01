@@ -16,11 +16,11 @@
 //! callback slug/context in a companion field and performs the mutation in the
 //! key handler after `ConfirmDialog::state()` returns `Confirmed`.
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use ratatui::Frame;
 
 // ── types ──────────────────────────────────────────────────────────────────
 

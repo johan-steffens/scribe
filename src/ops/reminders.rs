@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 
-use crate::domain::{slug, NewReminder, Projects, Reminder, ReminderPatch, Reminders, Tasks};
+use crate::domain::{NewReminder, Projects, Reminder, ReminderPatch, Reminders, Tasks, slug};
 use crate::store::{SqliteProjects, SqliteReminders, SqliteTasks};
 
 /// Parameters for creating a new reminder via [`ReminderOps`].

@@ -151,7 +151,7 @@ fn run() -> anyhow::Result<()> {
             cli::capture::run(&cmd, &inbox_ops)?;
         }
         Some(Commands::Inbox(cmd)) => {
-            cli::inbox::run(&cmd, &inbox_ops)?;
+            cli::inbox::run(&cmd, &inbox_ops, &conn)?;
         }
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
@@ -160,10 +160,12 @@ fn run() -> anyhow::Result<()> {
             cli::daemon::run(Arc::clone(&conn), interval)?;
         }
         // Handled above before the DB opens.
-        Some(Commands::Setup(_))
-        | Some(Commands::Service { .. })
-        | Some(Commands::Agent { .. })
-        | Some(Commands::Completions { .. }) => {}
+        Some(
+            Commands::Setup(_)
+            | Commands::Service { .. }
+            | Commands::Agent { .. }
+            | Commands::Completions { .. },
+        ) => {}
         #[cfg(feature = "mcp")]
         Some(Commands::Mcp) => {
             mcp::run(&conn, &config)?;

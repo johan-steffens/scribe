@@ -3,13 +3,18 @@
 //!
 //! Each subcommand maps to an operation in [`crate::ops::InboxOps`].
 //! The `process` subcommand is interactive (reads from stdin) unless
-//! `--output json` is passed.
+//! `--output json` is passed.  When stdin is a TTY, tab completion for
+//! project slugs is provided via [`crate::cli::prompt`].
+
+use std::sync::{Arc, Mutex};
 
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 
 use crate::cli::project::OutputFormat;
-use crate::ops::inbox::ProcessAction;
+use crate::cli::prompt;
 use crate::ops::InboxOps;
+use crate::ops::inbox::ProcessAction;
 
 use std::io::{BufRead, Write};
 
@@ -61,13 +66,20 @@ pub struct InboxProcess {
 
 /// Executes an `inbox` subcommand against the given ops layer.
 ///
+/// `conn` is forwarded to interactive prompts so that tab completion can
+/// query the database for project slugs.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails (e.g. item not found, DB error).
-pub fn run(cmd: &InboxCommand, ops: &InboxOps) -> anyhow::Result<()> {
+pub fn run(
+    cmd: &InboxCommand,
+    ops: &InboxOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     match &cmd.subcommand {
         InboxSubcommand::List(args) => handle_list(args, ops),
-        InboxSubcommand::Process(args) => handle_process(args, ops),
+        InboxSubcommand::Process(args) => handle_process(args, ops, conn),
     }
 }
 
@@ -91,7 +103,11 @@ fn handle_list(args: &InboxList, ops: &InboxOps) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn handle_process(args: &InboxProcess, ops: &InboxOps) -> anyhow::Result<()> {
+fn handle_process(
+    args: &InboxProcess,
+    ops: &InboxOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     let item = ops
         .get(&args.slug)?
         .ok_or_else(|| anyhow::anyhow!("capture item '{}' not found", args.slug))?;
@@ -125,8 +141,8 @@ fn handle_process(args: &InboxProcess, ops: &InboxOps) -> anyhow::Result<()> {
 
     let action = match choice.as_str() {
         "1" => {
-            let project_slug = prompt_line("Project slug: ")?;
-            let title_input = prompt_line("Title (leave blank to use body): ")?;
+            let project_slug = prompt::prompt_project_slug("Project slug: ", conn)?;
+            let title_input = prompt::prompt("Title (leave blank to use body): ")?;
             let title = if title_input.is_empty() {
                 None
             } else {
@@ -139,8 +155,8 @@ fn handle_process(args: &InboxProcess, ops: &InboxOps) -> anyhow::Result<()> {
             }
         }
         "2" => {
-            let project_slug = prompt_line("Project slug: ")?;
-            let title_input = prompt_line("Title (leave blank to use body): ")?;
+            let project_slug = prompt::prompt_project_slug("Project slug: ", conn)?;
+            let title_input = prompt::prompt("Title (leave blank to use body): ")?;
             let title = if title_input.is_empty() {
                 None
             } else {
@@ -152,7 +168,7 @@ fn handle_process(args: &InboxProcess, ops: &InboxOps) -> anyhow::Result<()> {
             }
         }
         "3" => {
-            let project_slug = prompt_line("Project slug: ")?;
+            let project_slug = prompt::prompt_project_slug("Project slug: ", conn)?;
             ProcessAction::AssignToProject { project_slug }
         }
         "4" => ProcessAction::Discard,
@@ -164,20 +180,4 @@ fn handle_process(args: &InboxProcess, ops: &InboxOps) -> anyhow::Result<()> {
     let processed = ops.process(&args.slug, action)?;
     println!("Processed: {}", processed.slug);
     Ok(())
-}
-
-/// Prints `prompt` to stdout, flushes, reads a trimmed line from stdin.
-fn prompt_line(prompt: &str) -> anyhow::Result<String> {
-    print!("{prompt}");
-    std::io::stdout()
-        .flush()
-        .map_err(|e| anyhow::anyhow!("flush: {e}"))?;
-    let stdin = std::io::stdin();
-    let line = stdin
-        .lock()
-        .lines()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("no input"))?
-        .map_err(|e| anyhow::anyhow!("read: {e}"))?;
-    Ok(line.trim().to_owned())
 }
