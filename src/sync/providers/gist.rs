@@ -25,6 +25,9 @@
 //! # }
 //! ```
 
+// DOCUMENTED-MAGIC: Provider unused until the sync engine is wired in a later task.
+#![allow(dead_code, reason = "wired via engine in a later task")]
+
 use async_trait::async_trait;
 use serde_json::Value;
 

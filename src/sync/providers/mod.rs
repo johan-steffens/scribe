@@ -4,6 +4,9 @@
 //! Each provider implements [`crate::sync::SyncProvider`]. The active provider
 //! is constructed from [`crate::config::Config`] via [`from_config`].
 
+// DOCUMENTED-MAGIC: Providers unused until the sync engine is wired into the daemon.
+#![allow(dead_code, reason = "providers wired via engine in a later task")]
+
 pub mod dropbox;
 pub mod file;
 pub mod gist;

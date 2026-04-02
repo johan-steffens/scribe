@@ -23,6 +23,9 @@
 //! It is stored outside `SQLite` deliberately so that the sync metadata never
 //! travels with the synced dataset.
 
+// DOCUMENTED-MAGIC: Engine items unused until Tasks 12/13 wire StateSnapshot DB methods.
+#![allow(dead_code, reason = "engine wired in later tasks")]
+
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};

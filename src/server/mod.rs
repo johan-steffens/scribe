@@ -34,6 +34,14 @@
 //! # }
 //! ```
 
+// DOCUMENTED-MAGIC: The server module is fully implemented but not yet called
+// from main.rs dispatch. Dead code warnings are expected until the daemon wires
+// this in a future task.
+#![allow(
+    dead_code,
+    reason = "server items wired via daemon in a later task; all items are implemented and tested"
+)]
+
 pub mod auth;
 pub mod handlers;
 

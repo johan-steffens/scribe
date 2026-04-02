@@ -195,7 +195,10 @@ impl Default for SyncDropboxConfig {
 /// services. If your OS or firewall already uses this port, override it in
 /// `sync.rest.port`. Changing the port requires updating all client machines.
 #[cfg(feature = "sync")]
-const DEFAULT_REST_PORT: u16 = 7171;
+pub const DEFAULT_REST_PORT_PUB: u16 = 7171;
+
+#[cfg(feature = "sync")]
+const DEFAULT_REST_PORT: u16 = DEFAULT_REST_PORT_PUB;
 
 #[cfg(feature = "sync")]
 fn default_rest_port() -> u16 {

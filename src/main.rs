@@ -21,7 +21,11 @@ mod domain;
 mod mcp;
 mod notify;
 mod ops;
+#[cfg(feature = "sync")]
+mod server;
 mod store;
+#[cfg(feature = "sync")]
+mod sync;
 mod tui;
 
 use cli::{Cli, Commands};
@@ -47,6 +51,10 @@ fn main() {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "top-level command dispatch; extracting further would reduce readability"
+)]
 fn run() -> anyhow::Result<()> {
     // Intercept `scribe __complete <entity>` before clap parsing.
     //
@@ -102,6 +110,12 @@ fn run() -> anyhow::Result<()> {
     }) = cli.command
     {
         return cli::agent::run(args, &mut config);
+    }
+
+    // `scribe sync [subcommand]` — no DB access needed for configure/status.
+    #[cfg(feature = "sync")]
+    if let Some(Commands::Sync(ref cmd)) = cli.command {
+        return cli::sync::run(cmd, &mut config);
     }
 
     // Allow integration tests to inject an isolated DB path without modifying
@@ -166,6 +180,8 @@ fn run() -> anyhow::Result<()> {
             | Commands::Agent { .. }
             | Commands::Completions { .. },
         ) => {}
+        #[cfg(feature = "sync")]
+        Some(Commands::Sync(_)) => {}
         #[cfg(feature = "mcp")]
         Some(Commands::Mcp) => {
             mcp::run(&conn, &config)?;

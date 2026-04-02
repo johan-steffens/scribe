@@ -25,6 +25,8 @@ pub mod prompt;
 pub mod reminder;
 pub mod service;
 pub mod setup;
+#[cfg(feature = "sync")]
+pub mod sync;
 pub mod task;
 pub mod todo;
 pub mod track;
@@ -47,6 +49,13 @@ pub use reminder::ReminderCommand;
 pub use service::ServiceCommand;
 #[doc(inline)]
 pub use setup::SetupArgs;
+#[cfg(feature = "sync")]
+#[doc(inline)]
+#[expect(
+    unused_imports,
+    reason = "public re-export for external consumers; Commands::Sync uses full path internally"
+)]
+pub use sync::SyncCommand;
 #[doc(inline)]
 pub use task::TaskCommand;
 #[doc(inline)]
@@ -125,4 +134,7 @@ pub enum Commands {
     /// protocol — do NOT run this in a plain terminal.
     #[cfg(feature = "mcp")]
     Mcp,
+    /// Sync state to or from a remote provider.
+    #[cfg(feature = "sync")]
+    Sync(crate::cli::sync::SyncCommand),
 }

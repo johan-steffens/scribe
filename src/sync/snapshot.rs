@@ -20,6 +20,12 @@
 //! type changes in a non-backwards-compatible way). Additive changes (new
 //! optional fields) do NOT require a bump.
 
+// DOCUMENTED-MAGIC: Snapshot items unused until Tasks 12/13 wire from_db/write_to_db.
+#![allow(
+    dead_code,
+    reason = "wired in later tasks when store methods are implemented"
+)]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

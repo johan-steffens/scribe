@@ -8,6 +8,18 @@
 //! exchange [`StateSnapshot`] values with the backend and handle failures
 //! through [`SyncError`].
 
+// DOCUMENTED-MAGIC: Many sync items are fully implemented but not yet called
+// from main dispatch paths. Unused item and import warnings are expected until
+// the engine, daemon, and full CLI are wired in later tasks.
+#![allow(
+    dead_code,
+    reason = "sync engine and providers wired in later tasks; all items are implemented"
+)]
+#![allow(
+    unused_imports,
+    reason = "re-exports used once Tasks 12/13 wire the engine into the CLI and daemon"
+)]
+
 pub mod engine;
 pub mod keychain;
 pub mod providers;
