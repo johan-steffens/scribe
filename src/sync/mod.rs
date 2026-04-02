@@ -57,8 +57,6 @@ pub trait SyncProvider: Send + Sync {
 
     /// Download the current remote snapshot.
     ///
-    /// Returns [`SyncError::NotFound`] when no remote state exists yet.
-    ///
     /// # Errors
     ///
     /// Returns [`SyncError::NotFound`] if no remote state exists yet, or
