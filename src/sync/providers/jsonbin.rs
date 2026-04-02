@@ -70,7 +70,7 @@ impl JsonBinProvider {
     /// Returns [`SyncError::Transport`] if the HTTP client cannot be built.
     pub fn new(bin_id: Option<String>) -> Result<Self, SyncError> {
         let client = reqwest::Client::builder()
-            .user_agent("scribe-sync/1.0")
+            .user_agent(super::USER_AGENT)
             .build()
             .map_err(|e| SyncError::Transport(format!("failed to build HTTP client: {e}")))?;
         Ok(Self { bin_id, client })

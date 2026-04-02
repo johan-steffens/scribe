@@ -29,10 +29,10 @@
 //!
 //! # async fn example() -> Result<(), scribe::sync::SyncError> {
 //! let provider = S3Provider::new(
-//!     "https://s3.amazonaws.com".to_owned(),
-//!     "my-bucket".to_owned(),
-//!     "scribe/state.json".to_owned(),
-//!     "us-east-1".to_owned(),
+//!     "https://s3.amazonaws.com",
+//!     "my-bucket",
+//!     "scribe/state.json",
+//!     "us-east-1",
 //! )?;
 //! let snapshot = provider.pull().await?;
 //! # Ok(())
@@ -91,26 +91,27 @@ impl S3Provider {
     ///
     /// `endpoint` is the S3-compatible base URL, `bucket` is the target
     /// bucket name, `key` is the object key, and `region` is the AWS region
-    /// (needed for `SigV4` signing).
+    /// (needed for `SigV4` signing). All parameters accept both `&str` and
+    /// `String`.
     ///
     /// # Errors
     ///
     /// Returns [`SyncError::Transport`] if the HTTP client cannot be built.
     pub fn new(
-        endpoint: String,
-        bucket: String,
-        key: String,
-        region: String,
+        endpoint: impl Into<String>,
+        bucket: impl Into<String>,
+        key: impl Into<String>,
+        region: impl Into<String>,
     ) -> Result<Self, SyncError> {
         let client = reqwest::Client::builder()
-            .user_agent("scribe-sync/1.0")
+            .user_agent(super::USER_AGENT)
             .build()
             .map_err(|e| SyncError::Transport(format!("failed to build HTTP client: {e}")))?;
         Ok(Self {
-            endpoint,
-            bucket,
-            key,
-            region,
+            endpoint: endpoint.into(),
+            bucket: bucket.into(),
+            key: key.into(),
+            region: region.into(),
             client,
         })
     }

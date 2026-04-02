@@ -77,11 +77,8 @@ impl GistProvider {
     /// Returns [`SyncError::Transport`] if the HTTP client cannot be built
     /// (e.g. TLS initialisation fails).
     pub fn new(gist_id: Option<String>) -> Result<Self, SyncError> {
-        // The user-agent string is required by GitHub's API policy; omitting it
-        // causes 403 responses. The value "scribe-sync/1.0" identifies this
-        // application unambiguously.
         let client = reqwest::Client::builder()
-            .user_agent("scribe-sync/1.0")
+            .user_agent(super::USER_AGENT)
             .build()
             .map_err(|e| SyncError::Transport(format!("failed to build HTTP client: {e}")))?;
         Ok(Self { gist_id, client })

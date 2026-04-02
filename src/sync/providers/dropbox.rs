@@ -18,7 +18,7 @@
 //! use scribe::sync::SyncProvider as _;
 //!
 //! # async fn example() -> Result<(), scribe::sync::SyncError> {
-//! let provider = DropboxProvider::new("/scribe-state.json".to_owned())?;
+//! let provider = DropboxProvider::new("/scribe-state.json")?;
 //! let snapshot = provider.pull().await?;
 //! # Ok(())
 //! # }
@@ -65,16 +65,20 @@ impl DropboxProvider {
     /// Creates a new `DropboxProvider` targeting `path` in Dropbox.
     ///
     /// `path` must be an absolute Dropbox path, e.g. `"/scribe-state.json"`.
+    /// Both `&str` and `String` are accepted.
     ///
     /// # Errors
     ///
     /// Returns [`SyncError::Transport`] if the HTTP client cannot be built.
-    pub fn new(path: String) -> Result<Self, SyncError> {
+    pub fn new(path: impl Into<String>) -> Result<Self, SyncError> {
         let client = reqwest::Client::builder()
-            .user_agent("scribe-sync/1.0")
+            .user_agent(super::USER_AGENT)
             .build()
             .map_err(|e| SyncError::Transport(format!("failed to build HTTP client: {e}")))?;
-        Ok(Self { path, client })
+        Ok(Self {
+            path: path.into(),
+            client,
+        })
     }
 }
 

@@ -19,7 +19,7 @@
 //! use scribe::sync::SyncProvider as _;
 //!
 //! # async fn example() -> Result<(), scribe::sync::SyncError> {
-//! let provider = RestProvider::new("http://192.168.1.10:7171".to_owned())?;
+//! let provider = RestProvider::new("http://192.168.1.10:7171")?;
 //! let snapshot = provider.pull().await?;
 //! # Ok(())
 //! # }
@@ -57,16 +57,20 @@ impl RestProvider {
     ///
     /// `url` is the base URL of the sync server. Trailing slashes are
     /// acceptable; the provider appends `/state` for all requests.
+    /// Both `&str` and `String` are accepted.
     ///
     /// # Errors
     ///
     /// Returns [`SyncError::Transport`] if the HTTP client cannot be built.
-    pub fn new(url: String) -> Result<Self, SyncError> {
+    pub fn new(url: impl Into<String>) -> Result<Self, SyncError> {
         let client = reqwest::Client::builder()
-            .user_agent("scribe-sync/1.0")
+            .user_agent(super::USER_AGENT)
             .build()
             .map_err(|e| SyncError::Transport(format!("failed to build HTTP client: {e}")))?;
-        Ok(Self { url, client })
+        Ok(Self {
+            url: url.into(),
+            client,
+        })
     }
 }
 
