@@ -122,19 +122,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/
-
-      - name: Flatten artefact directories
-        run: |
-          for dir in dist/*/; do
-            [ -d "$dir" ] || continue
-            name=$(basename "$dir")
-            for file in "$dir"*; do
-              [ -f "$file" ] && mv "$file" "dist/${name}.tmp"
-            done
-            rmdir "$dir"
-            [ -f "dist/${name}.tmp" ] && mv "dist/${name}.tmp" "dist/${name}"
-          done
-          ls -lh dist/
+          merge-multiple: true
 
       - name: Generate SHA-256 checksums
         working-directory: dist
