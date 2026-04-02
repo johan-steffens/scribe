@@ -20,10 +20,10 @@ use rusqlite::Connection;
 
 use crate::domain::TaskStatus;
 use crate::domain::{
-    slug, CaptureItem, CaptureItems, NewCaptureItem, NewTodo, Projects, TaskPriority, Todos,
+    CaptureItem, CaptureItems, NewCaptureItem, NewTodo, Projects, TaskPriority, Todos, slug,
 };
-use crate::ops::tasks::CreateTask;
 use crate::ops::TaskOps;
+use crate::ops::tasks::CreateTask;
 use crate::store::{SqliteCaptureItems, SqliteProjects, SqliteTodos};
 
 /// Action to take when processing a capture item.
