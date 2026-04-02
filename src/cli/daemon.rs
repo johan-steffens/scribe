@@ -165,7 +165,7 @@ fn run_sync_cycle(conn: &Arc<Mutex<Connection>>, config: &crate::config::Config)
         |d| d.data_dir().join("sync-state.json"),
     );
 
-    let provider_name = format!("{:?}", config.sync.provider).to_lowercase();
+    let provider_name = config.sync.provider.to_string();
     let engine = SyncEngine::new(provider, sync_state_path.clone(), provider_name.clone());
 
     let rt = match tokio::runtime::Runtime::new() {
@@ -186,13 +186,17 @@ fn run_sync_cycle(conn: &Arc<Mutex<Connection>>, config: &crate::config::Config)
             state.last_sync_at = Some(Utc::now());
             state.last_error = None;
             state.provider = Some(provider_name);
-            let _ = state.save(&sync_state_path);
+            if let Err(e) = state.save(&sync_state_path) {
+                tracing::warn!(error = %e, "sync.state.save.error");
+            }
             tracing::info!("sync.complete");
         }
         Err(e) => {
             tracing::warn!(error = %e, "sync.error");
             state.last_error = Some(e.to_string());
-            let _ = state.save(&sync_state_path);
+            if let Err(e) = state.save(&sync_state_path) {
+                tracing::warn!(error = %e, "sync.state.save.error");
+            }
         }
     }
 }

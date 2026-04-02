@@ -126,7 +126,7 @@ fn run_sync_once(
         |d| d.data_dir().join("sync-state.json"),
     );
 
-    let provider_name = format!("{:?}", config.sync.provider).to_lowercase();
+    let provider_name = config.sync.provider.to_string();
     let engine = SyncEngine::new(provider, sync_state_path.clone(), provider_name.clone());
 
     let rt = tokio::runtime::Runtime::new()?;
@@ -146,7 +146,9 @@ fn run_sync_once(
         }
         Err(e) => {
             state.last_error = Some(e.to_string());
-            let _ = state.save(&sync_state_path);
+            if let Err(save_err) = state.save(&sync_state_path) {
+                tracing::warn!(error = %save_err, "sync.state.save.error");
+            }
             anyhow::bail!("sync failed: {e}");
         }
     }
@@ -526,7 +528,7 @@ fn run_status(args: &SyncStatusArgs, config: &crate::config::Config) -> anyhow::
     let state_path = sync_state_path()?;
     let state = SyncState::load(&state_path);
 
-    let provider_name = format!("{:?}", config.sync.provider).to_lowercase();
+    let provider_name = config.sync.provider.to_string();
     let last_sync = state
         .last_sync_at
         .map_or_else(|| "never".to_owned(), |t| t.to_rfc3339());
