@@ -254,6 +254,14 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[test]
+    fn test_from_config_returns_none_when_sync_disabled() {
+        use scribe::sync::providers::from_config;
+        let config = scribe::config::Config::default(); // sync.enabled = false by default
+        let result = from_config(&config).unwrap();
+        assert!(result.is_none());
+    }
+
     #[tokio::test]
     async fn test_run_once_merges_remote_into_local() {
         let dir = tempfile::tempdir().unwrap();

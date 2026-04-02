@@ -19,6 +19,8 @@ use thiserror::Error;
 #[doc(inline)]
 pub use engine::{SyncEngine, SyncState};
 #[doc(inline)]
+pub use providers::from_config;
+#[doc(inline)]
 pub use snapshot::StateSnapshot;
 
 /// Errors that can occur during a sync operation.

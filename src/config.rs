@@ -347,7 +347,7 @@ impl Default for DisplayConfig {
 /// Tracks which optional setup steps the user has completed so that
 /// `scribe setup` can report status and skip already-done steps.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct SetupConfig {
+pub struct SetupConfig {
     /// Whether the background daemon service has been installed.
     #[serde(default)]
     pub daemon_service_installed: bool,
