@@ -8,4 +8,6 @@
 pub mod config;
 pub mod domain;
 #[cfg(feature = "sync")]
+pub mod server;
+#[cfg(feature = "sync")]
 pub mod sync;
