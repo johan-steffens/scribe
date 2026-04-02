@@ -44,8 +44,12 @@ mod tests {
         let mut snap = empty_snap();
         let h1 = snap.content_hash();
         // Changing snapshot_at should NOT change the content hash
-        snap.snapshot_at = snap.snapshot_at + chrono::Duration::seconds(1);
+        snap.snapshot_at += chrono::Duration::seconds(1);
         let h2 = snap.content_hash();
         assert_eq!(h1, h2, "content hash should not depend on snapshot_at");
+        // Changing machine_id should NOT change the content hash either
+        snap.machine_id = uuid::Uuid::new_v4();
+        let h3 = snap.content_hash();
+        assert_eq!(h1, h3, "content hash should not depend on machine_id");
     }
 }

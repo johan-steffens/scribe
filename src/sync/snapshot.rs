@@ -27,16 +27,6 @@ use uuid::Uuid;
 
 use crate::domain::{CaptureItem, Project, Reminder, Task, TimeEntry, Todo};
 
-// ── schema version ─────────────────────────────────────────────────────────
-
-/// Snapshot schema version — bump on every breaking format change.
-///
-/// Breaking changes include removing or renaming fields, changing a field's
-/// type incompatibly, or reordering enum variants. Additive changes (adding
-/// new optional fields) do NOT require a bump. Remote providers use this value
-/// to reject snapshots they cannot interpret.
-pub const SCHEMA_VERSION: u32 = 1;
-
 // ── snapshot struct ────────────────────────────────────────────────────────
 
 /// A flat, serialisable point-in-time view of all database entities.
@@ -49,7 +39,7 @@ pub struct StateSnapshot {
     pub snapshot_at: DateTime<Utc>,
     /// UUID identifying the machine that produced this snapshot.
     pub machine_id: Uuid,
-    /// Schema version; see [`SCHEMA_VERSION`].
+    /// Schema version; see [`StateSnapshot::SCHEMA_VERSION`].
     pub schema_version: u32,
     /// All project records at snapshot time.
     pub projects: Vec<Project>,
@@ -68,8 +58,13 @@ pub struct StateSnapshot {
 // ── snapshot impl ──────────────────────────────────────────────────────────
 
 impl StateSnapshot {
-    /// Snapshot schema version constant; see [`SCHEMA_VERSION`].
-    pub const SCHEMA_VERSION: u32 = SCHEMA_VERSION;
+    /// Snapshot schema version — bump on every breaking format change.
+    ///
+    /// Breaking changes include removing or renaming fields, changing a field's
+    /// type incompatibly, or reordering enum variants. Additive changes (adding
+    /// new optional fields) do NOT require a bump. Remote providers use this
+    /// value to reject snapshots they cannot interpret.
+    pub const SCHEMA_VERSION: u32 = 1;
 
     /// Returns a hex-encoded SHA-256 hash of the snapshot's data content.
     ///
@@ -115,10 +110,10 @@ impl StateSnapshot {
 #[derive(Serialize)]
 struct HashableSnapshot<'a> {
     schema_version: u32,
-    projects: &'a Vec<Project>,
-    tasks: &'a Vec<Task>,
-    todos: &'a Vec<Todo>,
-    time_entries: &'a Vec<TimeEntry>,
-    reminders: &'a Vec<Reminder>,
-    capture_items: &'a Vec<CaptureItem>,
+    projects: &'a [Project],
+    tasks: &'a [Task],
+    todos: &'a [Todo],
+    time_entries: &'a [TimeEntry],
+    reminders: &'a [Reminder],
+    capture_items: &'a [CaptureItem],
 }
