@@ -101,6 +101,7 @@ jobs:
           restore-keys: ${{ matrix.target }}-cargo-
 
       - name: Build release binary (with MCP and sync features)
+        shell: bash
         run: |
           cargo build \
             --release \
