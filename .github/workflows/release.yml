@@ -153,31 +153,35 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.preflight.outputs.version }}
-          name: v${{ needs.preflight.outputs.version }}
-          body: |
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v${{ needs.preflight.outputs.version }}
+        run: |
+          LINUX_SHA=$(cat dist/SHA256SUMS.txt | grep scribe-linux-x86_64 | cut -d' ' -f1)
+          MACOS_SHA=$(cat dist/SHA256SUMS.txt | grep scribe-macos-aarch64 | cut -d' ' -f1)
+          WIN_SHA=$(cat dist/SHA256SUMS.txt | grep scribe-windows-x86_64.exe | cut -d' ' -f1)
+
+          cat <<EOF > RELEASE_NOTES.md
             ## Installation
             
-            Download the binary for your platform, make it executable, and move it onto your `$PATH`.
+            Download the binary for your platform, make it executable, and move it onto your \$PATH.
 
-            ```sh
+            \`\`\`sh
             # macOS (Apple Silicon)
-            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-macos-aarch64
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/\$VERSION/scribe-macos-aarch64
             chmod +x scribe && sudo mv scribe /usr/local/bin/
 
             # Linux (x86_64)
-            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-linux-x86_64
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/\$VERSION/scribe-linux-x86_64
             chmod +x scribe && sudo mv scribe /usr/local/bin/
             
             # Windows (x86_64)
             # Download 'scribe-windows-x86_64.exe' and move it to a folder in your PATH.
-            ```
+            \`\`\`
 
             ## Shell completions
 
-            ```sh
+            \`\`\`sh
             # zsh
             scribe completions zsh > ~/.zfunc/_scribe
 
@@ -190,24 +194,22 @@ jobs:
 
             # bash
             scribe completions bash >> ~/.bash_completion
-            ```
+            \`\`\`
 
             ## MCP server
 
-            This binary is built with the `mcp` and `sync` features. Run `scribe mcp` to start the
+            This binary is built with the \`mcp\` and \`sync\` features. Run \`scribe mcp\` to start the
             MCP stdio server and connect it to your AI agent.
 
             ## Checksums
 
-            ```
-            linux: $(grep scribe-linux-x86_64 dist/SHA256SUMS.txt | cut -d' ' -f1)
-            macos: $(grep scribe-macos-aarch64 dist/SHA256SUMS.txt | cut -d' ' -f1)
-            windows: $(grep scribe-windows-x86_64.exe dist/SHA256SUMS.txt | cut -d' ' -f1)
-            ```
-          files: |
-            dist/scribe-linux-x86_64
-            dist/scribe-macos-aarch64
-            dist/scribe-windows-x86_64.exe
-          fail_on_unmatched_files: true
-          make_latest: true
+            \`\`\`
+            linux: \$LINUX_SHA
+            macos: \$MACOS_SHA
+            windows: \$WIN_SHA
+            \`\`\`
+          EOF
+
+          gh release create "\$VERSION" --title "\$VERSION" --notes-file RELEASE_NOTES.md \
+            dist/scribe-linux-x86_64 dist/scribe-macos-aarch64 dist/scribe-windows-x86_64.exe
 
