@@ -233,6 +233,58 @@ impl Todos for SqliteTodos {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteTodos {
+    /// Returns every todo row, including archived and done ones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<Todo>> {
+        let conn = self.lock()?;
+        let sql = format!("SELECT {SELECT_COLS} FROM todos ORDER BY created_at ASC");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_todo())
+            .collect()
+    }
+
+    /// Inserts or updates each todo by slug.
+    ///
+    /// `slug` and `created_at` are write-once fields excluded from the update
+    /// set. All other mutable fields are updated on conflict.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, todos: &[Todo]) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        for t in todos {
+            conn.execute(
+                "INSERT INTO todos \
+                 (slug, project_id, title, done, archived_at, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
+                   title       = excluded.title, \
+                   done        = excluded.done, \
+                   archived_at = excluded.archived_at, \
+                   updated_at  = excluded.updated_at",
+                rusqlite::params![
+                    t.slug,
+                    t.project_id.0,
+                    t.title,
+                    i64::from(t.done),
+                    t.archived_at.map(|dt| dt.to_rfc3339()),
+                    t.created_at.to_rfc3339(),
+                    t.updated_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -320,6 +320,60 @@ impl Projects for SqliteProjects {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteProjects {
+    /// Returns every project row, including archived ones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<Project>> {
+        let conn = self.lock()?;
+        let sql = format!("SELECT {SELECT_COLS} FROM projects ORDER BY created_at ASC");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_project())
+            .collect()
+    }
+
+    /// Inserts or updates each project by slug.
+    ///
+    /// If a project with the same slug already exists, all mutable fields are
+    /// updated. `is_reserved` and `created_at` are intentionally excluded from
+    /// the update — they are write-once fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, projects: &[Project]) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        for p in projects {
+            conn.execute(
+                "INSERT INTO projects \
+                 (slug, name, description, status, is_reserved, archived_at, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   name        = excluded.name, \
+                   description = excluded.description, \
+                   status      = excluded.status, \
+                   archived_at = excluded.archived_at, \
+                   updated_at  = excluded.updated_at",
+                rusqlite::params![
+                    p.slug,
+                    p.name,
+                    p.description,
+                    p.status.to_string(),
+                    i64::from(p.is_reserved),
+                    p.archived_at.map(|t| t.to_rfc3339()),
+                    p.created_at.to_rfc3339(),
+                    p.updated_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

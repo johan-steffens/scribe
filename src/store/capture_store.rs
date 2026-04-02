@@ -141,6 +141,51 @@ impl CaptureItems for SqliteCaptureItems {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteCaptureItems {
+    /// Returns every capture item row, including processed ones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<CaptureItem>> {
+        let conn = self.lock()?;
+        let sql = format!("SELECT {SELECT_COLS} FROM capture_items ORDER BY created_at ASC");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_item())
+            .collect()
+    }
+
+    /// Inserts or updates each capture item by slug.
+    ///
+    /// `slug` and `created_at` are write-once fields excluded from the update
+    /// set. `body` and `processed` are updated on conflict.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, items: &[CaptureItem]) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        for item in items {
+            conn.execute(
+                "INSERT INTO capture_items (slug, body, processed, created_at) \
+                 VALUES (?1, ?2, ?3, ?4) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   body      = excluded.body, \
+                   processed = excluded.processed",
+                rusqlite::params![
+                    item.slug,
+                    item.body,
+                    i64::from(item.processed),
+                    item.created_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

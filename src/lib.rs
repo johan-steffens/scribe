@@ -6,8 +6,10 @@
 //! and feature-gated modules directly without going through the binary.
 
 pub mod config;
+pub mod db;
 pub mod domain;
 #[cfg(feature = "sync")]
 pub mod server;
+pub mod store;
 #[cfg(feature = "sync")]
 pub mod sync;

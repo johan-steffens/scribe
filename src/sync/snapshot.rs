@@ -20,13 +20,10 @@
 //! type changes in a non-backwards-compatible way). Additive changes (new
 //! optional fields) do NOT require a bump.
 
-// DOCUMENTED-MAGIC: Snapshot items unused until Tasks 12/13 wire from_db/write_to_db.
-#![allow(
-    dead_code,
-    reason = "wired in later tasks when store methods are implemented"
-)]
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -104,6 +101,57 @@ impl StateSnapshot {
 
         let digest = Sha256::digest(&json);
         hex::encode(digest)
+    }
+
+    /// Builds a snapshot from the live database including all rows (even archived).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database query fails.
+    pub fn from_db(conn: &Arc<Mutex<Connection>>, machine_id: Uuid) -> anyhow::Result<Self> {
+        use crate::store::{
+            SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
+            SqliteTodos,
+        };
+
+        let projects = SqliteProjects::new(Arc::clone(conn)).list_all()?;
+        let tasks = SqliteTasks::new(Arc::clone(conn)).list_all()?;
+        let todos = SqliteTodos::new(Arc::clone(conn)).list_all()?;
+        let time_entries = SqliteTimeEntries::new(Arc::clone(conn)).list_all()?;
+        let reminders = SqliteReminders::new(Arc::clone(conn)).list_all()?;
+        let capture_items = SqliteCaptureItems::new(Arc::clone(conn)).list_all()?;
+
+        Ok(Self {
+            snapshot_at: Utc::now(),
+            machine_id,
+            schema_version: Self::SCHEMA_VERSION,
+            projects,
+            tasks,
+            todos,
+            time_entries,
+            reminders,
+            capture_items,
+        })
+    }
+
+    /// Writes all entities in this snapshot to the database using upsert semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn write_to_db(&self, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+        use crate::store::{
+            SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
+            SqliteTodos,
+        };
+
+        SqliteProjects::new(Arc::clone(conn)).upsert_all(&self.projects)?;
+        SqliteTasks::new(Arc::clone(conn)).upsert_all(&self.tasks)?;
+        SqliteTodos::new(Arc::clone(conn)).upsert_all(&self.todos)?;
+        SqliteTimeEntries::new(Arc::clone(conn)).upsert_all(&self.time_entries)?;
+        SqliteReminders::new(Arc::clone(conn)).upsert_all(&self.reminders)?;
+        SqliteCaptureItems::new(Arc::clone(conn)).upsert_all(&self.capture_items)?;
+        Ok(())
     }
 }
 

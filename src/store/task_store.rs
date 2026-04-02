@@ -302,6 +302,66 @@ impl Tasks for SqliteTasks {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteTasks {
+    /// Returns every task row, including archived ones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<Task>> {
+        let conn = self.lock()?;
+        let sql = format!("SELECT {SELECT_COLS} FROM tasks ORDER BY created_at ASC");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task())
+            .collect()
+    }
+
+    /// Inserts or updates each task by slug.
+    ///
+    /// `slug` and `created_at` are write-once fields excluded from the update
+    /// set. All other mutable fields are updated on conflict.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, tasks: &[Task]) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        for t in tasks {
+            let due_date_str = t.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+            conn.execute(
+                "INSERT INTO tasks \
+                 (slug, project_id, title, description, status, priority, \
+                  due_date, archived_at, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
+                   title       = excluded.title, \
+                   description = excluded.description, \
+                   status      = excluded.status, \
+                   priority    = excluded.priority, \
+                   due_date    = excluded.due_date, \
+                   archived_at = excluded.archived_at, \
+                   updated_at  = excluded.updated_at",
+                rusqlite::params![
+                    t.slug,
+                    t.project_id.0,
+                    t.title,
+                    t.description,
+                    t.status.to_string(),
+                    t.priority.to_string(),
+                    due_date_str,
+                    t.archived_at.map(|dt| dt.to_rfc3339()),
+                    t.created_at.to_rfc3339(),
+                    t.updated_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

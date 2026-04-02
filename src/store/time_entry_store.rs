@@ -266,6 +266,60 @@ impl TimeEntries for SqliteTimeEntries {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteTimeEntries {
+    /// Returns every time entry row, including archived ones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<TimeEntry>> {
+        let conn = self.lock()?;
+        let sql = format!("SELECT {SELECT_COLS} FROM time_entries ORDER BY created_at ASC");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_entry())
+            .collect()
+    }
+
+    /// Inserts or updates each time entry by slug.
+    ///
+    /// `slug` and `created_at` are write-once fields excluded from the update
+    /// set. All other mutable fields are updated on conflict.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, entries: &[TimeEntry]) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        for e in entries {
+            conn.execute(
+                "INSERT INTO time_entries \
+                 (slug, project_id, task_id, started_at, ended_at, note, archived_at, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
+                   task_id     = excluded.task_id, \
+                   started_at  = excluded.started_at, \
+                   ended_at    = excluded.ended_at, \
+                   note        = excluded.note, \
+                   archived_at = excluded.archived_at",
+                rusqlite::params![
+                    e.slug,
+                    e.project_id.0,
+                    e.task_id.map(|t| t.0),
+                    e.started_at.to_rfc3339(),
+                    e.ended_at.map(|dt| dt.to_rfc3339()),
+                    e.note,
+                    e.archived_at.map(|dt| dt.to_rfc3339()),
+                    e.created_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

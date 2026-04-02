@@ -274,6 +274,63 @@ impl Reminders for SqliteReminders {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteReminders {
+    /// Returns every reminder row, including archived ones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<Reminder>> {
+        let conn = self.lock()?;
+        let sql = format!("SELECT {SELECT_COLS} FROM reminders ORDER BY created_at ASC");
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder())
+            .collect()
+    }
+
+    /// Inserts or updates each reminder by slug.
+    ///
+    /// `slug` and `created_at` are write-once fields excluded from the update
+    /// set. All other mutable fields are updated on conflict.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, reminders: &[Reminder]) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        for r in reminders {
+            conn.execute(
+                "INSERT INTO reminders \
+                 (slug, project_id, task_id, remind_at, message, fired, persistent, \
+                  archived_at, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
+                   task_id     = excluded.task_id, \
+                   remind_at   = excluded.remind_at, \
+                   message     = excluded.message, \
+                   fired       = excluded.fired, \
+                   persistent  = excluded.persistent, \
+                   archived_at = excluded.archived_at",
+                rusqlite::params![
+                    r.slug,
+                    r.project_id.0,
+                    r.task_id.map(|t| t.0),
+                    r.remind_at.to_rfc3339(),
+                    r.message,
+                    i64::from(r.fired),
+                    i64::from(r.persistent),
+                    r.archived_at.map(|dt| dt.to_rfc3339()),
+                    r.created_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

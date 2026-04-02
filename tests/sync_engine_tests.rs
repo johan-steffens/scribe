@@ -262,6 +262,34 @@ mod tests {
         assert!(result.is_none());
     }
 
+    // ── StateSnapshot::from_db / write_to_db roundtrip ─────────────────────
+
+    fn open_test_db() -> std::sync::Arc<std::sync::Mutex<rusqlite::Connection>> {
+        let conn = scribe::db::open_in_memory().unwrap();
+        std::sync::Arc::new(std::sync::Mutex::new(conn))
+    }
+
+    #[test]
+    fn test_snapshot_from_db_and_write_to_db_roundtrip() {
+        let conn = open_test_db();
+
+        // The DB starts with the quick-capture seed project.
+        let snap1 = StateSnapshot::from_db(&conn, Uuid::nil()).unwrap();
+        assert!(
+            !snap1.projects.is_empty(),
+            "quick-capture project should exist"
+        );
+
+        // Mutate the snapshot and write it back.
+        let mut snap2 = snap1.clone();
+        snap2.projects[0].name = "Modified Name".to_owned();
+        snap2.write_to_db(&conn).unwrap();
+
+        // Verify the name was updated in the DB.
+        let snap3 = StateSnapshot::from_db(&conn, Uuid::nil()).unwrap();
+        assert_eq!(snap3.projects[0].name, "Modified Name");
+    }
+
     #[tokio::test]
     async fn test_run_once_merges_remote_into_local() {
         let dir = tempfile::tempdir().unwrap();
