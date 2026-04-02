@@ -2,7 +2,7 @@
 //! `scribe sync` — manual sync, configuration, and status subcommands.
 //!
 //! Provides three subcommands:
-//! - `scribe sync` — one-shot manual sync (wired in a later task)
+//! - `scribe sync` — one-shot manual sync
 //! - `scribe sync configure` — interactive provider configuration
 //! - `scribe sync status` — show last sync time and provider
 //!
@@ -10,8 +10,10 @@
 
 use std::io::Write as _;
 
+use chrono::Utc;
 use clap::{Args, Subcommand};
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::cli::project::OutputFormat;
 use crate::config::SyncProvider;
@@ -70,21 +72,85 @@ pub struct SyncStatusArgs {
 ///
 /// # Errors
 ///
-/// Returns an error if the subcommand fails.
-pub fn run(args: &SyncCommand, config: &mut crate::config::Config) -> anyhow::Result<()> {
+/// Returns an error if the subcommand fails or the one-shot sync fails.
+pub fn run(
+    args: &SyncCommand,
+    config: &mut crate::config::Config,
+    conn: Option<&std::sync::Arc<std::sync::Mutex<rusqlite::Connection>>>,
+) -> anyhow::Result<()> {
     match &args.subcommand {
         Some(SyncSubcommand::Configure(cfg_args)) => run_configure(cfg_args, config),
         Some(SyncSubcommand::Status(status_args)) => run_status(status_args, config),
         None => {
-            // One-shot sync — requires store methods from Task 12/13.
-            // TODO(task-13): wire up StateSnapshot::from_db and write_to_db here
-            eprintln!(
-                "scribe sync: manual sync not yet available in this build. \
-                 Run `scribe sync configure` to set up a provider."
-            );
-            Ok(())
+            if !config.sync.enabled {
+                anyhow::bail!(
+                    "sync is not enabled — run `scribe sync configure` to set up a provider"
+                );
+            }
+            let conn = conn.ok_or_else(|| {
+                anyhow::anyhow!("internal error: database connection required for sync")
+            })?;
+            run_sync_once(&args.output, config, conn)
         }
     }
+}
+
+// ── one-shot sync ──────────────────────────────────────────────────────────
+
+/// Runs a single pull → merge → push sync cycle and reports results.
+///
+/// # Errors
+///
+/// Returns an error if the provider cannot be constructed, the snapshot cannot
+/// be taken, the sync cycle fails, or the merged state cannot be written back.
+fn run_sync_once(
+    output: &OutputFormat,
+    config: &crate::config::Config,
+    conn: &std::sync::Arc<std::sync::Mutex<rusqlite::Connection>>,
+) -> anyhow::Result<()> {
+    use directories::ProjectDirs;
+
+    use crate::sync::{engine::SyncEngine, from_config, snapshot::StateSnapshot};
+
+    let provider = from_config(config)?.ok_or_else(|| {
+        anyhow::anyhow!("sync provider could not be constructed — is sync configured?")
+    })?;
+
+    // TODO(task-13): use a persisted, per-machine UUID instead of nil once
+    // machine_id generation is wired into Config. machine_id is diagnostic
+    // only and does not affect merge correctness.
+    let local = StateSnapshot::from_db(conn, Uuid::nil())?;
+
+    let sync_state_path = ProjectDirs::from("", "", "scribe").map_or_else(
+        || std::path::PathBuf::from(".local/share/scribe/sync-state.json"),
+        |d| d.data_dir().join("sync-state.json"),
+    );
+
+    let provider_name = format!("{:?}", config.sync.provider).to_lowercase();
+    let engine = SyncEngine::new(provider, sync_state_path.clone(), provider_name.clone());
+
+    let rt = tokio::runtime::Runtime::new()?;
+    let mut state = SyncState::load(&sync_state_path);
+
+    match rt.block_on(engine.run_once(local)) {
+        Ok(merged) => {
+            merged.write_to_db(conn)?;
+            state.last_sync_at = Some(Utc::now());
+            state.last_error = None;
+            state.provider = Some(provider_name);
+            state.save(&sync_state_path)?;
+            match output {
+                OutputFormat::Text => println!("Sync complete."),
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&state)?),
+            }
+        }
+        Err(e) => {
+            state.last_error = Some(e.to_string());
+            let _ = state.save(&sync_state_path);
+            anyhow::bail!("sync failed: {e}");
+        }
+    }
+    Ok(())
 }
 
 // ── configure ─────────────────────────────────────────────────────────────

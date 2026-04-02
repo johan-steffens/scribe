@@ -112,10 +112,13 @@ fn run() -> anyhow::Result<()> {
         return cli::agent::run(args, &mut config);
     }
 
-    // `scribe sync [subcommand]` — no DB access needed for configure/status.
+    // `scribe sync configure` and `scribe sync status` — no DB access needed.
+    // The one-shot `scribe sync` (no subcommand) is handled after DB open below.
     #[cfg(feature = "sync")]
-    if let Some(Commands::Sync(ref cmd)) = cli.command {
-        return cli::sync::run(cmd, &mut config);
+    if let Some(Commands::Sync(ref cmd)) = cli.command
+        && cmd.subcommand.is_some()
+    {
+        return cli::sync::run(cmd, &mut config, None);
     }
 
     // Allow integration tests to inject an isolated DB path without modifying
@@ -171,7 +174,7 @@ fn run() -> anyhow::Result<()> {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
         Some(Commands::Daemon { interval }) => {
-            cli::daemon::run(Arc::clone(&conn), interval)?;
+            cli::daemon::run(&conn, interval, &config)?;
         }
         // Handled above before the DB opens.
         Some(
@@ -181,7 +184,9 @@ fn run() -> anyhow::Result<()> {
             | Commands::Completions { .. },
         ) => {}
         #[cfg(feature = "sync")]
-        Some(Commands::Sync(_)) => {}
+        Some(Commands::Sync(ref cmd)) => {
+            cli::sync::run(cmd, &mut config, Some(&conn))?;
+        }
         #[cfg(feature = "mcp")]
         Some(Commands::Mcp) => {
             mcp::run(&conn, &config)?;
