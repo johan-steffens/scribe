@@ -33,7 +33,7 @@ jobs:
             VERSION="${{ inputs.version }}"
             echo "Using provided version $VERSION"
           else
-            VERSION=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+            VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
             echo "Found version $VERSION in Cargo.toml"
           fi
           
@@ -114,8 +114,8 @@ jobs:
         # Stamps the release version into the manifest so the binary reports
         # the correct version via `scribe --version`.
         run: |
-          # Use a more robust sed to only match the package version line
-          sed -i -E '/^version = "[0-9]+\.[0-9]+\.[0-9]+"/s/version = ".+"/version = "${{ needs.preflight.outputs.version }}"/' Cargo.toml
+          # Use cargo set-version to safely update the version in Cargo.toml
+          cargo set-version ${{ needs.preflight.outputs.version }}
 
       - name: Build release binary (with MCP and sync features)
         run: |
