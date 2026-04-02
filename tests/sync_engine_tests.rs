@@ -245,12 +245,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_once_pushes_local_when_remote_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("sync-state.json");
         let provider = MockProvider::new();
-        let engine = SyncEngine::new(
-            Box::new(provider),
-            std::path::PathBuf::from("/tmp/test-sync-state.json"),
-            "mock".to_owned(),
-        );
+        let engine = SyncEngine::new(Box::new(provider), state_path, "mock".to_owned());
         let local = empty_snap();
         let result = engine.run_once(local).await;
         assert!(result.is_ok());
@@ -258,6 +256,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_once_merges_remote_into_local() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("sync-state.json");
         let provider = MockProvider::new();
         // Pre-load remote state
         let mut remote = empty_snap();
@@ -266,11 +266,7 @@ mod tests {
             .push(make_project("remote-proj", "Remote", 0));
         provider.push(&remote).await.unwrap();
 
-        let engine = SyncEngine::new(
-            Box::new(provider),
-            std::path::PathBuf::from("/tmp/test-sync-state.json"),
-            "mock".to_owned(),
-        );
+        let engine = SyncEngine::new(Box::new(provider), state_path, "mock".to_owned());
         let local = empty_snap();
         let merged = engine.run_once(local).await.unwrap();
         assert_eq!(merged.projects.len(), 1);
