@@ -166,9 +166,10 @@ impl SqliteCaptureItems {
     ///
     /// Returns an error if any database write fails.
     pub fn upsert_all(&self, items: &[CaptureItem]) -> anyhow::Result<()> {
-        let conn = self.lock()?;
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
         for item in items {
-            conn.execute(
+            tx.execute(
                 "INSERT INTO capture_items (slug, body, processed, created_at) \
                  VALUES (?1, ?2, ?3, ?4) \
                  ON CONFLICT(slug) DO UPDATE SET \
@@ -182,6 +183,7 @@ impl SqliteCaptureItems {
                 ],
             )?;
         }
+        tx.commit()?;
         Ok(())
     }
 }

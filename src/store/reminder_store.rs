@@ -299,9 +299,10 @@ impl SqliteReminders {
     ///
     /// Returns an error if any database write fails.
     pub fn upsert_all(&self, reminders: &[Reminder]) -> anyhow::Result<()> {
-        let conn = self.lock()?;
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
         for r in reminders {
-            conn.execute(
+            tx.execute(
                 "INSERT INTO reminders \
                  (slug, project_id, task_id, remind_at, message, fired, persistent, \
                   archived_at, created_at) \
@@ -327,6 +328,7 @@ impl SqliteReminders {
                 ],
             )?;
         }
+        tx.commit()?;
         Ok(())
     }
 }

@@ -291,9 +291,10 @@ impl SqliteTimeEntries {
     ///
     /// Returns an error if any database write fails.
     pub fn upsert_all(&self, entries: &[TimeEntry]) -> anyhow::Result<()> {
-        let conn = self.lock()?;
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
         for e in entries {
-            conn.execute(
+            tx.execute(
                 "INSERT INTO time_entries \
                  (slug, project_id, task_id, started_at, ended_at, note, archived_at, created_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
@@ -316,6 +317,7 @@ impl SqliteTimeEntries {
                 ],
             )?;
         }
+        tx.commit()?;
         Ok(())
     }
 }

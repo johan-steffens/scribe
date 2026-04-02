@@ -258,9 +258,10 @@ impl SqliteTodos {
     ///
     /// Returns an error if any database write fails.
     pub fn upsert_all(&self, todos: &[Todo]) -> anyhow::Result<()> {
-        let conn = self.lock()?;
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
         for t in todos {
-            conn.execute(
+            tx.execute(
                 "INSERT INTO todos \
                  (slug, project_id, title, done, archived_at, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
@@ -281,6 +282,7 @@ impl SqliteTodos {
                 ],
             )?;
         }
+        tx.commit()?;
         Ok(())
     }
 }

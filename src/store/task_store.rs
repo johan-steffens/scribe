@@ -327,10 +327,11 @@ impl SqliteTasks {
     ///
     /// Returns an error if any database write fails.
     pub fn upsert_all(&self, tasks: &[Task]) -> anyhow::Result<()> {
-        let conn = self.lock()?;
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
         for t in tasks {
             let due_date_str = t.due_date.map(|d| d.format("%Y-%m-%d").to_string());
-            conn.execute(
+            tx.execute(
                 "INSERT INTO tasks \
                  (slug, project_id, title, description, status, priority, \
                   due_date, archived_at, created_at, updated_at) \
@@ -358,6 +359,7 @@ impl SqliteTasks {
                 ],
             )?;
         }
+        tx.commit()?;
         Ok(())
     }
 }
