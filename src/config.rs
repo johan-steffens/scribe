@@ -65,10 +65,18 @@ pub struct SyncGistConfig {
 }
 
 /// Default S3 object key for the sync state document.
+///
+/// `"scribe-state.json"` is a human-readable, unambiguous name. Changing this
+/// value orphans existing sync data — all machines must be reconfigured with the
+/// new key before they can re-join the same sync pool.
 #[cfg(feature = "sync")]
 const DEFAULT_S3_KEY: &str = "scribe-state.json";
 
 /// Default AWS region for S3 sync.
+///
+/// `"us-east-1"` is the AWS default region and typically has the lowest API
+/// latency from the US East Coast. Users outside North America should override
+/// this to a region geographically closer to them.
 #[cfg(feature = "sync")]
 const DEFAULT_S3_REGION: &str = "us-east-1";
 
@@ -111,29 +119,33 @@ impl Default for SyncS3Config {
 }
 
 /// Default iCloud Drive path for the sync state document.
+///
+/// The container path `com~apple~CloudDocs` is the standard iCloud Drive root
+/// on macOS and is locale-independent. Changing this value orphans existing
+/// sync files — all machines must be updated to the new path simultaneously.
 #[cfg(feature = "sync")]
 const DEFAULT_ICLOUD_PATH: &str =
     "~/Library/Mobile Documents/com~apple~CloudDocs/scribe-state.json";
 
 #[cfg(feature = "sync")]
-fn default_icloud_path() -> String {
-    DEFAULT_ICLOUD_PATH.to_owned()
+fn default_icloud_path() -> PathBuf {
+    PathBuf::from(DEFAULT_ICLOUD_PATH)
 }
 
 #[cfg(feature = "sync")]
 /// Non-secret configuration for the iCloud Drive sync provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncICloudConfig {
-    /// File path inside iCloud Drive for the sync state document.
+    /// Local iCloud Drive file path for the state document.
     #[serde(default = "default_icloud_path")]
-    pub path: String,
+    pub path: PathBuf,
 }
 
 #[cfg(feature = "sync")]
 impl Default for SyncICloudConfig {
     fn default() -> Self {
         Self {
-            path: DEFAULT_ICLOUD_PATH.to_owned(),
+            path: PathBuf::from(DEFAULT_ICLOUD_PATH),
         }
     }
 }
@@ -146,7 +158,11 @@ pub struct SyncJsonBinConfig {
     pub bin_id: String,
 }
 
-/// Default Dropbox file path for the sync state document.
+/// Default Dropbox remote path for the sync state document.
+///
+/// `"/scribe-state.json"` resolves to the Dropbox root directory. Changing this
+/// value orphans existing sync files — all machines must be updated to the new
+/// path simultaneously.
 #[cfg(feature = "sync")]
 const DEFAULT_DROPBOX_PATH: &str = "/scribe-state.json";
 
@@ -173,7 +189,11 @@ impl Default for SyncDropboxConfig {
     }
 }
 
-/// Default TCP port for the REST sync server.
+/// Default TCP port for the self-hosted REST sync master server.
+///
+/// `7171` was chosen as an unregistered port unlikely to conflict with common
+/// services. If your OS or firewall already uses this port, override it in
+/// `sync.rest.port`. Changing the port requires updating all client machines.
 #[cfg(feature = "sync")]
 const DEFAULT_REST_PORT: u16 = 7171;
 
@@ -211,10 +231,15 @@ impl Default for SyncRestConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyncFileConfig {
     /// Filesystem path to the sync state document.
-    pub path: String,
+    pub path: PathBuf,
 }
 
-/// Default sync polling interval in seconds.
+/// Default daemon sync interval in seconds.
+///
+/// 60 seconds balances data freshness against API rate limits. Very low values
+/// (< 10 s) may trigger rate limiting on providers such as GitHub Gist and
+/// JSONBin.io. The daemon reminder poll runs on a separate 30 s timer and is
+/// unaffected by this value.
 #[cfg(feature = "sync")]
 const DEFAULT_SYNC_INTERVAL_SECS: u64 = 60;
 
