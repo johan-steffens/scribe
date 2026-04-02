@@ -8,6 +8,8 @@
 //!    so that reminder notifications are delivered automatically.
 //! 2. **Agent integration** — install the Scribe skill file to detected AI
 //!    coding agent directories.
+//! 3. **State sync** (optional, requires `sync` feature) — configure a
+//!    remote sync provider so data is backed up and shared across machines.
 //!
 //! If setup has already been completed, the command prints a status summary
 //! instead. The user can force the wizard again with `--wizard`.
@@ -83,6 +85,8 @@ pub fn print_status(config: &Config) {
 
     println!("  Daemon service:    {daemon}");
     println!("  Agent integration: {agents}");
+    #[cfg(feature = "sync")]
+    print_sync_status(config);
     println!();
 
     if !config.setup.daemon_service_installed || !config.setup.agent_installed {
@@ -90,6 +94,19 @@ pub fn print_status(config: &Config) {
     } else {
         println!("All setup steps are complete.");
     }
+}
+
+// ── sync status helper (sync feature only) ────────────────────────────────
+
+/// Prints the sync configuration status line.
+#[cfg(feature = "sync")]
+fn print_sync_status(config: &Config) {
+    let sync_status = if config.sync.enabled {
+        format!("configured (provider: {})", config.sync.provider)
+    } else {
+        "not configured  (run `scribe sync configure`)".to_owned()
+    };
+    println!("  Sync:              {sync_status}");
 }
 
 // ── wizard ─────────────────────────────────────────────────────────────────
@@ -107,9 +124,15 @@ fn run_wizard(config: &mut Config) -> anyhow::Result<()> {
 
     // ── Step 1: daemon service ─────────────────────────────────────────────
     if config.setup.daemon_service_installed {
+        #[cfg(not(feature = "sync"))]
         println!("[1/2] Daemon service: already installed — skipping.");
+        #[cfg(feature = "sync")]
+        println!("[1/3] Daemon service: already installed — skipping.");
     } else {
+        #[cfg(not(feature = "sync"))]
         println!("[1/2] Daemon service");
+        #[cfg(feature = "sync")]
+        println!("[1/3] Daemon service");
         println!("      Installs `scribe daemon` as a background service so that");
         println!("      reminder notifications are delivered automatically.");
         println!("      On macOS: launchd user agent (no sudo required).");
@@ -129,9 +152,15 @@ fn run_wizard(config: &mut Config) -> anyhow::Result<()> {
 
     // ── Step 2: agent integration ──────────────────────────────────────────
     if config.setup.agent_installed {
+        #[cfg(not(feature = "sync"))]
         println!("[2/2] Agent integration: already installed — skipping.");
+        #[cfg(feature = "sync")]
+        println!("[2/3] Agent integration: already installed — skipping.");
     } else {
+        #[cfg(not(feature = "sync"))]
         println!("[2/2] Agent integration");
+        #[cfg(feature = "sync")]
+        println!("[2/3] Agent integration");
         println!("      Installs a Scribe skill file to detected AI coding agent");
         println!("      directories (Claude Code, Cursor, Codex, Windsurf).");
         println!();
@@ -145,6 +174,36 @@ fn run_wizard(config: &mut Config) -> anyhow::Result<()> {
             anything_done = true;
         } else {
             println!("      Skipped. You can install later with `scribe agent install`.");
+        }
+    }
+
+    // ── Step 3: sync configuration (sync feature only) ────────────────────
+    #[cfg(feature = "sync")]
+    {
+        println!();
+        if config.sync.enabled {
+            println!(
+                "[3/3] State sync: already configured (provider: {}) — skipping.",
+                config.sync.provider
+            );
+        } else {
+            println!("[3/3] State sync");
+            println!("      Configures a remote sync provider to back up your data");
+            println!("      and share it across multiple machines.");
+            println!();
+
+            if prompt_yes_no("      Configure state sync?", false)? {
+                println!();
+                let cfg_args = crate::cli::sync::SyncConfigureArgs {
+                    provider: None,
+                    remove: false,
+                    output: OutputFormat::Text,
+                };
+                crate::cli::sync::run_configure(&cfg_args, config)?;
+                anything_done = true;
+            } else {
+                println!("      Skipped. You can configure later with `scribe sync configure`.");
+            }
         }
     }
 

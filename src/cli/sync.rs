@@ -163,7 +163,7 @@ fn run_sync_once(
 ///
 /// Returns an error if prompting fails, keychain writes fail, or the config
 /// cannot be saved.
-fn run_configure(
+pub(crate) fn run_configure(
     args: &SyncConfigureArgs,
     config: &mut crate::config::Config,
 ) -> anyhow::Result<()> {
