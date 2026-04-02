@@ -51,11 +51,6 @@ jobs:
             os: macos-15
             artifact: scribe-macos-aarch64
 
-          # macOS Intel (x86_64)
-          - target: x86_64-apple-darwin
-            os: macos-13
-            artifact: scribe-macos-x86_64
-
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -138,7 +133,7 @@ jobs:
       - name: Generate SHA-256 checksums
         working-directory: dist
         run: |
-          sha256sum scribe-linux-x86_64 scribe-macos-aarch64 scribe-macos-x86_64 \
+          sha256sum scribe-linux-x86_64 scribe-macos-aarch64 \
             > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
@@ -155,10 +150,6 @@ jobs:
             ```sh
             # macOS (Apple Silicon)
             curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-macos-aarch64
-            chmod +x scribe && sudo mv scribe /usr/local/bin/
-
-            # macOS (Intel)
-            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/v${{ needs.preflight.outputs.version }}/scribe-macos-x86_64
             chmod +x scribe && sudo mv scribe /usr/local/bin/
 
             # Linux (x86_64)
@@ -194,7 +185,6 @@ jobs:
           files: |
             dist/scribe-linux-x86_64
             dist/scribe-macos-aarch64
-            dist/scribe-macos-x86_64
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
           make_latest: true

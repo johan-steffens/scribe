@@ -74,10 +74,6 @@ make it executable, and move it onto your `$PATH`:
 curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-macos-aarch64
 chmod +x scribe && sudo mv scribe /usr/local/bin/
 
-# macOS (Intel)
-curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-macos-x86_64
-chmod +x scribe && sudo mv scribe /usr/local/bin/
-
 # Linux (x86_64)
 curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-linux-x86_64
 chmod +x scribe && sudo mv scribe /usr/local/bin/
