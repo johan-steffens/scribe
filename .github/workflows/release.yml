@@ -124,10 +124,12 @@ jobs:
           path: dist/
 
       - name: Flatten artefact directories
-        # download-artifact@v4 creates one subdirectory per artefact name.
         run: |
           for dir in dist/*/; do
-            mv "$dir"* dist/ 2>/dev/null || true
+            [ -d "$dir" ] || continue
+            for file in "$dir"*; do
+              [ -f "$file" ] && mv "$file" dist/
+            done
             rmdir "$dir"
           done
           ls -lh dist/
