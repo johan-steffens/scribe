@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 1.0.0)"
-        required: true
+        description: "Release version (overrides Cargo.toml)"
+        required: false
         type: string
 
 # Only allow this workflow to run against main.
@@ -24,15 +24,30 @@ jobs:
           echo "::error::This workflow may only be run from the main branch (got ${{ github.ref }})."
           exit 1
 
-      - name: Validate version format
+      - name: Validate version and check tag existence
         id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${{ inputs.version }}"
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Version must be in MAJOR.MINOR.PATCH format (got '$VERSION')."
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "Using provided version $VERSION"
+          else
+            VERSION=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+            echo "Found version $VERSION in Cargo.toml"
+          fi
+          
+          # Check tag existence (GH CLI)
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists."
             exit 1
           fi
+          
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build and verify locally
+        run: |
+          cargo build --release --features mcp,sync
 
   build:
     name: Build — ${{ matrix.target }}
