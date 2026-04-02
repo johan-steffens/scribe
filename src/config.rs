@@ -20,6 +20,263 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+// ── sync config ────────────────────────────────────────────────────────────
+
+#[cfg(feature = "sync")]
+/// Active sync provider name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncProvider {
+    /// GitHub Gist-backed sync (default).
+    #[default]
+    Gist,
+    /// Amazon S3-compatible object storage.
+    S3,
+    /// Apple iCloud Drive file sync.
+    ICloud,
+    /// JSONBin.io cloud storage.
+    JsonBin,
+    /// Dropbox file sync.
+    Dropbox,
+    /// Custom REST server sync.
+    Rest,
+    /// Local or network file path sync.
+    File,
+}
+
+#[cfg(feature = "sync")]
+/// Role of this machine in the REST sync model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RestRole {
+    /// Receives state from a master node (default).
+    #[default]
+    Client,
+    /// Acts as the authoritative source of truth.
+    Master,
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the GitHub Gist sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SyncGistConfig {
+    /// ID of the Gist used to store the sync state document.
+    pub gist_id: String,
+}
+
+/// Default S3 object key for the sync state document.
+#[cfg(feature = "sync")]
+const DEFAULT_S3_KEY: &str = "scribe-state.json";
+
+/// Default AWS region for S3 sync.
+#[cfg(feature = "sync")]
+const DEFAULT_S3_REGION: &str = "us-east-1";
+
+#[cfg(feature = "sync")]
+fn default_s3_key() -> String {
+    DEFAULT_S3_KEY.to_owned()
+}
+
+#[cfg(feature = "sync")]
+fn default_s3_region() -> String {
+    DEFAULT_S3_REGION.to_owned()
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the S3-compatible sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncS3Config {
+    /// S3-compatible endpoint URL (e.g. `https://s3.amazonaws.com`).
+    pub endpoint: String,
+    /// Bucket name to store the sync state document.
+    pub bucket: String,
+    /// Object key for the sync state document.
+    #[serde(default = "default_s3_key")]
+    pub key: String,
+    /// AWS region name.
+    #[serde(default = "default_s3_region")]
+    pub region: String,
+}
+
+#[cfg(feature = "sync")]
+impl Default for SyncS3Config {
+    fn default() -> Self {
+        Self {
+            endpoint: String::new(),
+            bucket: String::new(),
+            key: DEFAULT_S3_KEY.to_owned(),
+            region: DEFAULT_S3_REGION.to_owned(),
+        }
+    }
+}
+
+/// Default iCloud Drive path for the sync state document.
+#[cfg(feature = "sync")]
+const DEFAULT_ICLOUD_PATH: &str =
+    "~/Library/Mobile Documents/com~apple~CloudDocs/scribe-state.json";
+
+#[cfg(feature = "sync")]
+fn default_icloud_path() -> String {
+    DEFAULT_ICLOUD_PATH.to_owned()
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the iCloud Drive sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncICloudConfig {
+    /// File path inside iCloud Drive for the sync state document.
+    #[serde(default = "default_icloud_path")]
+    pub path: String,
+}
+
+#[cfg(feature = "sync")]
+impl Default for SyncICloudConfig {
+    fn default() -> Self {
+        Self {
+            path: DEFAULT_ICLOUD_PATH.to_owned(),
+        }
+    }
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the JSONBin.io sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SyncJsonBinConfig {
+    /// ID of the bin used to store the sync state document.
+    pub bin_id: String,
+}
+
+/// Default Dropbox file path for the sync state document.
+#[cfg(feature = "sync")]
+const DEFAULT_DROPBOX_PATH: &str = "/scribe-state.json";
+
+#[cfg(feature = "sync")]
+fn default_dropbox_path() -> String {
+    DEFAULT_DROPBOX_PATH.to_owned()
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the Dropbox sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncDropboxConfig {
+    /// Dropbox path for the sync state document.
+    #[serde(default = "default_dropbox_path")]
+    pub path: String,
+}
+
+#[cfg(feature = "sync")]
+impl Default for SyncDropboxConfig {
+    fn default() -> Self {
+        Self {
+            path: DEFAULT_DROPBOX_PATH.to_owned(),
+        }
+    }
+}
+
+/// Default TCP port for the REST sync server.
+#[cfg(feature = "sync")]
+const DEFAULT_REST_PORT: u16 = 7171;
+
+#[cfg(feature = "sync")]
+fn default_rest_port() -> u16 {
+    DEFAULT_REST_PORT
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the custom REST sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncRestConfig {
+    /// Base URL of the REST sync server (e.g. `http://192.168.1.1:7171`).
+    pub url: String,
+    /// Role of this machine in the REST sync model.
+    pub role: RestRole,
+    /// TCP port the REST server listens on.
+    #[serde(default = "default_rest_port")]
+    pub port: u16,
+}
+
+#[cfg(feature = "sync")]
+impl Default for SyncRestConfig {
+    fn default() -> Self {
+        Self {
+            url: String::new(),
+            role: RestRole::default(),
+            port: DEFAULT_REST_PORT,
+        }
+    }
+}
+
+#[cfg(feature = "sync")]
+/// Non-secret configuration for the local/network file sync provider.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SyncFileConfig {
+    /// Filesystem path to the sync state document.
+    pub path: String,
+}
+
+/// Default sync polling interval in seconds.
+#[cfg(feature = "sync")]
+const DEFAULT_SYNC_INTERVAL_SECS: u64 = 60;
+
+#[cfg(feature = "sync")]
+fn default_sync_interval_secs() -> u64 {
+    DEFAULT_SYNC_INTERVAL_SECS
+}
+
+#[cfg(feature = "sync")]
+/// Top-level `[sync]` configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncConfig {
+    /// Whether the sync subsystem is active.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Which sync provider to use.
+    #[serde(default)]
+    pub provider: SyncProvider,
+    /// How often (in seconds) to poll for remote changes.
+    #[serde(default = "default_sync_interval_secs")]
+    pub interval_secs: u64,
+    /// GitHub Gist provider configuration.
+    #[serde(default)]
+    pub gist: SyncGistConfig,
+    /// S3-compatible provider configuration.
+    #[serde(default)]
+    pub s3: SyncS3Config,
+    /// iCloud Drive provider configuration.
+    #[serde(default)]
+    pub icloud: SyncICloudConfig,
+    /// JSONBin.io provider configuration.
+    #[serde(default)]
+    pub jsonbin: SyncJsonBinConfig,
+    /// Dropbox provider configuration.
+    #[serde(default)]
+    pub dropbox: SyncDropboxConfig,
+    /// Custom REST server provider configuration.
+    #[serde(default)]
+    pub rest: SyncRestConfig,
+    /// Local/network file provider configuration.
+    #[serde(default)]
+    pub file: SyncFileConfig,
+}
+
+#[cfg(feature = "sync")]
+impl Default for SyncConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: SyncProvider::default(),
+            interval_secs: DEFAULT_SYNC_INTERVAL_SECS,
+            gist: SyncGistConfig::default(),
+            s3: SyncS3Config::default(),
+            icloud: SyncICloudConfig::default(),
+            jsonbin: SyncJsonBinConfig::default(),
+            dropbox: SyncDropboxConfig::default(),
+            rest: SyncRestConfig::default(),
+            file: SyncFileConfig::default(),
+        }
+    }
+}
+
 // ── on-disk representation ─────────────────────────────────────────────────
 
 /// Raw `[data]` section as it appears in `config.toml`.
@@ -85,6 +342,9 @@ struct RawConfig {
     display: DisplayConfig,
     #[serde(default)]
     setup: SetupConfig,
+    #[cfg(feature = "sync")]
+    #[serde(default)]
+    sync: SyncConfig,
 }
 
 // ── public Config ──────────────────────────────────────────────────────────
@@ -118,6 +378,9 @@ pub struct Config {
     pub time_format: String,
     /// Setup completion state — written by `scribe setup` and `scribe service`.
     pub setup: SetupConfig,
+    /// Cloud sync configuration (requires the `sync` feature).
+    #[cfg(feature = "sync")]
+    pub sync: SyncConfig,
 }
 
 impl Default for Config {
@@ -238,6 +501,8 @@ impl Config {
             date_format: raw.display.date_format,
             time_format: raw.display.time_format,
             setup: raw.setup,
+            #[cfg(feature = "sync")]
+            sync: raw.sync,
         }
     }
 
@@ -257,6 +522,8 @@ impl Config {
                 time_format: self.time_format.clone(),
             },
             setup: self.setup.clone(),
+            #[cfg(feature = "sync")]
+            sync: self.sync.clone(),
         }
     }
 }
@@ -307,6 +574,8 @@ mod tests {
             date_format: "%Y-%m-%d".to_owned(),
             time_format: "%H:%M".to_owned(),
             setup: SetupConfig::default(),
+            #[cfg(feature = "sync")]
+            sync: SyncConfig::default(),
         };
         assert_eq!(cfg.db_path(), PathBuf::from("/tmp/test.db"));
     }
@@ -335,5 +604,28 @@ mod tests {
         let restored = Config::from_raw(raw);
         assert!(restored.setup.daemon_service_installed);
         assert!(restored.setup.agent_installed);
+    }
+
+    #[cfg(feature = "sync")]
+    #[test]
+    fn test_sync_config_defaults_to_disabled() {
+        let cfg = Config::default();
+        assert!(!cfg.sync.enabled);
+        assert_eq!(cfg.sync.provider, SyncProvider::Gist);
+        assert_eq!(cfg.sync.interval_secs, 60);
+    }
+
+    #[cfg(feature = "sync")]
+    #[test]
+    fn test_sync_config_round_trip() {
+        let mut cfg = Config::default();
+        cfg.sync.enabled = true;
+        cfg.sync.provider = SyncProvider::S3;
+        cfg.sync.s3.bucket = "my-bucket".to_owned();
+        let raw = cfg.to_raw();
+        let restored = Config::from_raw(raw);
+        assert!(restored.sync.enabled);
+        assert_eq!(restored.sync.provider, SyncProvider::S3);
+        assert_eq!(restored.sync.s3.bucket, "my-bucket");
     }
 }
