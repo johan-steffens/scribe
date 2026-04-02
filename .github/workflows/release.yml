@@ -53,9 +53,13 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build and verify locally
+      - name: Install clippy and rustfmt
+        run: rustup component add clippy rustfmt
+
+      - name: Run checks
         run: |
-          cargo build --release --features mcp,sync
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
 
   build:
     name: Build — ${{ matrix.target }}
