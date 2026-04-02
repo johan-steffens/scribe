@@ -8,6 +8,7 @@
 //! exchange [`StateSnapshot`] values with the backend and handle failures
 //! through [`SyncError`].
 
+pub mod engine;
 pub mod keychain;
 pub mod providers;
 pub mod snapshot;
@@ -15,6 +16,8 @@ pub mod snapshot;
 use async_trait::async_trait;
 use thiserror::Error;
 
+#[doc(inline)]
+pub use engine::{SyncEngine, SyncState};
 #[doc(inline)]
 pub use snapshot::StateSnapshot;
 

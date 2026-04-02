@@ -163,4 +163,117 @@ mod tests {
             "scribe.sync.rest.secret"
         );
     }
+
+    // ── SyncEngine / merge_into tests ──────────────────────────────────────
+
+    use chrono::Duration;
+    use scribe::domain::{Project, ProjectId, ProjectStatus};
+    use scribe::sync::engine::SyncEngine;
+
+    fn make_project(slug: &str, name: &str, updated_secs_ago: i64) -> Project {
+        let t = Utc::now() - Duration::seconds(updated_secs_ago);
+        Project {
+            id: ProjectId(1),
+            slug: slug.to_owned(),
+            name: name.to_owned(),
+            description: None,
+            status: ProjectStatus::Active,
+            is_reserved: false,
+            archived_at: None,
+            created_at: t,
+            updated_at: t,
+        }
+    }
+
+    #[test]
+    fn test_merge_remote_only_entity_is_inserted() {
+        let mut local = empty_snap();
+        let mut remote = empty_snap();
+        remote
+            .projects
+            .push(make_project("remote-proj", "Remote", 0));
+        SyncEngine::merge_into(&mut local, &remote);
+        assert_eq!(local.projects.len(), 1);
+        assert_eq!(local.projects[0].slug, "remote-proj");
+    }
+
+    #[test]
+    fn test_merge_local_only_entity_is_preserved() {
+        let mut local = empty_snap();
+        local.projects.push(make_project("local-proj", "Local", 0));
+        let remote = empty_snap();
+        SyncEngine::merge_into(&mut local, &remote);
+        assert_eq!(local.projects.len(), 1);
+        assert_eq!(local.projects[0].slug, "local-proj");
+    }
+
+    #[test]
+    fn test_merge_remote_newer_replaces_local() {
+        let mut local = empty_snap();
+        local.projects.push(make_project("shared", "Old Name", 120));
+        let mut remote = empty_snap();
+        remote.projects.push(make_project("shared", "New Name", 10));
+        SyncEngine::merge_into(&mut local, &remote);
+        assert_eq!(local.projects.len(), 1);
+        assert_eq!(local.projects[0].name, "New Name");
+    }
+
+    #[test]
+    fn test_merge_local_newer_keeps_local() {
+        let mut local = empty_snap();
+        local.projects.push(make_project("shared", "New Name", 10));
+        let mut remote = empty_snap();
+        remote
+            .projects
+            .push(make_project("shared", "Old Name", 120));
+        SyncEngine::merge_into(&mut local, &remote);
+        assert_eq!(local.projects.len(), 1);
+        assert_eq!(local.projects[0].name, "New Name");
+    }
+
+    #[test]
+    fn test_merge_archived_propagates_from_remote() {
+        let mut local = empty_snap();
+        local.projects.push(make_project("proj", "Project", 120));
+        let mut remote = empty_snap();
+        let mut archived = make_project("proj", "Project", 10);
+        archived.archived_at = Some(Utc::now());
+        remote.projects.push(archived);
+        SyncEngine::merge_into(&mut local, &remote);
+        assert!(local.projects[0].archived_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_run_once_pushes_local_when_remote_empty() {
+        let provider = MockProvider::new();
+        let engine = SyncEngine::new(
+            Box::new(provider),
+            std::path::PathBuf::from("/tmp/test-sync-state.json"),
+            "mock".to_owned(),
+        );
+        let local = empty_snap();
+        let result = engine.run_once(local).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_run_once_merges_remote_into_local() {
+        let provider = MockProvider::new();
+        // Pre-load remote state
+        let mut remote = empty_snap();
+        remote
+            .projects
+            .push(make_project("remote-proj", "Remote", 0));
+        provider.push(&remote).await.unwrap();
+
+        let engine = SyncEngine::new(
+            Box::new(provider),
+            std::path::PathBuf::from("/tmp/test-sync-state.json"),
+            "mock".to_owned(),
+        );
+        let local = empty_snap();
+        let merged = engine.run_once(local).await.unwrap();
+        assert_eq!(merged.projects.len(), 1);
+        assert_eq!(merged.projects[0].slug, "remote-proj");
+    }
 }
