@@ -61,8 +61,12 @@ impl KeychainStore {
     /// `scribe.sync.gist.token`.  Both `provider` and `field` are embedded
     /// verbatim — callers must ensure they contain only URL-safe characters so
     /// that the resulting name is unambiguous across platforms.
+    ///
+    /// Accepts any string type for `provider` and `field`.
     #[must_use]
-    pub fn service_name(provider: &str, field: &str) -> String {
+    pub fn service_name(provider: impl AsRef<str>, field: impl AsRef<str>) -> String {
+        let provider = provider.as_ref();
+        let field = field.as_ref();
         format!("scribe.sync.{provider}.{field}")
     }
 
@@ -70,7 +74,8 @@ impl KeychainStore {
     ///
     /// The service name is derived from `provider` and `field` via
     /// [`KeychainStore::service_name`]; the username is always
-    /// [`KEYCHAIN_USERNAME`].
+    /// [`KEYCHAIN_USERNAME`].  Accepts any string type for `provider` and
+    /// `field`.
     ///
     /// # Errors
     ///
@@ -80,7 +85,7 @@ impl KeychainStore {
     ///   gnome-keyring or kwallet.
     /// - The secret is not present in the keychain.  The message instructs the
     ///   user to run `scribe sync configure`.
-    pub fn get(provider: &str, field: &str) -> Result<String, SyncError> {
+    pub fn get(provider: impl AsRef<str>, field: impl AsRef<str>) -> Result<String, SyncError> {
         let service = Self::service_name(provider, field);
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
@@ -102,13 +107,18 @@ impl KeychainStore {
     /// The service name is derived from `provider` and `field` via
     /// [`KeychainStore::service_name`]; the username is always
     /// [`KEYCHAIN_USERNAME`].  Any existing value for the same service name is
-    /// overwritten.
+    /// overwritten.  Accepts any string type for `provider`, `field`, and
+    /// `secret`.
     ///
     /// # Errors
     ///
     /// Returns [`SyncError::Keychain`] when the entry cannot be created (no
     /// keychain daemon) or when the write fails.
-    pub fn set(provider: &str, field: &str, secret: &str) -> Result<(), SyncError> {
+    pub fn set(
+        provider: impl AsRef<str>,
+        field: impl AsRef<str>,
+        secret: impl AsRef<str>,
+    ) -> Result<(), SyncError> {
         let service = Self::service_name(provider, field);
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
@@ -118,7 +128,7 @@ impl KeychainStore {
             ))
         })?;
         entry
-            .set_password(secret)
+            .set_password(secret.as_ref())
             .map_err(|e| SyncError::Keychain(format!("could not write to keychain: {e}")))
     }
 
@@ -127,14 +137,14 @@ impl KeychainStore {
     /// The service name is derived from `provider` and `field` via
     /// [`KeychainStore::service_name`]; the username is always
     /// [`KEYCHAIN_USERNAME`].  If the entry does not exist, this method
-    /// succeeds silently.
+    /// succeeds silently.  Accepts any string type for `provider` and `field`.
     ///
     /// # Errors
     ///
     /// Returns [`SyncError::Keychain`] when the entry cannot be created (no
     /// keychain daemon) or when the deletion fails for a reason other than the
     /// entry being absent.
-    pub fn remove(provider: &str, field: &str) -> Result<(), SyncError> {
+    pub fn remove(provider: impl AsRef<str>, field: impl AsRef<str>) -> Result<(), SyncError> {
         let service = Self::service_name(provider, field);
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
