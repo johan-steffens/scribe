@@ -52,4 +52,51 @@ mod tests {
         let h3 = snap.content_hash();
         assert_eq!(h1, h3, "content hash should not depend on machine_id");
     }
+
+    use async_trait::async_trait;
+    use scribe::sync::{SyncError, SyncProvider};
+
+    struct MockProvider {
+        stored: std::sync::Mutex<Option<StateSnapshot>>,
+    }
+
+    impl MockProvider {
+        fn new() -> Self {
+            Self {
+                stored: std::sync::Mutex::new(None),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SyncProvider for MockProvider {
+        async fn push(&self, snapshot: &StateSnapshot) -> Result<(), SyncError> {
+            *self.stored.lock().unwrap() = Some(snapshot.clone());
+            Ok(())
+        }
+
+        async fn pull(&self) -> Result<StateSnapshot, SyncError> {
+            self.stored
+                .lock()
+                .unwrap()
+                .clone()
+                .ok_or_else(|| SyncError::NotFound("no remote state".to_owned()))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mock_provider_push_pull_roundtrip() {
+        let provider = MockProvider::new();
+        let snap = empty_snap();
+        provider.push(&snap).await.unwrap();
+        let pulled = provider.pull().await.unwrap();
+        assert_eq!(pulled.schema_version, StateSnapshot::SCHEMA_VERSION);
+    }
+
+    #[tokio::test]
+    async fn test_mock_provider_pull_when_empty_returns_not_found() {
+        let provider = MockProvider::new();
+        let result = provider.pull().await;
+        assert!(matches!(result, Err(SyncError::NotFound(_))));
+    }
 }
