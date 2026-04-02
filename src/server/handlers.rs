@@ -30,9 +30,9 @@ use crate::sync::{engine::SyncEngine, snapshot::StateSnapshot};
 /// operation because all lock holders are async tasks that do not panic.
 pub struct ServerState {
     /// The current local snapshot shared across all requests.
-    pub snapshot: Arc<RwLock<StateSnapshot>>,
+    pub(crate) snapshot: Arc<RwLock<StateSnapshot>>,
     /// The expected Bearer token used by the authentication middleware.
-    pub secret: String,
+    pub(crate) secret: String,
 }
 
 impl std::fmt::Debug for ServerState {
@@ -74,9 +74,9 @@ pub async fn get_state(State(state): State<ServerState>) -> impl IntoResponse {
 ///
 /// # Errors
 ///
-/// Returns [`StatusCode::BAD_REQUEST`] if axum cannot deserialise the request
-/// body as a [`StateSnapshot`] (handled automatically by the [`Json`] extractor
-/// before this function is called).
+/// Returns [`StatusCode::UNPROCESSABLE_ENTITY`] (422) if axum cannot
+/// deserialise the request body as a [`StateSnapshot`] (handled automatically
+/// by the [`Json`] extractor before this function is called).
 pub async fn put_state(
     State(state): State<ServerState>,
     Json(remote): Json<StateSnapshot>,
