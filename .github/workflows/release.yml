@@ -185,7 +185,13 @@ jobs:
 
             ## Checksums
 
-            See `SHA256SUMS.txt` attached below.
+            Verify the checksum of the downloaded binary:
+
+            ```sh
+            echo "<checksum>  scribe" | sha256sum -c
+            ```
+
+            (Replace `<checksum>` with the corresponding value from `SHA256SUMS.txt`.)
           files: |
             dist/scribe-linux-x86_64
             dist/scribe-macos-aarch64
