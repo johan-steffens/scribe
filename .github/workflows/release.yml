@@ -90,12 +90,12 @@ jobs:
           sed -i.bak 's/^version = ".*"/version = "${{ needs.preflight.outputs.version }}"/' Cargo.toml
           rm -f Cargo.toml.bak
 
-      - name: Build release binary (with MCP feature)
+      - name: Build release binary (with MCP and sync features)
         run: |
           cargo build \
             --release \
             --locked \
-            --features mcp \
+            --features mcp,sync \
             --target ${{ matrix.target }}
 
       - name: Rename binary
@@ -185,7 +185,7 @@ jobs:
 
             ## MCP server
 
-            This binary is built with the `mcp` feature. Run `scribe mcp` to start the
+            This binary is built with the `mcp` and `sync` features. Run `scribe mcp` to start the
             MCP stdio server and connect it to your AI agent.
 
             ## Checksums
