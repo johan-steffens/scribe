@@ -115,8 +115,8 @@ pub trait Projects {
     /// # Errors
     ///
     /// Returns an error on database failure.
-    // Used in Phase 2+ archive browsing.
-    #[expect(dead_code, reason = "used in Phase 2+ archive browsing")]
+    // Reserved for Phase 2+ archive browsing.
+    #[allow(dead_code, reason = "used in Phase 2+ archive browsing")]
     fn list_archived(&self) -> anyhow::Result<Vec<Project>>;
 
     /// Lists projects filtered by status, including archived when requested.

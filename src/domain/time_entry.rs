@@ -104,7 +104,7 @@ pub trait TimeEntries {
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
     // Reserved for Phase 5 restore flows.
-    #[expect(
+    #[allow(
         dead_code,
         reason = "reserved for Phase 5 restore and archive management flows"
     )]
@@ -123,7 +123,7 @@ pub trait TimeEntries {
     ///
     /// Returns an error if the entry does not exist or a database error occurs.
     // Reserved for Phase 5 hard-delete administrative flows.
-    #[expect(
+    #[allow(
         dead_code,
         reason = "reserved for Phase 5 hard-delete administrative flows"
     )]

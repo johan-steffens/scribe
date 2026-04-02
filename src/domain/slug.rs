@@ -121,6 +121,7 @@ impl std::error::Error for SlugError {}
 /// assert_eq!(slug::generate("proj-task-", "Fix Login Bug"), "proj-task-fix-login-bug");
 /// assert_eq!(slug::generate("", "hello world"), "hello-world");
 /// ```
+#[must_use]
 pub fn generate(prefix: &str, title: &str) -> String {
     let normalised = normalise(title);
     format!("{prefix}{normalised}")
