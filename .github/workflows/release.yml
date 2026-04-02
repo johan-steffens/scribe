@@ -45,6 +45,14 @@ jobs:
           
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Build and verify locally
         run: |
           cargo build --release --features mcp,sync
