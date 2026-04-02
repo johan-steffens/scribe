@@ -19,6 +19,11 @@ jobs:
           echo "::error::This workflow may only be run from the main branch (got ${{ github.ref }})."
           exit 1
 
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
       - name: Validate version and check tag existence
         id: validate
         env:
@@ -34,11 +39,6 @@ jobs:
           fi
           
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout main
-        uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
