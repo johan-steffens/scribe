@@ -99,4 +99,26 @@ mod tests {
         let result = provider.pull().await;
         assert!(matches!(result, Err(SyncError::NotFound(_))));
     }
+
+    use scribe::sync::keychain::KeychainStore;
+
+    #[test]
+    fn test_keychain_service_name_format() {
+        assert_eq!(
+            KeychainStore::service_name("gist", "token"),
+            "scribe.sync.gist.token"
+        );
+    }
+
+    #[test]
+    fn test_keychain_service_name_different_providers() {
+        assert_eq!(
+            KeychainStore::service_name("s3", "access_key_id"),
+            "scribe.sync.s3.access_key_id"
+        );
+        assert_eq!(
+            KeychainStore::service_name("rest", "secret"),
+            "scribe.sync.rest.secret"
+        );
+    }
 }

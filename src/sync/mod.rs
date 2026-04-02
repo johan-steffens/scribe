@@ -8,6 +8,7 @@
 //! exchange [`StateSnapshot`] values with the backend and handle failures
 //! through [`SyncError`].
 
+pub mod keychain;
 pub mod snapshot;
 
 use async_trait::async_trait;
