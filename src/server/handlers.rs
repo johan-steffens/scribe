@@ -10,7 +10,6 @@
 //!   snapshot into local state, and returns the merged result.
 
 // DOCUMENTED-MAGIC: Dead code until the daemon wires the server in a later task.
-#![allow(dead_code, reason = "wired via daemon in a later task")]
 
 use std::sync::Arc;
 

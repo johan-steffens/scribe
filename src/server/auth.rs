@@ -9,7 +9,6 @@
 //! presenting an incorrect Bearer token are rejected with `401 Unauthorized`.
 
 // DOCUMENTED-MAGIC: Dead code until the daemon wires the server in a later task.
-#![allow(dead_code, reason = "wired via daemon in a later task")]
 
 use axum::{
     extract::Request,
