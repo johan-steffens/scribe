@@ -20,10 +20,10 @@ use rusqlite::Connection;
 
 use crate::domain::TaskStatus;
 use crate::domain::{
-    CaptureItem, CaptureItems, NewCaptureItem, NewTodo, Projects, TaskPriority, Todos, slug,
+    slug, CaptureItem, CaptureItems, NewCaptureItem, NewTodo, Projects, TaskPriority, Todos,
 };
-use crate::ops::TaskOps;
 use crate::ops::tasks::CreateTask;
+use crate::ops::TaskOps;
 use crate::store::{SqliteCaptureItems, SqliteProjects, SqliteTodos};
 
 /// Action to take when processing a capture item.
@@ -324,7 +324,11 @@ mod tests {
         let item = ops.capture("No project").expect("capture");
         let err = ops.process(&item.slug, ProcessAction::Discard).map(|_| ());
         // Discard always succeeds
-        assert!(err.is_ok());
+        assert!(
+            err.is_ok(),
+            "Discard should have succeeded, but got error: {:?}",
+            err.err()
+        );
 
         let item2 = ops.capture("No project 2").expect("capture");
         let err2 = ops

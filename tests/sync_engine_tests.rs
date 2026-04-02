@@ -251,7 +251,7 @@ mod tests {
         let engine = SyncEngine::new(Box::new(provider), state_path, "mock".to_owned());
         let local = empty_snap();
         let result = engine.run_once(local).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Sync engine run failed: {:?}", result.err());
     }
 
     #[test]
