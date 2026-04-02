@@ -22,8 +22,6 @@ mod mcp;
 mod notify;
 mod ops;
 mod store;
-#[cfg(feature = "sync")]
-mod sync;
 mod tui;
 
 use cli::{Cli, Commands};

@@ -18,7 +18,7 @@
 //! [`StateSnapshot::SCHEMA_VERSION`] must be bumped whenever a breaking change
 //! is made to the snapshot format (e.g. a field is removed, renamed, or its
 //! type changes in a non-backwards-compatible way). Additive changes (new
-//! optional fields) do not require a bump.
+//! optional fields) do NOT require a bump.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -35,10 +35,6 @@ use crate::domain::{CaptureItem, Project, Reminder, Task, TimeEntry, Todo};
 /// type incompatibly, or reordering enum variants. Additive changes (adding
 /// new optional fields) do NOT require a bump. Remote providers use this value
 /// to reject snapshots they cannot interpret.
-#[allow(
-    dead_code,
-    reason = "sync module is new; consumers will be added in future tasks"
-)]
 pub const SCHEMA_VERSION: u32 = 1;
 
 // ── snapshot struct ────────────────────────────────────────────────────────
@@ -47,10 +43,6 @@ pub const SCHEMA_VERSION: u32 = 1;
 ///
 /// Captures every entity table in a single document for transfer to, or
 /// comparison with, a remote sync provider.
-#[allow(
-    dead_code,
-    reason = "sync module is new; consumers will be added in future tasks"
-)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StateSnapshot {
     /// UTC timestamp when this snapshot was taken.
@@ -75,10 +67,6 @@ pub struct StateSnapshot {
 
 // ── snapshot impl ──────────────────────────────────────────────────────────
 
-#[allow(
-    dead_code,
-    reason = "sync module is new; consumers will be added in future tasks"
-)]
 impl StateSnapshot {
     /// Snapshot schema version constant; see [`SCHEMA_VERSION`].
     pub const SCHEMA_VERSION: u32 = SCHEMA_VERSION;
@@ -124,10 +112,6 @@ impl StateSnapshot {
 ///
 /// `snapshot_at` and `machine_id` are omitted so that the hash reflects only
 /// the *data* content of the snapshot, not when or where it was created.
-#[allow(
-    dead_code,
-    reason = "only used inside content_hash; clippy sees it as unused in binary"
-)]
 #[derive(Serialize)]
 struct HashableSnapshot<'a> {
     schema_version: u32,
