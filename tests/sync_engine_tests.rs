@@ -100,6 +100,48 @@ mod tests {
         assert!(matches!(result, Err(SyncError::NotFound(_))));
     }
 
+    use scribe::sync::providers::file::FileProvider;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_file_provider_push_then_pull_roundtrip() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("state.json");
+        let provider = FileProvider::new(path.clone());
+
+        let snap = empty_snap();
+        provider.push(&snap).await.unwrap();
+
+        assert!(path.exists(), "state.json should exist after push");
+
+        let pulled = provider.pull().await.unwrap();
+        assert_eq!(pulled.schema_version, StateSnapshot::SCHEMA_VERSION);
+        assert!(pulled.projects.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_file_provider_pull_when_no_file_returns_not_found() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("missing.json");
+        let provider = FileProvider::new(path);
+
+        let result = provider.pull().await;
+        assert!(
+            matches!(result, Err(scribe::sync::SyncError::NotFound(_))),
+            "expected NotFound, got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_file_provider_push_creates_parent_directories() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("nested").join("deep").join("state.json");
+        let provider = FileProvider::new(path.clone());
+
+        provider.push(&empty_snap()).await.unwrap();
+        assert!(path.exists());
+    }
+
     use scribe::sync::keychain::KeychainStore;
 
     #[test]

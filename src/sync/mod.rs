@@ -9,6 +9,7 @@
 //! through [`SyncError`].
 
 pub mod keychain;
+pub mod providers;
 pub mod snapshot;
 
 use async_trait::async_trait;
