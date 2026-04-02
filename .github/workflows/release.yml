@@ -168,11 +168,11 @@ jobs:
 
             \`\`\`sh
             # macOS (Apple Silicon)
-            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/\$VERSION/scribe-macos-aarch64
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/$VERSION/scribe-macos-aarch64
             chmod +x scribe && sudo mv scribe /usr/local/bin/
 
             # Linux (x86_64)
-            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/\$VERSION/scribe-linux-x86_64
+            curl -Lo scribe https://github.com/${{ github.repository }}/releases/download/$VERSION/scribe-linux-x86_64
             chmod +x scribe && sudo mv scribe /usr/local/bin/
             
             # Windows (x86_64)
@@ -204,12 +204,12 @@ jobs:
             ## Checksums
 
             \`\`\`
-            linux: \$LINUX_SHA
-            macos: \$MACOS_SHA
-            windows: \$WIN_SHA
+            linux: $LINUX_SHA
+            macos: $MACOS_SHA
+            windows: $WIN_SHA
             \`\`\`
           EOF
 
-          gh release create "\$VERSION" --title "\$VERSION" --notes-file RELEASE_NOTES.md \
+          gh release create "$VERSION" --title "$VERSION" --notes-file RELEASE_NOTES.md \
             dist/scribe-linux-x86_64 dist/scribe-macos-aarch64 dist/scribe-windows-x86_64.exe
 
