@@ -51,6 +51,11 @@ jobs:
             os: macos-15
             artifact: scribe-macos-aarch64
 
+          # Windows x86_64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: scribe-windows-x86_64.exe
+
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -94,8 +99,13 @@ jobs:
             --target ${{ matrix.target }}
 
       - name: Rename binary
+        shell: bash
         run: |
-          cp target/${{ matrix.target }}/release/scribe ${{ matrix.artifact }}
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cp target/${{ matrix.target }}/release/scribe.exe ${{ matrix.artifact }}
+          else
+            cp target/${{ matrix.target }}/release/scribe ${{ matrix.artifact }}
+          fi
 
       - name: Upload binary artefact
         uses: actions/upload-artifact@v4
@@ -127,7 +137,7 @@ jobs:
       - name: Generate SHA-256 checksums
         working-directory: dist
         run: |
-          sha256sum scribe-linux-x86_64 scribe-macos-aarch64 \
+          sha256sum scribe-linux-x86_64 scribe-macos-aarch64 scribe-windows-x86_64.exe \
             > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
@@ -179,6 +189,7 @@ jobs:
           files: |
             dist/scribe-linux-x86_64
             dist/scribe-macos-aarch64
+            dist/scribe-windows-x86_64.exe
             dist/SHA256SUMS.txt
           fail_on_unmatched_files: true
           make_latest: true
