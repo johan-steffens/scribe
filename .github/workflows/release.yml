@@ -14,7 +14,7 @@ on:
 jobs:
   preflight:
     name: Preflight checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.validate.outputs.version }}
     steps:
@@ -43,15 +43,15 @@ jobs:
         include:
           # Linux x86_64 (static musl — no glibc dependency)
           - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
+            os: ubuntu-24.04
             artifact: scribe-linux-x86_64
 
-          # macOS Apple Silicon
+          # macOS Apple Silicon (arm64)
           - target: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-15
             artifact: scribe-macos-aarch64
 
-          # macOS Intel
+          # macOS Intel (x86_64)
           - target: x86_64-apple-darwin
             os: macos-13
             artifact: scribe-macos-x86_64
@@ -70,7 +70,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install musl tools (Linux only)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-24.04'
         run: sudo apt-get install -y musl-tools
 
       - name: Cache Cargo registry and build artefacts
@@ -112,7 +112,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs: [preflight, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 

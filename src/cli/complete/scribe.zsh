@@ -226,6 +226,7 @@ _scribe() {
     'setup:First-run wizard and setup status'
     'service:Manage the background daemon service'
     'daemon:Run the background reminder daemon'
+    'sync:Sync state to or from a remote provider'
     'agent:Install skill files for AI coding agents'
     'completions:Print a shell completion script'
     'help:Print help'
@@ -292,7 +293,32 @@ _scribe() {
         _scribe_args_reminder
       fi ;;
     (agent)
-      _arguments '--output=[Output format]:format:(text json)' ;;
+      if (( CURRENT == 1 )); then
+        local -a s; s=('install:Install the Scribe skill file to all detected agent directories')
+        _describe -t commands 'agent subcommands' s
+      else
+        _arguments '--output=[Output format]:format:(text json)'
+      fi ;;
+    (sync)
+      if (( CURRENT == 1 )); then
+        local -a s; s=(
+          'configure:Configure the sync provider and store secrets in the keychain'
+          'status:Show sync status'
+        )
+        _describe -t commands 'sync subcommands' s
+      else
+        case $words[1] in
+        (configure)
+          _arguments \
+            '--provider=[Sync provider]:provider:(gist s3 icloud jsonbin dropbox rest file)' \
+            '--remove[Remove stored keychain secrets for the active provider]' \
+            '--output=[Output format]:format:(text json)' ;;
+        (status)
+          _arguments '--output=[Output format]:format:(text json)' ;;
+        (*)
+          _arguments '--output=[Output format]:format:(text json)' ;;
+        esac
+      fi ;;
     (setup)
       _arguments \
         '--wizard[Always run the interactive wizard]' \

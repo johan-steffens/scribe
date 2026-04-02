@@ -19,6 +19,9 @@ Scribe has two modes:
 Both modes share the same database. A task created via the CLI appears
 immediately in the TUI the next time it refreshes, and vice versa.
 
+Everything works fully offline by default. Optional sync lets you mirror your
+state across multiple machines — see the [Sync](#sync) section.
+
 ---
 
 ## Core concepts
@@ -906,6 +909,152 @@ scribe task list --project payments --output json
 - Pipe to `jq` for custom reports.
 - Consume from shell scripts or CI pipelines.
 - Integrate with external tools that accept JSON on stdin.
+
+---
+
+## Sync
+
+Scribe can mirror your full state (all projects, tasks, todos, time entries,
+reminders, and capture items) to a remote provider so your data stays in sync
+across multiple machines. Sync is **off by default** and requires the `sync`
+Cargo feature, which is included in all pre-built binaries.
+
+### Quick setup
+
+Run the interactive wizard and follow the prompts:
+
+```sh
+scribe sync configure
+```
+
+Or specify the provider directly:
+
+```sh
+scribe sync configure --provider gist
+```
+
+The wizard stores all API tokens and secrets in the **OS keychain**
+(macOS Keychain, Linux libsecret / gnome-keyring, Windows Credential Manager).
+Nothing sensitive is written to `config.toml`.
+
+### Supported providers
+
+| Provider | Notes |
+|---|---|
+| `gist` | GitHub Gist (free, recommended — requires a GitHub PAT with `gist` scope) |
+| `s3` | Any S3-compatible store: AWS S3, Cloudflare R2, MinIO, etc. |
+| `icloud` | iCloud Drive file path — macOS only; iCloud handles propagation |
+| `jsonbin` | JSONBin.io free-tier JSON bin |
+| `dropbox` | Dropbox API v2 with a long-lived access token |
+| `rest` | Self-hosted master server embedded in the Scribe daemon |
+| `file` | Custom local or network file path (managed folder, NFS, Syncthing, etc.) |
+
+Only one provider is active at a time. You can configure multiple providers and
+switch between them by changing `sync.provider` in `config.toml` — credentials
+for all configured providers are retained in the keychain.
+
+### How sync works
+
+On each sync cycle Scribe:
+
+1. **Pulls** the remote snapshot (a JSON document of all entities).
+2. **Merges** it into local state — field-level, last-write-wins on conflict,
+   keyed by each entity's `updated_at` timestamp.
+3. **Pushes** the merged result back as the new remote snapshot.
+
+Entities with no `updated_at` (time entries, reminders, capture items) use
+insert-or-keep: new remote entities are inserted locally; existing local
+entities are never replaced.
+
+Archiving propagates: if one machine archives a record, the `archived_at`
+timestamp syncs to all other machines on the next cycle.
+
+### Automatic sync via the daemon
+
+If you have the background service installed, sync runs automatically:
+
+```sh
+# Install the service (runs scribe daemon in the background)
+scribe service install
+
+# Sync happens every 60 seconds by default
+# Change the interval in config.toml:
+# [sync]
+# interval_secs = 30
+```
+
+Without the service, run sync manually at any time:
+
+```sh
+scribe sync
+```
+
+### Sync status
+
+```sh
+scribe sync status
+```
+
+Output:
+
+```
+sync enabled:  true
+provider:      gist
+last sync:     2026-04-02T09:01:00Z
+last error:    none
+```
+
+### Removing sync configuration
+
+```sh
+# Remove stored keychain secrets for the active provider
+scribe sync configure --remove
+```
+
+This clears the keychain entries. Set `sync.enabled = false` in `config.toml`
+(or run `scribe sync configure` again) to reconfigure.
+
+### Self-hosted REST master
+
+One machine runs as the master; all others are clients. The master's HTTP
+server starts automatically inside the daemon.
+
+**On the master machine:**
+
+```sh
+scribe sync configure --provider rest
+# Select [1] Master when prompted
+# Enter a port (default 7171)
+# A cryptographically random secret is generated and printed once:
+#
+#   SECRET: 4a9f2c8e1b7d3f6a...
+#
+# Copy this secret — it will not be shown again.
+```
+
+**On each client machine:**
+
+```sh
+scribe sync configure --provider rest
+# Select [2] Client when prompted
+# Enter the master URL: http://192.168.1.10:7171
+# Enter the secret when prompted (input is hidden)
+```
+
+The secret is stored in each machine's keychain. Clients sync by calling
+`PUT /state` (push) and `GET /state` (pull) against the master.
+
+### GitHub Gist (recommended for most users)
+
+1. Create a GitHub Personal Access Token at
+   <https://github.com/settings/tokens> with the `gist` scope.
+2. Run `scribe sync configure --provider gist` and paste the token when
+   prompted.
+3. On first sync, Scribe creates a **private** secret gist named
+   `scribe-state.json` and stores the gist ID in `config.toml`.
+4. On each subsequent machine, run `scribe sync configure --provider gist`,
+   enter the same token, and add the gist ID to `[sync.gist] gist_id` in
+   `config.toml` (or copy the `config.toml` from the first machine).
 
 ---
 

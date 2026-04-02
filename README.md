@@ -7,8 +7,9 @@
 Scribe is a personal productivity tool for the terminal. It keeps projects,
 tasks, todos, time entries, a quick-capture inbox, and reminders in a single
 local SQLite database, and exposes them through both a scriptable CLI and a
-keyboard-driven full-screen TUI — no accounts, no network, no background
-services.
+keyboard-driven full-screen TUI. Everything works fully offline by default;
+optional sync lets you mirror your state across multiple machines using a
+provider of your choice.
 
 ---
 
@@ -33,6 +34,10 @@ services.
   (live slug lookup from the database) for zsh and fish; static only for bash.
 - **Machine-readable output** — every subcommand accepts `--output json`.
 - **Offline-first** — all data is in a single SQLite file you own.
+- **Optional sync** — mirror your state across machines via GitHub Gist, S3-compatible
+  storage, iCloud Drive, JSONBin.io, Dropbox, a self-hosted REST master, or any local
+  file path. Sync is off by default; run `scribe sync configure` to enable it. Secrets
+  are stored in the OS keychain, never in the config file.
 
 ---
 
@@ -40,11 +45,11 @@ services.
 
 ```sh
 # 1. Download the binary for your platform (see Installation below)
-#    or install from source:
-cargo install --path .
+#    or install from source with all features:
+cargo install --path . --features mcp,sync
 
 # 2. Run the setup wizard (optional but recommended)
-scribe setup
+scribe setup --wizard
 
 # 3. Create a project and a task
 scribe project add payments --name "Payments Integration"
@@ -78,7 +83,7 @@ curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/
 chmod +x scribe && sudo mv scribe /usr/local/bin/
 ```
 
-Pre-built binaries include the MCP server feature (`scribe mcp`).
+Pre-built binaries include the MCP server and sync features (`scribe mcp`, `scribe sync`).
 
 Verify the download against the published checksums:
 
@@ -97,7 +102,13 @@ cd scribe
 cargo install --path .
 ```
 
-To include the MCP server:
+To include the MCP server and sync:
+
+```sh
+cargo install --path . --features mcp,sync
+```
+
+To include only the MCP server:
 
 ```sh
 cargo install --path . --features mcp
@@ -160,6 +171,12 @@ enabled = true
 # strftime-compatible date and time format strings used in output.
 date_format = "%Y-%m-%d"
 time_format = "%H:%M"
+
+[sync]
+# Sync is disabled by default. Run `scribe sync configure` to enable it.
+enabled = false
+provider = "gist"      # gist | s3 | icloud | jsonbin | dropbox | rest | file
+interval_secs = 60     # how often the daemon syncs (when running as a service)
 ```
 
 | Key | Default | Description |
@@ -168,6 +185,13 @@ time_format = "%H:%M"
 | `notifications.enabled` | `true` | Enable desktop notifications for fired reminders. |
 | `display.date_format` | `%Y-%m-%d` | `strftime` format used when displaying dates. |
 | `display.time_format` | `%H:%M` | `strftime` format used when displaying times. |
+| `sync.enabled` | `false` | Enable state sync. Run `scribe sync configure` to set up. |
+| `sync.provider` | `gist` | Active sync provider. |
+| `sync.interval_secs` | `60` | Daemon sync interval in seconds. |
+
+Provider-specific non-secret settings (endpoint URLs, bucket names, file paths, etc.) are
+also stored in `config.toml`. Secrets (tokens, access keys, shared secrets) are stored
+exclusively in the **OS keychain** — never in the config file.
 
 ---
 
@@ -289,6 +313,10 @@ scribe
 │   ├── install
 │   ├── uninstall
 │   └── status
+├── sync
+│   ├── configure [--provider <name>] [--remove] [--output json]
+│   ├── status    [--output json]
+│   └── (bare)    [--output json]  — run a one-shot manual sync
 └── agent
     └── install [--output json]
 ```
@@ -312,6 +340,70 @@ call directly (requires building with the `mcp` feature):
 
     cargo install --path . --features mcp
     # Then add the printed config snippet to your agent's MCP configuration.
+
+---
+
+## Sync
+
+Scribe can mirror your full state (projects, tasks, todos, time entries,
+reminders, capture items) to a remote provider so your data stays in sync
+across multiple machines. Sync is **off by default**.
+
+### Setup
+
+```sh
+# Interactive wizard — picks up where `scribe setup` left off
+scribe sync configure
+
+# Or specify the provider directly
+scribe sync configure --provider gist
+```
+
+### Supported providers
+
+| Provider | Notes |
+|---|---|
+| `gist` | GitHub Gist (free, recommended — requires a GitHub account) |
+| `s3` | Any S3-compatible store: AWS S3, Cloudflare R2, MinIO, etc. |
+| `icloud` | iCloud Drive file path (macOS only, no extra credentials needed) |
+| `jsonbin` | JSONBin.io free-tier JSON storage |
+| `dropbox` | Dropbox API v2 |
+| `rest` | Self-hosted master server (runs inside the Scribe daemon) |
+| `file` | Custom local or network file path (Dropbox folder, NFS, Syncthing, etc.) |
+
+### How it works
+
+- **Pull → merge → push.** On each sync cycle Scribe pulls the remote snapshot,
+  merges it with local state (field-level, last-write-wins on conflicts keyed by
+  `updated_at`), then pushes the merged result back.
+- **Secrets in the keychain.** API tokens and shared secrets are stored in the
+  OS keychain (macOS Keychain, Linux libsecret, Windows Credential Manager) —
+  never in `config.toml`.
+- **Automatic sync via daemon.** If you have the background service installed
+  (`scribe service install`), sync runs automatically every `sync.interval_secs`
+  seconds (default: 60). Without the service, run `scribe sync` manually.
+
+### Self-hosted REST master
+
+One machine runs the master; all others are clients:
+
+```sh
+# On the master machine
+scribe sync configure --provider rest
+# → select Master, choose a port, secret is auto-generated and printed once
+
+# On each client machine
+scribe sync configure --provider rest
+# → select Client, enter the master URL and the shared secret
+```
+
+The master's HTTP server is started automatically by the daemon.
+
+### Status
+
+```sh
+scribe sync status
+```
 
 ---
 
