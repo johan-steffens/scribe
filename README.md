@@ -4,15 +4,21 @@
   <img src=".github/assets/scribe-logo.png" alt="Scribe logo" width="400" />
 </p>
 
-[![Build status](https://github.com/johan-steffens/scribe/actions/workflows/release.yml/badge.svg)](https://github.com/johan-steffens/scribe/actions)
-[![Version](https://img.shields.io/github/v/release/johan-steffens/scribe)](https://github.com/johan-steffens/scribe/releases)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange)](https://www.rust-lang.org)
-[![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center">
+  <a href="https://github.com/johan-steffens/scribe/actions"><img src="https://github.com/johan-steffens/scribe/actions/workflows/release.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/johan-steffens/scribe/releases"><img src="https://img.shields.io/github/v/release/johan-steffens/scribe" alt="Version"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.85%2B-orange" alt="Rust"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+</p>
 
 A keyboard-driven CLI and TUI for managing projects, tasks, todos, time
 tracking, reminders, and quick captures — all in a single SQLite file you
 own. No accounts, no cloud lock-in, no monthly fees. Sync across machines
 when you want to.
+
+Scribe is **AI-ready** — connect it to your coding agent and manage your
+productivity through conversation. Ask your agent to add tasks, review your
+tracker, process your inbox, or schedule reminders using plain English.
 
 ---
 
@@ -64,6 +70,58 @@ or projects. **Reminders** fire desktop notifications at scheduled times.
 **Capture** grabs fleeting thoughts into the inbox for processing later.
 
 Everything has slugs (`my-task-20260403`) for fast CLI and completion lookup.
+
+---
+
+## AI Agent Integration
+
+Connect Scribe to your AI agent to manage your productivity through conversation.
+
+**Skill files** teach agents Scribe's commands. Run once:
+
+```sh
+scribe agent install
+```
+
+**MCP server** (build with `mcp` feature) exposes all data as tools:
+
+```sh
+cargo install --path . --features mcp
+# Copy the printed MCP config snippet to your agent's config
+```
+
+### Talk to Your Agent
+
+Once connected, you can manage your life with plain English:
+
+```
+"You: Add a high priority task to review the API design doc"
+Agent: → scribe task add "Review API design doc" --priority high
+
+"You: What should I be working on today?"
+Agent: → scribe task list --status todo
+     → Shows your tasks due today or overdue
+
+"You: Start tracking time on the backend project"
+Agent: → scribe track start --project backend
+
+"You: Remind me to call mom tomorrow at 2pm"
+Agent: → scribe reminder add --at "tomorrow 2pm" --message "Call mom"
+
+"You: Process my inbox"
+Agent: → scribe inbox list
+     → Walks through unprocessed captures, converts to tasks/todos
+
+"You: How did I spend my time this week?"
+Agent: → scribe track report --week
+     → Shows time entries grouped by project
+
+"You: Sync everything to gist"
+Agent: → scribe sync push
+```
+
+Your agent acts as a smart interface — it knows your projects, tasks, and
+workflow. No more context-switching between apps.
 
 ---
 
@@ -187,23 +245,6 @@ scribe sync configure --provider rest
 | `icloud` | iCloud Drive (macOS, no credentials) |
 | `rest` | Self-hosted master server via `scribe daemon` |
 | `file` | Local/network path (Dropbox, NFS, Syncthing) |
-
----
-
-## AI Agent Integration
-
-**Skill files** teach agents Scribe's commands. Run once:
-
-```sh
-scribe agent install
-```
-
-**MCP server** (build with `mcp` feature) exposes all data as tools:
-
-```sh
-cargo install --path . --features mcp
-# Copy the printed MCP config snippet to your agent's config
-```
 
 ---
 
