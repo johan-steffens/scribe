@@ -25,7 +25,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_get_state_requires_auth() {
-        let (port, _handle) = start_server(0, "test-secret".to_owned(), empty_snap()).await;
+        let (port, _handle) = start_server(
+            0,
+            "test-secret".to_owned(),
+            empty_snap(),
+            ServerConfig::default(),
+        )
+        .await;
         let client = reqwest::Client::new();
         let resp = client
             .get(format!("http://127.0.0.1:{port}/state"))
@@ -37,7 +43,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_get_state_returns_snapshot_with_valid_auth() {
-        let (port, _handle) = start_server(0, "test-secret".to_owned(), empty_snap()).await;
+        let (port, _handle) = start_server(
+            0,
+            "test-secret".to_owned(),
+            empty_snap(),
+            ServerConfig::default(),
+        )
+        .await;
         let client = reqwest::Client::new();
         let resp = client
             .get(format!("http://127.0.0.1:{port}/state"))
@@ -52,7 +64,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_put_state_merges_and_returns_merged() {
-        let (port, _handle) = start_server(0, "test-secret".to_owned(), empty_snap()).await;
+        let (port, _handle) = start_server(
+            0,
+            "test-secret".to_owned(),
+            empty_snap(),
+            ServerConfig::default(),
+        )
+        .await;
         let client = reqwest::Client::new();
         let snap = empty_snap();
         let resp = client
@@ -69,7 +87,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_put_state_requires_auth() {
-        let (port, _handle) = start_server(0, "test-secret".to_owned(), empty_snap()).await;
+        let (port, _handle) = start_server(
+            0,
+            "test-secret".to_owned(),
+            empty_snap(),
+            ServerConfig::default(),
+        )
+        .await;
         let client = reqwest::Client::new();
         let resp = client
             .put(format!("http://127.0.0.1:{port}/state"))
