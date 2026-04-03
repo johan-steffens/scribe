@@ -116,6 +116,11 @@ impl KeychainStore {
     ///
     /// This is useful for daemons that may be configured to perform a
     /// bootstrap handoff if the secret is missing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SyncError::Keychain`] if the keychain entry cannot be created
+    /// or if a keychain error occurs after the bootstrap handoff.
     pub fn get_optional(
         provider: impl AsRef<str>,
         field: impl AsRef<str>,

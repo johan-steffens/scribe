@@ -143,7 +143,9 @@ impl SyncEngine {
                 let mut merged = local;
                 Self::merge_into(&mut merged, &remote);
                 let merged_hash = merged.content_hash();
-                if merged_hash != remote_hash {
+                if merged_hash == remote_hash {
+                    tracing::info!("sync: content unchanged, skipping push");
+                } else {
                     tracing::info!(
                         merged_entities = merged.entities(),
                         merged_hash = %merged_hash,
@@ -151,8 +153,6 @@ impl SyncEngine {
                     );
                     self.provider.push(&merged).await?;
                     tracing::info!("sync: push succeeded");
-                } else {
-                    tracing::info!("sync: content unchanged, skipping push");
                 }
                 Ok(merged)
             }
