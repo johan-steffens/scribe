@@ -29,8 +29,12 @@ pub struct TimeEntry {
     pub slug: String,
     /// The project this entry belongs to.
     pub project_id: ProjectId,
+    /// The slug of the project this entry belongs to (used for sync).
+    pub project_slug: String,
     /// Optional linked task.
     pub task_id: Option<TaskId>,
+    /// The slug of the linked task (used for sync).
+    pub task_slug: Option<String>,
     /// When the timer was started.
     pub started_at: DateTime<Utc>,
     /// When the timer was stopped; `None` means it is still running.

@@ -21,6 +21,8 @@ pub struct Todo {
     pub slug: String,
     /// The project this todo belongs to.
     pub project_id: ProjectId,
+    /// The slug of the project this todo belongs to (used for sync).
+    pub project_slug: String,
     /// Short description of the item.
     pub title: String,
     /// Whether the item has been completed.

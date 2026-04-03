@@ -38,12 +38,30 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
     })
 }
 
+fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRow, String)> {
+    Ok((
+        RawRow {
+            id: row.get(0)?,
+            slug: row.get(1)?,
+            project_id: row.get(2)?,
+            title: row.get(3)?,
+            done: row.get::<_, i64>(4)? != 0,
+            archived_at: row.get(5)?,
+            created_at: row.get(6)?,
+            updated_at: row.get(7)?,
+        },
+        row.get(8)?,
+    ))
+}
+
 impl RawRow {
-    fn into_todo(self) -> anyhow::Result<Todo> {
+    fn into_todo(self, project_slug: Option<String>) -> anyhow::Result<Todo> {
+        let project_slug = project_slug.unwrap_or_else(|| "unknown".to_owned());
         Ok(Todo {
             id: TodoId(self.id),
             slug: self.slug,
             project_id: ProjectId(self.project_id),
+            project_slug,
             title: self.title,
             done: self.done,
             archived_at: parse_dt_opt(self.archived_at)?,
@@ -91,7 +109,13 @@ impl SqliteTodos {
         iter.next()
             .transpose()
             .map_err(anyhow::Error::from)?
-            .map(RawRow::into_todo)
+            .map(|raw| {
+                let project_slug = {
+                    let mut s = conn.prepare("SELECT p.slug FROM projects p JOIN todos t ON t.project_id = p.id WHERE t.slug = ?1")?;
+                    s.query_row(params![slug], |row| row.get(0)).ok()
+                };
+                raw.into_todo(project_slug)
+            })
             .transpose()
     }
 }
@@ -139,7 +163,7 @@ impl Todos for SqliteTodos {
         let sql = format!("SELECT {SELECT_COLS} FROM todos {where_clause} ORDER BY created_at");
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_todo())
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_todo(None))
             .collect()
     }
 
@@ -242,38 +266,63 @@ impl SqliteTodos {
     /// Returns an error if the database query fails.
     pub fn list_all(&self) -> anyhow::Result<Vec<Todo>> {
         let conn = self.lock()?;
-        let sql = format!("SELECT {SELECT_COLS} FROM todos ORDER BY created_at ASC");
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_todo())
-            .collect()
+        let sql = "SELECT t.id, t.slug, t.project_id, t.title, t.done, t.archived_at, \
+             t.created_at, t.updated_at, p.slug \
+             FROM todos t JOIN projects p ON t.project_id = p.id ORDER BY t.created_at ASC";
+        let mut stmt = conn.prepare(sql)?;
+        let rows = stmt.query_map([], map_row_with_project_slug)?;
+        rows.map(|r| {
+            let (raw, project_slug) = r.map_err(anyhow::Error::from)?;
+            raw.into_todo(Some(project_slug))
+        })
+        .collect()
     }
 
-    /// Inserts or updates each todo by slug.
+    fn resolve_project_id(conn: &Connection, project_slug: &str) -> anyhow::Result<ProjectId> {
+        let id = conn
+            .query_row(
+                "SELECT id FROM projects WHERE slug = ?1",
+                params![project_slug],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| anyhow::anyhow!("project '{project_slug}' not found: {e}"))?;
+        Ok(ProjectId(id))
+    }
+
+    /// Inserts or updates each todo by slug, resolving project slug to local ID.
     ///
-    /// `slug` and `created_at` are write-once fields excluded from the update
-    /// set. All other mutable fields are updated on conflict.
+    /// This is the sync-safe version. It resolves `project_slug` to the local
+    /// numeric ID before inserting, avoiding foreign key mismatches.
     ///
     /// # Errors
     ///
-    /// Returns an error if any database write fails.
-    pub fn upsert_all(&self, todos: &[Todo]) -> anyhow::Result<()> {
+    /// Returns an error if any project slug cannot be resolved or if any
+    /// database write fails.
+    pub fn upsert_all_with_slug_resolution(&self, todos: &[Todo]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+
+        let todo_data: Vec<_> = todos
+            .iter()
+            .map(|t| {
+                let local_project_id = Self::resolve_project_id(&conn, &t.project_slug)?;
+                Ok((local_project_id, t))
+            })
+            .collect::<anyhow::Result<_>>()?;
+
         let tx = conn.transaction()?;
-        for t in todos {
+        for (local_project_id, t) in todo_data {
             tx.execute(
                 "INSERT INTO todos \
                  (slug, project_id, title, done, archived_at, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
                  ON CONFLICT(slug) DO UPDATE SET \
-                   project_id  = excluded.project_id, \
                    title       = excluded.title, \
                    done        = excluded.done, \
                    archived_at = excluded.archived_at, \
                    updated_at  = excluded.updated_at",
                 rusqlite::params![
                     t.slug,
-                    t.project_id.0,
+                    local_project_id.0,
                     t.title,
                     i64::from(t.done),
                     t.archived_at.map(|dt| dt.to_rfc3339()),

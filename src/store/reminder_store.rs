@@ -29,6 +29,12 @@ struct RawRow {
     created_at: String,
 }
 
+struct RawRowWithSlugs {
+    raw: RawRow,
+    project_slug: String,
+    task_slug: Option<String>,
+}
+
 fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
     Ok(RawRow {
         id: row.get(0)?,
@@ -44,13 +50,39 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
     })
 }
 
+fn map_row_with_slugs(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRowWithSlugs> {
+    Ok(RawRowWithSlugs {
+        raw: RawRow {
+            id: row.get(0)?,
+            slug: row.get(1)?,
+            project_id: row.get(2)?,
+            task_id: row.get(3)?,
+            remind_at: row.get(6)?,
+            message: row.get(7)?,
+            fired: row.get::<_, i64>(8)? != 0,
+            persistent: row.get::<_, i64>(9)? != 0,
+            archived_at: row.get(10)?,
+            created_at: row.get(11)?,
+        },
+        project_slug: row.get(4)?,
+        task_slug: row.get(5)?,
+    })
+}
+
 impl RawRow {
-    fn into_reminder(self) -> anyhow::Result<Reminder> {
+    fn into_reminder(
+        self,
+        project_slug: Option<String>,
+        task_slug: Option<String>,
+    ) -> anyhow::Result<Reminder> {
+        let project_slug = project_slug.unwrap_or_else(|| "unknown".to_owned());
         Ok(Reminder {
             id: ReminderId(self.id),
             slug: self.slug,
             project_id: ProjectId(self.project_id),
+            project_slug,
             task_id: self.task_id.map(TaskId),
+            task_slug,
             remind_at: parse_dt(&self.remind_at)?,
             message: self.message,
             fired: self.fired,
@@ -93,13 +125,25 @@ impl SqliteReminders {
     }
 
     fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Reminder>> {
-        let sql = format!("SELECT {SELECT_COLS} FROM reminders WHERE slug = ?1");
-        let mut stmt = conn.prepare(&sql)?;
-        let mut iter = stmt.query_map(params![slug], map_row)?;
+        let sql = "SELECT r.id, r.slug, r.project_id, r.task_id, p.slug, t.slug, \
+             r.remind_at, r.message, r.fired, r.persistent, r.archived_at, r.created_at \
+             FROM reminders r \
+             JOIN projects p ON r.project_id = p.id \
+             LEFT JOIN tasks t ON r.task_id = t.id \
+             WHERE r.slug = ?1";
+        let mut stmt = conn.prepare(sql)?;
+        let mut iter = stmt.query_map(params![slug], map_row_with_slugs)?;
         iter.next()
             .transpose()
             .map_err(anyhow::Error::from)?
-            .map(RawRow::into_reminder)
+            .map(|r| {
+                let RawRowWithSlugs {
+                    raw,
+                    project_slug,
+                    task_slug,
+                } = r;
+                raw.into_reminder(Some(project_slug), task_slug)
+            })
             .transpose()
     }
 }
@@ -152,7 +196,7 @@ impl Reminders for SqliteReminders {
         let sql = format!("SELECT {SELECT_COLS} FROM reminders {where_clause} ORDER BY remind_at");
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder())
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder(None, None))
             .collect()
     }
 
@@ -256,7 +300,7 @@ impl Reminders for SqliteReminders {
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(params![before_str], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder())
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder(None, None))
             .collect()
     }
 
@@ -283,33 +327,80 @@ impl SqliteReminders {
     /// Returns an error if the database query fails.
     pub fn list_all(&self) -> anyhow::Result<Vec<Reminder>> {
         let conn = self.lock()?;
-        let sql = format!("SELECT {SELECT_COLS} FROM reminders ORDER BY created_at ASC");
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_reminder())
-            .collect()
+        let sql = "SELECT r.id, r.slug, r.project_id, r.task_id, p.slug, t.slug, \
+             r.remind_at, r.message, r.fired, r.persistent, r.archived_at, r.created_at \
+             FROM reminders r \
+             JOIN projects p ON r.project_id = p.id \
+             LEFT JOIN tasks t ON r.task_id = t.id \
+             ORDER BY r.created_at ASC";
+        let mut stmt = conn.prepare(sql)?;
+        let rows = stmt.query_map([], map_row_with_slugs)?;
+        rows.map(|r| {
+            let RawRowWithSlugs {
+                raw,
+                project_slug,
+                task_slug,
+            } = r.map_err(anyhow::Error::from)?;
+            raw.into_reminder(Some(project_slug), task_slug)
+        })
+        .collect()
     }
 
-    /// Inserts or updates each reminder by slug.
+    fn resolve_project_id(conn: &Connection, project_slug: &str) -> anyhow::Result<ProjectId> {
+        let id = conn
+            .query_row(
+                "SELECT id FROM projects WHERE slug = ?1",
+                params![project_slug],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| anyhow::anyhow!("project '{project_slug}' not found: {e}"))?;
+        Ok(ProjectId(id))
+    }
+
+    fn resolve_task_id(conn: &Connection, task_slug: &str) -> anyhow::Result<TaskId> {
+        let id = conn
+            .query_row(
+                "SELECT id FROM tasks WHERE slug = ?1",
+                params![task_slug],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| anyhow::anyhow!("task '{task_slug}' not found: {e}"))?;
+        Ok(TaskId(id))
+    }
+
+    /// Inserts or updates each reminder by slug, resolving project and task slugs to local IDs.
     ///
-    /// `slug` and `created_at` are write-once fields excluded from the update
-    /// set. All other mutable fields are updated on conflict.
+    /// This is the sync-safe version. It resolves `project_slug` and `task_slug`
+    /// to local numeric IDs before inserting, avoiding foreign key mismatches.
     ///
     /// # Errors
     ///
-    /// Returns an error if any database write fails.
-    pub fn upsert_all(&self, reminders: &[Reminder]) -> anyhow::Result<()> {
+    /// Returns an error if any project or task slug cannot be resolved or if
+    /// any database write fails.
+    pub fn upsert_all_with_slug_resolution(&self, reminders: &[Reminder]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+
+        let reminder_data: Vec<_> = reminders
+            .iter()
+            .map(|r| {
+                let local_project_id = Self::resolve_project_id(&conn, &r.project_slug)?;
+                let local_task_id = if let Some(ref task_slug) = r.task_slug {
+                    Some(Self::resolve_task_id(&conn, task_slug)?)
+                } else {
+                    None
+                };
+                Ok((local_project_id, local_task_id, r))
+            })
+            .collect::<anyhow::Result<_>>()?;
+
         let tx = conn.transaction()?;
-        for r in reminders {
+        for (local_project_id, local_task_id, r) in reminder_data {
             tx.execute(
                 "INSERT INTO reminders \
                  (slug, project_id, task_id, remind_at, message, fired, persistent, \
                   archived_at, created_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
                  ON CONFLICT(slug) DO UPDATE SET \
-                   project_id  = excluded.project_id, \
-                   task_id     = excluded.task_id, \
                    remind_at   = excluded.remind_at, \
                    message     = excluded.message, \
                    fired       = excluded.fired, \
@@ -317,8 +408,8 @@ impl SqliteReminders {
                    archived_at = excluded.archived_at",
                 rusqlite::params![
                     r.slug,
-                    r.project_id.0,
-                    r.task_id.map(|t| t.0),
+                    local_project_id.0,
+                    local_task_id.map(|t| t.0),
                     r.remind_at.to_rfc3339(),
                     r.message,
                     i64::from(r.fired),

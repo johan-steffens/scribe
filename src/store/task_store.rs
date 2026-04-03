@@ -33,7 +33,8 @@ struct RawRow {
 }
 
 impl RawRow {
-    fn into_task(self) -> anyhow::Result<Task> {
+    fn into_task(self, project_slug: Option<String>) -> anyhow::Result<Task> {
+        let project_slug = project_slug.unwrap_or_else(|| "unknown".to_owned());
         let due_date = self
             .due_date
             .map(|s| {
@@ -46,6 +47,7 @@ impl RawRow {
             id: TaskId(self.id),
             slug: self.slug,
             project_id: ProjectId(self.project_id),
+            project_slug,
             title: self.title,
             description: self.description,
             status: self
@@ -80,6 +82,25 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
     })
 }
 
+fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRow, String)> {
+    Ok((
+        RawRow {
+            id: row.get(0)?,
+            slug: row.get(1)?,
+            project_id: row.get(2)?,
+            title: row.get(3)?,
+            description: row.get(4)?,
+            status: row.get(5)?,
+            priority: row.get(6)?,
+            due_date: row.get(7)?,
+            archived_at: row.get(8)?,
+            created_at: row.get(9)?,
+            updated_at: row.get(10)?,
+        },
+        row.get(11)?,
+    ))
+}
+
 fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Task>> {
     let sql = format!("SELECT {SELECT_COLS} FROM tasks WHERE slug = ?1");
     let mut stmt = conn.prepare(&sql)?;
@@ -87,7 +108,16 @@ fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Task>> {
     iter.next()
         .transpose()
         .map_err(anyhow::Error::from)?
-        .map(RawRow::into_task)
+        .map(|raw| {
+            let project_slug = {
+                let mut s = conn.prepare(
+                    "SELECT p.slug FROM projects p JOIN tasks t ON t.project_id = p.id WHERE t.slug = ?1",
+                )?;
+                s.query_row(params![slug], |row| row.get(0))
+                    .ok()
+            };
+            raw.into_task(project_slug)
+        })
         .transpose()
 }
 
@@ -184,7 +214,7 @@ impl Tasks for SqliteTasks {
         let sql = format!("SELECT {SELECT_COLS} FROM tasks {where_clause} ORDER BY created_at");
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task())
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task(None))
             .collect()
     }
 
@@ -311,33 +341,67 @@ impl SqliteTasks {
     /// Returns an error if the database query fails.
     pub fn list_all(&self) -> anyhow::Result<Vec<Task>> {
         let conn = self.lock()?;
-        let sql = format!("SELECT {SELECT_COLS} FROM tasks ORDER BY created_at ASC");
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task())
-            .collect()
+        let sql = "SELECT t.id, t.slug, t.project_id, t.title, t.description, t.status, \
+             t.priority, t.due_date, t.archived_at, t.created_at, t.updated_at, p.slug \
+             FROM tasks t JOIN projects p ON t.project_id = p.id ORDER BY t.created_at ASC";
+        let mut stmt = conn.prepare(sql)?;
+        let rows = stmt.query_map([], map_row_with_project_slug)?;
+        rows.map(|r| {
+            let (raw, project_slug) = r.map_err(anyhow::Error::from)?;
+            raw.into_task(Some(project_slug))
+        })
+        .collect()
     }
 
-    /// Inserts or updates each task by slug.
+    /// Resolves a project slug to its local numeric ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the project with the given slug does not exist.
+    fn resolve_project_id(conn: &Connection, project_slug: &str) -> anyhow::Result<ProjectId> {
+        let id = conn
+            .query_row(
+                "SELECT id FROM projects WHERE slug = ?1",
+                params![project_slug],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| anyhow::anyhow!("project '{project_slug}' not found: {e}"))?;
+        Ok(ProjectId(id))
+    }
+
+    /// Inserts or updates each task by slug, resolving project slugs to local IDs.
+    ///
+    /// This is the sync-safe version of `upsert_all`. It resolves `project_slug`
+    /// to the local `project_id` before inserting, avoiding foreign key mismatches
+    /// when syncing from remote.
     ///
     /// `slug` and `created_at` are write-once fields excluded from the update
     /// set. All other mutable fields are updated on conflict.
     ///
     /// # Errors
     ///
-    /// Returns an error if any database write fails.
-    pub fn upsert_all(&self, tasks: &[Task]) -> anyhow::Result<()> {
+    /// Returns an error if any project slug cannot be resolved or any database
+    /// write fails.
+    pub fn upsert_all_with_slug_resolution(&self, tasks: &[Task]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+
+        let task_data: Vec<_> = tasks
+            .iter()
+            .map(|t| {
+                let local_project_id = Self::resolve_project_id(&conn, &t.project_slug)?;
+                let due_date_str = t.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+                Ok((local_project_id, due_date_str, t))
+            })
+            .collect::<anyhow::Result<_>>()?;
+
         let tx = conn.transaction()?;
-        for t in tasks {
-            let due_date_str = t.due_date.map(|d| d.format("%Y-%m-%d").to_string());
+        for (local_project_id, due_date_str, t) in task_data {
             tx.execute(
                 "INSERT INTO tasks \
                  (slug, project_id, title, description, status, priority, \
                   due_date, archived_at, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
                  ON CONFLICT(slug) DO UPDATE SET \
-                   project_id  = excluded.project_id, \
                    title       = excluded.title, \
                    description = excluded.description, \
                    status      = excluded.status, \
@@ -347,7 +411,7 @@ impl SqliteTasks {
                    updated_at  = excluded.updated_at",
                 rusqlite::params![
                     t.slug,
-                    t.project_id.0,
+                    local_project_id.0,
                     t.title,
                     t.description,
                     t.status.to_string(),

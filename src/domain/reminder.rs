@@ -26,8 +26,12 @@ pub struct Reminder {
     pub slug: String,
     /// The project this reminder belongs to.
     pub project_id: ProjectId,
+    /// The slug of the project this reminder belongs to (used for sync).
+    pub project_slug: String,
     /// Optional linked task.
     pub task_id: Option<TaskId>,
+    /// The slug of the linked task (used for sync).
+    pub task_slug: Option<String>,
     /// When the reminder should fire.
     pub remind_at: DateTime<Utc>,
     /// Optional free-text message to display.
