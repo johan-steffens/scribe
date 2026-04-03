@@ -133,7 +133,12 @@ fn run_sync_once(
 
     match rt.block_on(engine.run_once(local)) {
         Ok(merged) => {
+            tracing::debug!(
+                merged_entities = merged.entities(),
+                "sync: writing merged state to database"
+            );
             merged.write_to_db(conn)?;
+            tracing::debug!("sync: write to database complete");
             state.last_sync_at = Some(Utc::now());
             state.last_error = None;
             state.provider = Some(provider_name);

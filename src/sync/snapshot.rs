@@ -136,6 +136,11 @@ impl StateSnapshot {
 
     /// Writes all entities in this snapshot to the database using upsert semantics.
     ///
+    /// For entities with foreign keys (tasks, todos, reminders, `time_entries`),
+    /// this uses slug resolution to properly map remote project/task slugs to
+    /// local numeric IDs, avoiding foreign key mismatches when syncing from
+    /// upstream.
+    ///
     /// # Errors
     ///
     /// Returns an error if any database write fails.
@@ -145,12 +150,25 @@ impl StateSnapshot {
             SqliteTodos,
         };
 
+        tracing::debug!(
+            projects = self.projects.len(),
+            tasks = self.tasks.len(),
+            todos = self.todos.len(),
+            time_entries = self.time_entries.len(),
+            reminders = self.reminders.len(),
+            capture_items = self.capture_items.len(),
+            "write_to_db: starting"
+        );
+
         SqliteProjects::new(Arc::clone(conn)).upsert_all(&self.projects)?;
-        SqliteTasks::new(Arc::clone(conn)).upsert_all(&self.tasks)?;
-        SqliteTodos::new(Arc::clone(conn)).upsert_all(&self.todos)?;
-        SqliteTimeEntries::new(Arc::clone(conn)).upsert_all(&self.time_entries)?;
-        SqliteReminders::new(Arc::clone(conn)).upsert_all(&self.reminders)?;
+        SqliteTasks::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.tasks)?;
+        SqliteTodos::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.todos)?;
+        SqliteTimeEntries::new(Arc::clone(conn))
+            .upsert_all_with_slug_resolution(&self.time_entries)?;
+        SqliteReminders::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.reminders)?;
         SqliteCaptureItems::new(Arc::clone(conn)).upsert_all(&self.capture_items)?;
+
+        tracing::debug!("write_to_db: complete");
         Ok(())
     }
 

@@ -106,6 +106,8 @@ pub struct Task {
     pub slug: String,
     /// The project this task belongs to.
     pub project_id: ProjectId,
+    /// The slug of the project this task belongs to (used for sync).
+    pub project_slug: String,
     /// Short task title.
     pub title: String,
     /// Optional detailed description.
