@@ -77,6 +77,9 @@ impl KeychainStore {
     /// [`KEYCHAIN_USERNAME`].  Accepts any string type for `provider` and
     /// `field`.
     ///
+    /// On macOS, if the keychain is inaccessible (launchd session), this will
+    /// check the bootstrap file first to handle the "Two Vaults" problem.
+    ///
     /// # Errors
     ///
     /// Returns [`SyncError::Keychain`] when:
@@ -86,7 +89,13 @@ impl KeychainStore {
     /// - The secret is not present in the keychain.  The message instructs the
     ///   user to run `scribe sync configure`.
     pub fn get(provider: impl AsRef<str>, field: impl AsRef<str>) -> Result<String, SyncError> {
-        let service = Self::service_name(provider, field);
+        let service = Self::service_name(&provider, &field);
+
+        if let Some(secret) = Self::get_from_bootstrap(provider.as_ref(), field.as_ref()) {
+            tracing::debug!(service, "keychain.get: using bootstrap file");
+            return Ok(secret);
+        }
+
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
                 "sync requires a keychain daemon to store secrets securely. \
@@ -100,6 +109,61 @@ impl KeychainStore {
                  `scribe sync configure` to set it up. (detail: {e})"
             ))
         })
+    }
+
+    /// Retrieves a secret from the OS keychain, optionally failing silently
+    /// instead of returning an error if the secret is missing.
+    ///
+    /// This is useful for daemons that may be configured to perform a
+    /// bootstrap handoff if the secret is missing.
+    pub fn get_optional(
+        provider: impl AsRef<str>,
+        field: impl AsRef<str>,
+    ) -> Result<Option<String>, SyncError> {
+        let service = Self::service_name(&provider, &field);
+
+        if let Some(secret) = Self::get_from_bootstrap(provider.as_ref(), field.as_ref()) {
+            tracing::debug!(service, "keychain.get_optional: using bootstrap file");
+            return Ok(Some(secret));
+        }
+
+        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+            SyncError::Keychain(format!(
+                "sync requires a keychain daemon to store secrets securely. \
+                 Install and start gnome-keyring or kwallet, then re-run \
+                 `scribe sync configure`. (detail: {e})"
+            ))
+        })?;
+        match entry.get_password() {
+            Ok(p) => Ok(Some(p)),
+            Err(keyring::Error::NoEntry) => {
+                Self::apply_bootstrap();
+                match entry.get_password() {
+                    Ok(p) => Ok(Some(p)),
+                    Err(keyring::Error::NoEntry) => Ok(None),
+                    Err(e) => Err(SyncError::Keychain(format!(
+                        "could not read from keychain after bootstrap: {e}"
+                    ))),
+                }
+            }
+            Err(e) => Err(SyncError::Keychain(format!(
+                "could not read from keychain: {e}"
+            ))),
+        }
+    }
+
+    /// Retrieves a secret from the bootstrap file, if present.
+    fn get_from_bootstrap(provider: &str, field: &str) -> Option<String> {
+        let path = Self::bootstrap_path()?;
+        if !path.exists() {
+            return None;
+        }
+
+        let content = std::fs::read_to_string(&path).ok()?;
+        let secrets: std::collections::HashMap<String, String> =
+            serde_json::from_str(&content).ok()?;
+        let key = format!("{provider}.{field}");
+        secrets.get(&key).cloned()
     }
 
     /// Stores a secret in the OS keychain.
@@ -119,7 +183,11 @@ impl KeychainStore {
         field: impl AsRef<str>,
         secret: impl AsRef<str>,
     ) -> Result<(), SyncError> {
-        let service = Self::service_name(provider, field);
+        let provider_ref = provider.as_ref();
+        let field_ref = field.as_ref();
+        let secret_ref = secret.as_ref();
+
+        let service = Self::service_name(provider_ref, field_ref);
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
                 "sync requires a keychain daemon to store secrets securely. \
@@ -128,8 +196,90 @@ impl KeychainStore {
             ))
         })?;
         entry
-            .set_password(secret.as_ref())
-            .map_err(|e| SyncError::Keychain(format!("could not write to keychain: {e}")))
+            .set_password(secret_ref)
+            .map_err(|e| SyncError::Keychain(format!("could not write to keychain: {e}")))?;
+
+        Self::update_bootstrap(provider_ref, field_ref, secret_ref);
+        Ok(())
+    }
+
+    /// Returns the path to the keychain bootstrap JSON file.
+    pub fn bootstrap_path() -> Option<std::path::PathBuf> {
+        directories::ProjectDirs::from("", "", "scribe")
+            .map(|d| d.data_local_dir().join("keychain-bootstrap.json"))
+    }
+
+    /// Updates the bootstrap file so that background daemons can pick up secrets
+    /// even if they run in a different session context (e.g., launchd vs terminal).
+    fn update_bootstrap(provider: &str, field: &str, secret: &str) {
+        let Some(path) = Self::bootstrap_path() else {
+            return;
+        };
+
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+
+        let mut map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(existing) = serde_json::from_str(&content) {
+                map = existing;
+            }
+        }
+
+        map.insert(format!("{provider}.{field}"), secret.to_owned());
+
+        if let Ok(json) = serde_json::to_string(&map) {
+            let _ = std::fs::write(&path, json);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+    }
+
+    /// Checks for and applies a keychain bootstrap file.
+    ///
+    /// This bridges the "Two Vaults" problem on macOS where the CLI and the daemon
+    /// (or multiple CLI invocations in different contexts) have different
+    /// path identities, preventing access to secrets.
+    pub fn apply_bootstrap() {
+        let Some(path) = Self::bootstrap_path() else {
+            return;
+        };
+        if !path.exists() {
+            return;
+        }
+
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(secrets) =
+                serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
+            {
+                for (key, value) in secrets {
+                    let parts: Vec<&str> = key.split('.').collect();
+                    if parts.len() == 2 {
+                        let service = Self::service_name(parts[0], parts[1]);
+                        let entry = Entry::new(&service, KEYCHAIN_USERNAME);
+                        match entry {
+                            Ok(e) => match e.set_password(&value) {
+                                Ok(()) => {
+                                    tracing::info!(service, "keychain.bootstrap.applied");
+                                }
+                                Err(e) => {
+                                    tracing::error!("set_password error: {:?}", e);
+                                }
+                            },
+                            Err(e) => {
+                                tracing::error!("Entry::new error: {:?}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Delete after consuming
+        let _ = std::fs::remove_file(&path);
     }
 
     /// Removes a secret from the OS keychain.

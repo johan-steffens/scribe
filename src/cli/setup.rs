@@ -197,6 +197,7 @@ fn run_wizard(config: &mut Config) -> anyhow::Result<()> {
                 let cfg_args = crate::cli::sync::SyncConfigureArgs {
                     provider: None,
                     remove: false,
+                    gist_id: None,
                     output: OutputFormat::Text,
                 };
                 crate::cli::sync::run_configure(&cfg_args, config)?;

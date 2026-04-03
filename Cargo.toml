@@ -1,10 +1,10 @@
 [package]
 name = "scribe"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "A personal productivity CLI/TUI tool for offline project and task management"
 license = "MIT"
-repository = "https://github.com/placeholder/scribe"
+repository = "https://github.com/johan-steffens/scribe"
 readme = "README.md"
 keywords = ["cli", "productivity", "tasks", "tui"]
 categories = ["command-line-utilities"]
@@ -59,11 +59,26 @@ async-trait = { version = "0.1",  optional = true }
 axum        = { version = "0.8",  optional = true }
 getrandom   = { version = "0.3",  optional = true }
 hex         = { version = "0.4",  optional = true }
-keyring     = { version = "3",    optional = true }
+keyring     = { version = "3", optional = true }
 reqwest     = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 rpassword   = { version = "7",    optional = true }
 sha2        = { version = "0.10", optional = true }
 uuid        = { version = "1",    features = ["v4", "serde"], optional = true }
+
+# Platform-specific keyring credential store backends.
+# These features select the appropriate native keystore for each OS.
+# Without these, keyring falls back to a mock store that doesn't persist.
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"], optional = true }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+keyring = { version = "3", features = ["apple-native"], optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["linux-native"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"], optional = true }
 
 # notify-rust is used on Linux and Windows only.
 # On macOS we shell out to osascript — mac-notification-sys (notify-rust's

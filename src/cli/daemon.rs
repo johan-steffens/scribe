@@ -33,8 +33,6 @@ use chrono::Utc;
 #[cfg(feature = "sync")]
 use directories::ProjectDirs;
 use rusqlite::Connection;
-#[cfg(feature = "sync")]
-use uuid::Uuid;
 
 use crate::ops::ReminderOps;
 #[cfg(feature = "sync")]
@@ -83,6 +81,9 @@ pub fn run(
         reminder_interval.as_secs()
     );
 
+    #[cfg(feature = "sync")]
+    run_bootstrap();
+
     // Start the REST sync master server (if configured) before entering the loop.
     #[cfg(feature = "sync")]
     spawn_rest_server_thread(conn, config)?;
@@ -105,6 +106,9 @@ pub fn run(
         .unwrap_or_else(Instant::now);
 
     loop {
+        #[cfg(feature = "sync")]
+        run_bootstrap();
+
         let now = Instant::now();
 
         if now.duration_since(last_reminder) >= reminder_interval {
@@ -134,6 +138,18 @@ pub fn run(
 
 // ── sync helpers (feature-gated) ───────────────────────────────────────────
 
+/// Checks for and applies a keychain bootstrap file.
+///
+/// This bridges the "Two Vaults" problem on macOS where the CLI (running in a
+/// user session) and the daemon (running in a launchd session) have different
+/// code signatures or path identities, preventing the daemon from reading
+/// secrets the CLI just wrote. The CLI writes a transient JSON file which the
+/// daemon consumes to populate its own view of the keychain.
+#[cfg(feature = "sync")]
+fn run_bootstrap() {
+    crate::sync::keychain::KeychainStore::apply_bootstrap();
+}
+
 /// Runs one pull → merge → push sync cycle, logging errors rather than failing.
 ///
 /// Errors are logged at `WARN` level and recorded in the sync-state file. This
@@ -149,10 +165,7 @@ fn run_sync_cycle(conn: &Arc<Mutex<Connection>>, config: &crate::config::Config)
         }
     };
 
-    // TODO(task-13): use a persisted, per-machine UUID instead of nil once
-    // machine_id generation is wired into Config. machine_id is diagnostic
-    // only and does not affect merge correctness.
-    let local = match StateSnapshot::from_db(conn, Uuid::nil()) {
+    let local = match StateSnapshot::from_db(conn, config.machine_id()) {
         Ok(s) => s,
         Err(e) => {
             tracing::warn!(error = %e, "sync.snapshot.error");
@@ -228,7 +241,7 @@ fn spawn_rest_server_thread(
     let secret = KeychainStore::get("rest", "secret")
         .map_err(|e| anyhow::anyhow!("could not read REST secret from keychain: {e}"))?;
     let port = config.sync.rest.port;
-    let initial = StateSnapshot::from_db(conn, Uuid::nil())?;
+    let initial = StateSnapshot::from_db(conn, config.machine_id())?;
 
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("invariant: tokio runtime must be created");
