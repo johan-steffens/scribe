@@ -6,7 +6,7 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-    use scribe::server::start_server;
+    use scribe::server::{ServerConfig, start_server};
     use scribe::sync::snapshot::StateSnapshot;
 
     fn empty_snap() -> StateSnapshot {
