@@ -5,7 +5,7 @@
 </p>
 
 [![Build status](https://github.com/johan-steffens/scribe/actions/workflows/release.yml/badge.svg)](https://github.com/johan-steffens/scribe/actions)
-[![Version](https://img.shields.io/badge/version-1.0.4-blue)](https://github.com/johan-steffens/scribe/releases)
+[![Version](https://img.shields.io/github/v/release/johan-steffens/scribe)](https://github.com/johan-steffens/scribe/releases)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange)](https://www.rust-lang.org)
 [![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
