@@ -29,7 +29,7 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 #[doc(inline)]
-pub use engine::{SyncEngine, SyncState};
+pub use engine::{SyncEngine, SyncState, SyncSummary};
 #[doc(inline)]
 pub use providers::from_config;
 #[doc(inline)]

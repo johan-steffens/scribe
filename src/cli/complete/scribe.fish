@@ -6,33 +6,31 @@
 complete -c scribe -f
 
 # ── top-level subcommands ─────────────────────────────────────────────────────
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a project    -d 'Manage projects'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a task       -d 'Manage tasks'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a todo       -d 'Manage todos'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a track      -d 'Time tracking'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a capture    -d 'Quickly capture a thought into the inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a inbox      -d 'Manage the quick-capture inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a reminder   -d 'Manage reminders'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a setup      -d 'First-run wizard and setup status'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a service    -d 'Manage the background daemon service'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
-  -a daemon     -d 'Run the background reminder daemon'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a sync       -d 'Sync state to or from a remote provider'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a agent      -d 'Install skill files for AI coding agents'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a completions -d 'Print a shell completion script for the given shell'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service daemon sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
   -a help       -d 'Print this message or the help of the given subcommand(s)'
 
 # ── global flags ──────────────────────────────────────────────────────────────
@@ -418,6 +416,8 @@ complete -c scribe -n '__fish_seen_subcommand_from sync; and not __fish_seen_sub
 complete -c scribe -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from configure' \
   -l provider -d 'Sync provider' -r -a 'gist s3 icloud jsonbin dropbox rest file'
 complete -c scribe -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from configure' \
+  -l gist-id  -d 'GitHub Gist ID (for gist provider)'
+complete -c scribe -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from configure' \
   -l remove   -d 'Remove stored keychain secrets for the active provider'
 complete -c scribe -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from configure' \
   -l output   -d 'Output format' -r -a 'text json'
@@ -427,15 +427,21 @@ complete -c scribe -n '__fish_seen_subcommand_from sync; and __fish_seen_subcomm
   -l output -d 'Output format' -r -a 'text json'
 
 # ── service subcommands ───────────────────────────────────────────────────────
-complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status help' \
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status run restart reinstall help' \
   -a install   -d 'Install and start the background daemon service'
-complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status help' \
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status run restart reinstall help' \
   -a uninstall -d 'Stop and remove the background daemon service'
-complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status help' \
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status run restart reinstall help' \
   -a status    -d 'Show whether the daemon service is installed'
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status run restart reinstall help' \
+  -a run       -d 'Run the background reminder daemon'
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status run restart reinstall help' \
+  -a restart   -d 'Restart the daemon service'
+complete -c scribe -n '__fish_seen_subcommand_from service; and not __fish_seen_subcommand_from install uninstall status run restart reinstall help' \
+  -a reinstall -d 'Reinstall the daemon service (after upgrades)'
 
-# ── daemon ────────────────────────────────────────────────────────────────────
-complete -c scribe -n '__fish_seen_subcommand_from daemon' \
+# service run
+complete -c scribe -n '__fish_seen_subcommand_from service; and __fish_seen_subcommand_from run' \
   -l interval -s i -d 'Polling interval in seconds' -r
 
 # ── completions ───────────────────────────────────────────────────────────────

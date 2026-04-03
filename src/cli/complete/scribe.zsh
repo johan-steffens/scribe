@@ -225,7 +225,6 @@ _scribe() {
     'reminder:Manage reminders'
     'setup:First-run wizard and setup status'
     'service:Manage the background daemon service'
-    'daemon:Run the background reminder daemon'
     'sync:Sync state to or from a remote provider'
     'agent:Install skill files for AI coding agents'
     'completions:Print a shell completion script'
@@ -311,6 +310,7 @@ _scribe() {
         (configure)
           _arguments \
             '--provider=[Sync provider]:provider:(gist s3 icloud jsonbin dropbox rest file)' \
+            '--gist-id=[GitHub Gist ID (for gist provider)]:gist-id: ' \
             '--remove[Remove stored keychain secrets for the active provider]' \
             '--output=[Output format]:format:(text json)' ;;
         (status)
@@ -329,17 +329,11 @@ _scribe() {
           'install:Install and start the background daemon service'
           'uninstall:Stop and remove the background daemon service'
           'status:Show whether the daemon service is installed'
-        )
-        _describe -t commands 'service subcommands' s
-      fi ;;
-    (daemon)
-      if (( CURRENT == 1 )); then
-        local -a s; s=(
           'run:Run the background reminder daemon'
           'restart:Restart the daemon service'
           'reinstall:Reinstall the daemon service (after upgrades)'
         )
-        _describe -t commands 'daemon subcommands' s
+        _describe -t commands 'service subcommands' s
       else
         case $words[1] in
         (run)

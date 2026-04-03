@@ -32,6 +32,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::domain::{CaptureItem, Project, Reminder, Task, TimeEntry, Todo};
 use crate::sync::{StateSnapshot, SyncError, SyncProvider};
 
 // ── SyncState ──────────────────────────────────────────────────────────────
@@ -80,6 +81,128 @@ impl SyncState {
     }
 }
 
+// ── SyncSummary ─────────────────────────────────────────────────────────────
+
+/// Summary of a single sync operation, tracking what was pulled from and
+/// pushed to the remote.
+///
+/// `pulled_additions` counts entities that existed only on the remote side
+/// and were added to the local snapshot during merge. `pulled_updates` counts
+/// entities that existed on both sides but were replaced because the remote
+/// version was newer.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SyncSummary {
+    pub projects_added: u32,
+    pub projects_updated: u32,
+    pub tasks_added: u32,
+    pub tasks_updated: u32,
+    pub todos_added: u32,
+    pub todos_updated: u32,
+    pub time_entries_added: u32,
+    pub time_entries_updated: u32,
+    pub reminders_added: u32,
+    pub reminders_updated: u32,
+    pub capture_items_added: u32,
+    pub capture_items_updated: u32,
+    pub last_sync_at: Option<DateTime<Utc>>,
+    pub error: Option<String>,
+}
+
+impl SyncSummary {
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_error(error: String) -> Self {
+        Self {
+            error: Some(error),
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub fn total_pulled(&self) -> u32 {
+        self.projects_added
+            + self.projects_updated
+            + self.tasks_added
+            + self.tasks_updated
+            + self.todos_added
+            + self.todos_updated
+            + self.time_entries_added
+            + self.time_entries_updated
+            + self.reminders_added
+            + self.reminders_updated
+            + self.capture_items_added
+            + self.capture_items_updated
+    }
+
+    #[must_use]
+    pub fn from_comparison(original: &StateSnapshot, merged: &StateSnapshot) -> Self {
+        let (projects_added, projects_updated) = diff_counts(&original.projects, &merged.projects);
+        let (tasks_added, tasks_updated) = diff_counts(&original.tasks, &merged.tasks);
+        let (todos_added, todos_updated) = diff_counts(&original.todos, &merged.todos);
+        let (time_entries_added, time_entries_updated) =
+            diff_counts(&original.time_entries, &merged.time_entries);
+        let (reminders_added, reminders_updated) =
+            diff_counts(&original.reminders, &merged.reminders);
+        let (capture_items_added, capture_items_updated) =
+            diff_counts(&original.capture_items, &merged.capture_items);
+
+        Self {
+            projects_added,
+            projects_updated,
+            tasks_added,
+            tasks_updated,
+            todos_added,
+            todos_updated,
+            time_entries_added,
+            time_entries_updated,
+            reminders_added,
+            reminders_updated,
+            capture_items_added,
+            capture_items_updated,
+            last_sync_at: Some(Utc::now()),
+            error: None,
+        }
+    }
+}
+
+fn diff_counts<T: Clone + serde::Serialize>(original: &[T], merged: &[T]) -> (u32, u32) {
+    let original_slugs: Vec<_> = original
+        .iter()
+        .map(|e| serde_json::to_string(e).unwrap_or_default())
+        .collect();
+    let merged_slugs: Vec<_> = merged
+        .iter()
+        .map(|e| serde_json::to_string(e).unwrap_or_default())
+        .collect();
+    let added = count_added(&original_slugs, &merged_slugs);
+    let updated = count_updated(&original_slugs, &merged_slugs);
+    (added, updated)
+}
+
+fn count_added(original: &[String], merged: &[String]) -> u32 {
+    let original_keys: std::collections::HashSet<_> = original.iter().collect();
+    let merged_keys: std::collections::HashSet<_> = merged.iter().collect();
+    u32::try_from(merged_keys.difference(&original_keys).count()).unwrap_or(u32::MAX)
+}
+
+fn count_updated(original: &[String], merged: &[String]) -> u32 {
+    let mut count = 0u32;
+    let original_map: std::collections::HashMap<_, _> =
+        original.iter().map(|s| (s.as_str(), s)).collect();
+    for merged_entity in merged {
+        if let Some(orig) = original_map.get(merged_entity.as_str())
+            && **orig != **merged_entity
+        {
+            count += 1;
+        }
+    }
+    count
+}
+
 // ── SyncEngine ─────────────────────────────────────────────────────────────
 
 /// Orchestrates pull → merge → push sync cycles against a [`SyncProvider`].
@@ -124,7 +247,11 @@ impl SyncEngine {
     ///
     /// Returns [`SyncError`] if the pull or push operation fails for any
     /// reason other than `NotFound` on pull.
-    pub async fn run_once(&self, local: StateSnapshot) -> Result<StateSnapshot, SyncError> {
+    pub async fn run_once(
+        &self,
+        local: StateSnapshot,
+    ) -> Result<(StateSnapshot, SyncSummary), SyncError> {
+        let original = local.clone();
         let local_hash = local.content_hash();
         tracing::info!(
             provider = %self.provider_name,
@@ -164,7 +291,8 @@ impl SyncEngine {
                     self.provider.push(&merged).await?;
                     tracing::info!("sync: push succeeded");
                 }
-                Ok(merged)
+                let summary = SyncSummary::from_comparison(&original, &merged);
+                Ok((merged, summary))
             }
             Err(SyncError::NotFound(_)) => {
                 tracing::info!(
@@ -173,7 +301,8 @@ impl SyncEngine {
                 );
                 self.provider.push(&local).await?;
                 tracing::info!("sync: initial push succeeded");
-                Ok(local)
+                let summary = SyncSummary::from_comparison(&original, &local);
+                Ok((local, summary))
             }
             Err(e) => {
                 tracing::warn!(error = %e, "sync: pull failed");

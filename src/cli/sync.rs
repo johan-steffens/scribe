@@ -82,7 +82,7 @@ pub fn run(
 ) -> anyhow::Result<()> {
     match &args.subcommand {
         Some(SyncSubcommand::Configure(cfg_args)) => run_configure(cfg_args, config),
-        Some(SyncSubcommand::Status(status_args)) => run_status(status_args, config),
+        Some(SyncSubcommand::Status(status_args)) => run_status(status_args, config, conn),
         None => {
             if !config.sync.enabled {
                 anyhow::bail!(
@@ -132,20 +132,34 @@ fn run_sync_once(
     let mut state = SyncState::load(&sync_state_path);
 
     match rt.block_on(engine.run_once(local)) {
-        Ok(merged) => {
+        Ok((merged, summary)) => {
             tracing::debug!(
                 merged_entities = merged.entities(),
                 "sync: writing merged state to database"
             );
             merged.write_to_db(conn)?;
             tracing::debug!("sync: write to database complete");
+            if let Err(e) = crate::db::save_sync_summary(conn, &summary) {
+                tracing::warn!(error = %e, "sync.summary.save.error");
+            }
             state.last_sync_at = Some(Utc::now());
             state.last_error = None;
-            state.provider = Some(provider_name);
+            state.provider = Some(provider_name.clone());
             state.save(&sync_state_path)?;
             match output {
-                OutputFormat::Text => println!("Sync complete."),
-                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&state)?),
+                OutputFormat::Text => {
+                    println!("Sync complete. {} items pulled.", summary.total_pulled());
+                }
+                OutputFormat::Json => {
+                    let obj = json!({
+                        "enabled": config.sync.enabled,
+                        "provider": provider_name,
+                        "last_sync_at": state.last_sync_at,
+                        "last_error": state.last_error,
+                        "summary": summary,
+                    });
+                    println!("{}", serde_json::to_string_pretty(&obj)?);
+                }
             }
         }
         Err(e) => {
@@ -537,12 +551,16 @@ fn remove_secrets(config: &crate::config::Config) -> anyhow::Result<()> {
 
 // ── status ─────────────────────────────────────────────────────────────────
 
-/// Shows the current sync status (provider, last sync time, last error).
+/// Shows the current sync status (provider, last sync time, last error, summary).
 ///
 /// # Errors
 ///
 /// Returns an error if the sync state file cannot be read or output fails.
-fn run_status(args: &SyncStatusArgs, config: &crate::config::Config) -> anyhow::Result<()> {
+fn run_status(
+    args: &SyncStatusArgs,
+    config: &crate::config::Config,
+    conn: Option<&std::sync::Arc<std::sync::Mutex<rusqlite::Connection>>>,
+) -> anyhow::Result<()> {
     let state_path = sync_state_path()?;
     let state = SyncState::load(&state_path);
 
@@ -552,12 +570,43 @@ fn run_status(args: &SyncStatusArgs, config: &crate::config::Config) -> anyhow::
         .map_or_else(|| "never".to_owned(), |t| t.to_rfc3339());
     let last_error = state.last_error.as_deref().unwrap_or("none").to_owned();
 
+    let summary = conn.and_then(crate::db::load_sync_summary);
+
     match args.output {
         OutputFormat::Text => {
             println!("sync enabled:  {}", config.sync.enabled);
             println!("provider:      {provider_name}");
             println!("last sync:     {last_sync}");
             println!("last error:    {last_error}");
+            if let Some(s) = &summary {
+                println!("\nLast sync summary:");
+                println!(
+                    "  projects:     +{} added, ~{} updated",
+                    s.projects_added, s.projects_updated
+                );
+                println!(
+                    "  tasks:       +{} added, ~{} updated",
+                    s.tasks_added, s.tasks_updated
+                );
+                println!(
+                    "  todos:       +{} added, ~{} updated",
+                    s.todos_added, s.todos_updated
+                );
+                println!(
+                    "  time_entries:+{} added, ~{} updated",
+                    s.time_entries_added, s.time_entries_updated
+                );
+                println!(
+                    "  reminders:   +{} added, ~{} updated",
+                    s.reminders_added, s.reminders_updated
+                );
+                println!(
+                    "  captures:    +{} added, ~{} updated",
+                    s.capture_items_added, s.capture_items_updated
+                );
+            } else {
+                println!("\nNo sync summary available.");
+            }
         }
         OutputFormat::Json => {
             let obj = json!({
@@ -565,6 +614,7 @@ fn run_status(args: &SyncStatusArgs, config: &crate::config::Config) -> anyhow::
                 "provider":     provider_name,
                 "last_sync_at": state.last_sync_at,
                 "last_error":   state.last_error,
+                "summary":      summary,
             });
             println!("{}", serde_json::to_string_pretty(&obj)?);
         }

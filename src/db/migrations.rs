@@ -125,6 +125,17 @@ VALUES ('quick-capture', 'Quick Capture', 'active', 1,
 pub(super) const M2: &str =
     "ALTER TABLE reminders ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0;";
 
+/// M3 — creates the `sync_metadata` table for storing sync-related key-value data.
+///
+/// Stores the last successful [`SyncSummary`][crate::sync::SyncSummary] as JSON
+/// alongside other sync-related metadata keys.
+pub(super) const M3: &str = "
+CREATE TABLE IF NOT EXISTS sync_metadata (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -135,5 +146,5 @@ pub(super) const M2: &str =
 /// let migrations = rusqlite_migration::Migrations::new(scribe::db::migrations::all());
 /// ```
 pub(super) fn all() -> Vec<M<'static>> {
-    vec![M::up(M1), M::up(M2)]
+    vec![M::up(M1), M::up(M2), M::up(M3)]
 }
