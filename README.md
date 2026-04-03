@@ -4,6 +4,11 @@
   <img src=".github/assets/scribe-logo.png" alt="Scribe logo" width="400" />
 </p>
 
+[![Build status](https://github.com/johan-steffens/scribe/actions/workflows/release.yml/badge.svg)](https://github.com/johan-steffens/scribe/actions)
+[![Version](https://img.shields.io/badge/version-1.0.4-blue)](https://github.com/johan-steffens/scribe/releases)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange)](https://www.rust-lang.org)
+[![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A keyboard-driven CLI and TUI for managing projects, tasks, todos, time
 tracking, reminders, and quick captures — all in a single SQLite file you
 own. No accounts, no cloud lock-in, no monthly fees. Sync across machines

@@ -7,6 +7,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - src/**
+      - Cargo.toml
+      - Cargo.lock
   workflow_dispatch:
 
 jobs:
@@ -156,16 +160,64 @@ jobs:
             > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Create GitHub Release
+      - name: Generate release notes from conventional commits
+        id: release-notes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: v${{ needs.preflight.outputs.version }}
         run: |
-          LINUX_SHA=$(cat dist/SHA256SUMS.txt | grep scribe-linux-x86_64 | cut -d' ' -f1)
-          MACOS_SHA=$(cat dist/SHA256SUMS.txt | grep scribe-macos-aarch64 | cut -d' ' -f1)
-          WIN_SHA=$(cat dist/SHA256SUMS.txt | grep scribe-windows-x86_64.exe | cut -d' ' -f1)
+          # Get the last tag to compare against
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "Last tag: $LAST_TAG"
 
+          # Parse conventional commits since last tag
+          CHANGELOG=""
+          if [[ -n "$LAST_TAG" ]]; then
+            # Collect commits between last tag and this version
+            CHANGELOG=$(git log --format="|%s" "$LAST_TAG..HEAD" 2>/dev/null | grep "^|" || true)
+          fi
+
+          # Build categorized changelog
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+          while IFS= read -r line; do
+            commit=${line:1}  # Remove leading |
+            # Extract description after type(scope): or type:
+            if [[ "$commit" =~ ^(feat|fix|docs|style|chore|refactor|perf)(\([a-zA-Z0-9_-]+\))?:[[:space:]](.*) ]]; then
+              type="${BASH_REMATCH[1]}"
+              desc="${BASH_REMATCH[3]}"
+              case "$type" in
+                feat) FEATURES="${FEATURES}- ${desc}\n" ;;
+                fix)  FIXES="${FIXES}- ${desc}\n" ;;
+                *)    OTHER="${OTHER}- [${type}] ${desc}\n" ;;
+              esac
+            elif [[ -n "$commit" ]]; then
+              OTHER="${OTHER}- ${commit}\n"
+            fi
+          done <<< "$CHANGELOG"
+
+          # Read checksums
+          LINUX_SHA=$(grep scribe-linux-x86_64 SHA256SUMS.txt | cut -d' ' -f1)
+          MACOS_SHA=$(grep scribe-macos-aarch64 SHA256SUMS.txt | cut -d' ' -f1)
+          WIN_SHA=$(grep scribe-windows-x86_64.exe SHA256SUMS.txt | cut -d' ' -f1)
+
+          # Generate release notes
           cat <<EOF > RELEASE_NOTES.md
+            ## What's Changed
+
+            **${{ needs.preflight.outputs.version }}** is a bug fix and feature release.
+
+            ### New Features
+            $(echo -e "${FEATURES:-_No new features in this release._}")
+
+            ### Bug Fixes
+            $(echo -e "${FIXES:-_No bug fixes in this release._}")
+
+            ### Other Changes
+            $(echo -e "${OTHER:-_No other changes in this release._}")
+
+            ---
+
             ## Installation
 
             Download the binary for your platform, make it executable, and move it onto your \$PATH.
@@ -180,10 +232,10 @@ jobs:
             chmod +x scribe && sudo mv scribe /usr/local/bin/
 
             # Windows (x86_64)
-            # Download 'scribe-windows-x86_64.exe' and move it to a folder in your PATH.
+            # Download 'scribe-windows-x86_64.exe' from the releases page.
             \`\`\`
 
-            ## Shell completions
+            ### Shell Completions
 
             \`\`\`sh
             # zsh
@@ -200,19 +252,33 @@ jobs:
             scribe completions bash >> ~/.bash_completion
             \`\`\`
 
-            ## MCP server
+            ### MCP Server
 
-            This binary is built with the \`mcp\` and \`sync\` features. Run \`scribe mcp\` to start the
-            MCP stdio server and connect it to your AI agent.
+            This binary includes the \`mcp\` and \`sync\` features. Run \`scribe mcp\` to
+            start the MCP stdio server and connect it to your AI agent.
 
-            ## Checksums
+            ### Checksums
 
             \`\`\`
-            linux: $LINUX_SHA
-            macos: $MACOS_SHA
-            windows: $WIN_SHA
+            linux-x86_64:   $LINUX_SHA
+            macos-aarch64:  $MACOS_SHA
+            windows-x86_64: $WIN_SHA
             \`\`\`
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/$LAST_TAG...$VERSION
           EOF
 
-          gh release create "$VERSION" --title "$VERSION" --notes-file RELEASE_NOTES.md \
-            dist/scribe-linux-x86_64 dist/scribe-macos-aarch64 dist/scribe-windows-x86_64.exe
+          echo "Release notes generated:"
+          cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v${{ needs.preflight.outputs.version }}
+        run: |
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes-file RELEASE_NOTES.md \
+            dist/scribe-linux-x86_64 \
+            dist/scribe-macos-aarch64 \
+            dist/scribe-windows-x86_64.exe
