@@ -153,6 +153,17 @@ impl StateSnapshot {
         SqliteCaptureItems::new(Arc::clone(conn)).upsert_all(&self.capture_items)?;
         Ok(())
     }
+
+    /// Returns the total count of all entities across all tables.
+    #[must_use]
+    pub fn entities(&self) -> usize {
+        self.projects.len()
+            + self.tasks.len()
+            + self.todos.len()
+            + self.time_entries.len()
+            + self.reminders.len()
+            + self.capture_items.len()
+    }
 }
 
 // ── internal hashable projection ───────────────────────────────────────────

@@ -13,7 +13,6 @@ use std::io::Write as _;
 use chrono::Utc;
 use clap::{Args, Subcommand};
 use serde_json::json;
-use uuid::Uuid;
 
 use crate::cli::project::OutputFormat;
 use crate::config::SyncProvider;
@@ -53,6 +52,9 @@ pub struct SyncConfigureArgs {
     /// Remove stored secrets for the active provider from the keychain.
     #[arg(long)]
     pub remove: bool,
+    /// Existing Gist ID to use (omit to create a new Gist on first sync).
+    #[arg(long)]
+    pub gist_id: Option<String>,
     /// Output format.
     #[arg(long, default_value = "text")]
     pub output: OutputFormat,
@@ -116,10 +118,7 @@ fn run_sync_once(
         anyhow::anyhow!("sync provider could not be constructed — is sync configured?")
     })?;
 
-    // TODO(task-13): use a persisted, per-machine UUID instead of nil once
-    // machine_id generation is wired into Config. machine_id is diagnostic
-    // only and does not affect merge correctness.
-    let local = StateSnapshot::from_db(conn, Uuid::nil())?;
+    let local = StateSnapshot::from_db(conn, config.machine_id())?;
 
     let sync_state_path = ProjectDirs::from("", "", "scribe").map_or_else(
         || std::path::PathBuf::from(".local/share/scribe/sync-state.json"),
@@ -179,7 +178,7 @@ pub(crate) fn run_configure(
     };
 
     config.sync.provider = provider;
-    configure_provider(config)?;
+    configure_provider(config, args.gist_id.as_deref())?;
     config.sync.enabled = true;
     config.save()?;
 
@@ -248,9 +247,12 @@ fn prompt_provider_choice() -> anyhow::Result<SyncProvider> {
 ///
 /// Returns an error if prompting fails, keychain writes fail, or getrandom
 /// fails during REST master secret generation.
-fn configure_provider(config: &mut crate::config::Config) -> anyhow::Result<()> {
+fn configure_provider(
+    config: &mut crate::config::Config,
+    gist_id: Option<&str>,
+) -> anyhow::Result<()> {
     match config.sync.provider {
-        SyncProvider::Gist => configure_gist()?,
+        SyncProvider::Gist => configure_gist(config, gist_id)?,
         SyncProvider::S3 => configure_s3(config)?,
         SyncProvider::ICloud => configure_icloud(config)?,
         SyncProvider::JsonBin => configure_jsonbin()?,
@@ -263,14 +265,25 @@ fn configure_provider(config: &mut crate::config::Config) -> anyhow::Result<()> 
 
 /// Configures the GitHub Gist sync provider.
 ///
+/// If `gist_id` is provided, syncing will update that existing Gist.
+/// Otherwise, a new private Gist will be created on the first sync.
+///
 /// # Errors
 ///
 /// Returns an error if the PAT prompt fails or the keychain write fails.
-fn configure_gist() -> anyhow::Result<()> {
+fn configure_gist(config: &mut crate::config::Config, gist_id: Option<&str>) -> anyhow::Result<()> {
     let token = rpassword::prompt_password("GitHub personal access token (PAT): ")?;
     KeychainStore::set("gist", "token", &token)
         .map_err(|e| anyhow::anyhow!("keychain error: {e}"))?;
     println!("GitHub PAT stored in keychain.");
+
+    if let Some(id) = gist_id {
+        config.sync.gist.gist_id = id.to_owned();
+        println!("Using existing Gist ID: {}", id);
+    } else {
+        println!("No Gist ID provided — a new private Gist will be created on first sync.");
+    }
+
     Ok(())
 }
 

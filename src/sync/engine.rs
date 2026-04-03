@@ -125,30 +125,50 @@ impl SyncEngine {
     /// Returns [`SyncError`] if the pull or push operation fails for any
     /// reason other than `NotFound` on pull.
     pub async fn run_once(&self, local: StateSnapshot) -> Result<StateSnapshot, SyncError> {
+        let local_hash = local.content_hash();
+        tracing::info!(
+            provider = %self.provider_name,
+            local_entities = local.entities(),
+            "sync: starting pull phase"
+        );
+
         match self.provider.pull().await {
             Ok(remote) => {
                 let remote_hash = remote.content_hash();
+                tracing::info!(
+                    remote_entities = remote.entities(),
+                    remote_hash = %remote_hash,
+                    "sync: pull succeeded, merging"
+                );
                 let mut merged = local;
                 Self::merge_into(&mut merged, &remote);
-                // Only push if the merge changed anything relative to the
-                // remote snapshot. This avoids unnecessary writes when local
-                // and remote are already in sync.
-                //
-                // DOCUMENTED-MAGIC: We compare against the *remote* hash (not
-                // the pre-merge local hash) because a merge that produces a
-                // result identical to what the remote already has means no
-                // push is necessary — the remote is already authoritative.
-                if merged.content_hash() != remote_hash {
+                let merged_hash = merged.content_hash();
+                if merged_hash != remote_hash {
+                    tracing::info!(
+                        merged_entities = merged.entities(),
+                        merged_hash = %merged_hash,
+                        "sync: content changed, pushing"
+                    );
                     self.provider.push(&merged).await?;
+                    tracing::info!("sync: push succeeded");
+                } else {
+                    tracing::info!("sync: content unchanged, skipping push");
                 }
                 Ok(merged)
             }
             Err(SyncError::NotFound(_)) => {
-                // No remote state yet — push local as the seed.
+                tracing::info!(
+                    local_hash = %local_hash,
+                    "sync: no remote state, pushing initial snapshot"
+                );
                 self.provider.push(&local).await?;
+                tracing::info!("sync: initial push succeeded");
                 Ok(local)
             }
-            Err(e) => Err(e),
+            Err(e) => {
+                tracing::warn!(error = %e, "sync: pull failed");
+                Err(e)
+            }
         }
     }
 

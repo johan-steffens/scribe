@@ -327,6 +327,8 @@ impl Default for SyncConfig {
 struct DataConfig {
     /// Override for the `SQLite` database path; empty string means use default.
     db_path: Option<String>,
+    /// Persisted per-machine UUID used for sync diagnostics.
+    machine_id: Option<String>,
 }
 
 /// Raw `[notifications]` section as it appears in `config.toml`.
@@ -424,6 +426,9 @@ pub struct Config {
     /// Cloud sync configuration (requires the `sync` feature).
     #[cfg(feature = "sync")]
     pub sync: SyncConfig,
+    /// Persisted per-machine UUID used for sync diagnostics.
+    #[cfg(feature = "sync")]
+    machine_id: Option<uuid::Uuid>,
 }
 
 impl Default for Config {
@@ -470,7 +475,18 @@ impl Config {
             config.path = %path.display(),
             "config loaded",
         );
-        Ok(Self::from_raw(raw))
+        let mut cfg = Self::from_raw(raw);
+
+        #[cfg(feature = "sync")]
+        if cfg.machine_id.is_none() {
+            cfg.machine_id = Some(uuid::Uuid::new_v4());
+            tracing::info!(machine_id = %cfg.machine_id.unwrap(), "generated new machine_id");
+            if let Err(e) = cfg.save() {
+                tracing::warn!(error = %e, "failed to persist machine_id");
+            }
+        }
+
+        Ok(cfg)
     }
 
     /// Persists the current configuration to disk.
@@ -529,6 +545,12 @@ impl Config {
         default_db_path()
     }
 
+    #[cfg(feature = "sync")]
+    #[must_use]
+    pub fn machine_id(&self) -> uuid::Uuid {
+        self.machine_id.unwrap_or_else(uuid::Uuid::nil)
+    }
+
     // ── private helpers ────────────────────────────────────────────────────
 
     fn from_raw(raw: RawConfig) -> Self {
@@ -538,6 +560,15 @@ impl Config {
             .filter(|s| !s.is_empty())
             .map(PathBuf::from);
 
+        #[cfg(feature = "sync")]
+        let machine_id = raw.data.machine_id.and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                uuid::Uuid::parse_str(&s).ok()
+            }
+        });
+
         Self {
             db_path,
             notifications_enabled: raw.notifications.enabled,
@@ -546,6 +577,8 @@ impl Config {
             setup: raw.setup,
             #[cfg(feature = "sync")]
             sync: raw.sync,
+            #[cfg(feature = "sync")]
+            machine_id,
         }
     }
 
@@ -556,6 +589,8 @@ impl Config {
                     .db_path
                     .as_ref()
                     .map(|p| p.to_string_lossy().into_owned()),
+                #[cfg(feature = "sync")]
+                machine_id: self.machine_id.map(|u| u.to_string()),
             },
             notifications: NotificationsConfig {
                 enabled: self.notifications_enabled,
@@ -619,6 +654,8 @@ mod tests {
             setup: SetupConfig::default(),
             #[cfg(feature = "sync")]
             sync: SyncConfig::default(),
+            #[cfg(feature = "sync")]
+            machine_id: None,
         };
         assert_eq!(cfg.db_path(), PathBuf::from("/tmp/test.db"));
     }
