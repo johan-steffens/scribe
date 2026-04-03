@@ -40,6 +40,8 @@ pub use capture::CaptureCommand;
 #[doc(inline)]
 pub use complete::CompletionShell;
 #[doc(inline)]
+pub use daemon::DaemonCommand;
+#[doc(inline)]
 pub use inbox::InboxCommand;
 #[doc(inline)]
 pub use project::ProjectCommand;
@@ -96,14 +98,14 @@ pub enum Commands {
     Inbox(InboxCommand),
     /// Manage reminders.
     Reminder(ReminderCommand),
-    /// Run the background reminder notification daemon.
+    /// Manage the background reminder notification daemon.
     ///
     /// Polls for due reminders and fires OS desktop notifications.
     /// Intended to be registered with launchd (macOS) or systemd (Linux).
     Daemon {
-        /// Polling interval in seconds (default: 30).
-        #[arg(long, short = 'i')]
-        interval: Option<u64>,
+        /// Daemon subcommand.
+        #[command(subcommand)]
+        command: DaemonCommand,
     },
     /// Configure Scribe features interactively (first-run wizard).
     ///

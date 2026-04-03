@@ -15,15 +15,17 @@
 //!
 //! ```sh
 //! scribe daemon            # poll every 30 s (default)
-//! scribe daemon --interval 60
+//! scribe daemon run       # same as above (explicit)
+//! scribe daemon restart   # restart the daemon service
+//! scribe daemon reinstall # reinstall the daemon service (after upgrades)
 //! ```
 //!
 //! # Stopping
 //!
 //! Send `SIGINT` or `SIGTERM` (Ctrl-C) to stop gracefully.
 
-#[cfg(feature = "sync")]
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -33,6 +35,8 @@ use chrono::Utc;
 #[cfg(feature = "sync")]
 use directories::ProjectDirs;
 use rusqlite::Connection;
+
+use clap::Subcommand;
 
 use crate::ops::ReminderOps;
 #[cfg(feature = "sync")]
@@ -53,7 +57,225 @@ const DEFAULT_INTERVAL_SECS: u64 = 30;
 // would increase CPU wake-up frequency with no user-visible benefit.
 const TICK_SECS: u64 = 1;
 
-/// Launches the daemon loop, blocking until the process is interrupted.
+// ── clap types ─────────────────────────────────────────────────────────────
+
+/// Subcommands for `scribe daemon`.
+#[derive(Debug, Subcommand)]
+pub enum DaemonCommand {
+    /// Run the background reminder notification daemon.
+    ///
+    /// Polls for due reminders and fires OS desktop notifications.
+    /// Intended to be registered with launchd (macOS) or systemd (Linux).
+    Run {
+        /// Polling interval in seconds (default: 30).
+        #[arg(long, short = 'i')]
+        interval: Option<u64>,
+    },
+    /// Restart the background daemon service.
+    ///
+    /// This stops the currently running daemon (if any) and starts a fresh
+    /// instance. Useful after config changes or when the daemon becomes
+    /// unresponsive.
+    Restart,
+    /// Reinstall the daemon service.
+    ///
+    /// This uninstalls and reinstalls the service definition, picking up any
+    /// changes from binary upgrades. Use this after upgrading Scribe.
+    Reinstall,
+}
+
+// ── public entry point ─────────────────────────────────────────────────────
+
+/// Executes a `scribe daemon` subcommand.
+///
+/// # Errors
+///
+/// Returns an error if the service control commands fail.
+pub fn run(cmd: &DaemonCommand, config: &crate::config::Config) -> anyhow::Result<()> {
+    match cmd {
+        DaemonCommand::Run { interval } => {
+            let conn = crate::db::open(&config.db_path())?;
+            let conn = Arc::new(Mutex::new(conn));
+            run_loop(&conn, *interval, config);
+        }
+        DaemonCommand::Restart => {
+            restart_service();
+        }
+        DaemonCommand::Reinstall => {
+            reinstall_service(config)?;
+        }
+    }
+    Ok(())
+}
+
+// ── service control ────────────────────────────────────────────────────────
+
+/// Restarts the daemon service by stopping and starting it.
+fn restart_service() {
+    #[cfg(target_os = "macos")]
+    {
+        let label = "com.scribe.daemon";
+        println!("Restarting {label}...");
+
+        let uid = std::env::var("UID").unwrap_or_else(|_| {
+            std::process::Command::new("id")
+                .args(["-u"])
+                .output()
+                .map_or_else(
+                    |_| String::new(),
+                    |o| String::from_utf8_lossy(&o.stdout).trim().to_owned(),
+                )
+        });
+
+        let _ = Command::new("launchctl")
+            .args(["bootout", &format!("gui/{uid}/{label}")])
+            .status();
+
+        let _ = Command::new("launchctl")
+            .args(["kickstart", "-kp", &format!("gui/{uid}/{label}")])
+            .status();
+
+        println!("{label} restarted.");
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        println!("Restarting scribe-daemon...");
+        let _ = Command::new("systemctl")
+            .args(["--user", "restart", "scribe-daemon"])
+            .status();
+        println!("scribe-daemon restarted.");
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        println!("Restart not supported on this platform.");
+    }
+}
+
+/// Reinstalls the daemon service by uninstalling and reinstalling it.
+#[allow(
+    clippy::too_many_lines,
+    reason = "function contains platform-specific blocks that cannot be further refactored without complicating the structure"
+)]
+fn reinstall_service(_config: &crate::config::Config) -> anyhow::Result<()> {
+    println!("Reinstalling daemon service...");
+
+    #[cfg(target_os = "macos")]
+    {
+        use crate::cli::service::{LAUNCHD_LABEL, launchd_plist_path};
+        let plist_path = launchd_plist_path()?;
+        let _ = Command::new("launchctl")
+            .args(["unload", "-w", &plist_path.to_string_lossy()])
+            .status();
+        if plist_path.exists() {
+            std::fs::remove_file(&plist_path)?;
+            println!("  Removed  {}", plist_path.display());
+        }
+        let binary = std::env::current_exe()?;
+        let home = directories::UserDirs::new()
+            .map(|u| u.home_dir().to_owned())
+            .ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?;
+        let plist = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>{LAUNCHD_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{binary}</string>
+    <string>daemon</string>
+    <string>run</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>{home}/Library/Logs/scribe-daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>{home}/Library/Logs/scribe-daemon.log</string>
+</dict>
+</plist>
+"#,
+            binary = binary.display(),
+            home = home.display(),
+        );
+        if let Some(parent) = plist_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&plist_path, &plist)?;
+        println!("  Created  {}", plist_path.display());
+        let status = Command::new("launchctl")
+            .args(["load", "-w", &plist_path.to_string_lossy()])
+            .status()?;
+        if status.success() {
+            println!("  Started  {LAUNCHD_LABEL} (launchctl)");
+        }
+        println!();
+        println!("Daemon service reinstalled.");
+    };
+
+    #[cfg(target_os = "linux")]
+    {
+        use crate::cli::service::systemd_unit_path;
+        let unit_path = systemd_unit_path()?;
+
+        let _ = Command::new("systemctl")
+            .args(["--user", "disable", "--now", "scribe-daemon"])
+            .status();
+
+        if unit_path.exists() {
+            std::fs::remove_file(&unit_path)?;
+            println!("  Removed  {}", unit_path.display());
+        }
+
+        let binary = std::env::current_exe()?;
+        let unit = format!(
+            "[Unit]\n\
+             Description=Scribe reminder notification daemon\n\
+             After=graphical-session.target\n\
+             \n\
+             [Service]\n\
+             ExecStart={binary}\n\
+             Restart=on-failure\n\
+             \n\
+             [Install]\n\
+             WantedBy=default.target\n",
+            binary = binary.display(),
+        );
+
+        if let Some(parent) = unit_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        std::fs::write(&unit_path, &unit)?;
+        println!("  Created  {}", unit_path.display());
+
+        let _ = Command::new("systemctl")
+            .args(["--user", "daemon-reload"])
+            .status()?;
+
+        let _ = Command::new("systemctl")
+            .args(["--user", "enable", "--now", "scribe-daemon"])
+            .status()?;
+
+        println!();
+        println!("Daemon service reinstalled.");
+    };
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        println!("Daemon reinstall not supported on this platform.");
+    };
+
+    Ok(())
+}
+
+/// Runs the daemon loop, blocking until the process is interrupted.
 ///
 /// `interval_secs` controls how often the database is polled for due
 /// reminders. Pass `None` to use the default (30 s). When the `sync` feature
@@ -64,7 +286,7 @@ const TICK_SECS: u64 = 1;
 ///
 /// Returns an error only if the initial REST server startup fails. Subsequent
 /// poll and sync errors are logged at `WARN` level and do not abort the loop.
-pub fn run(
+fn run_loop(
     conn: &Arc<Mutex<Connection>>,
     interval_secs: Option<u64>,
     #[cfg_attr(
@@ -72,7 +294,7 @@ pub fn run(
         expect(unused_variables, reason = "only used by sync feature")
     )]
     config: &crate::config::Config,
-) -> anyhow::Result<()> {
+) {
     let reminder_interval = Duration::from_secs(interval_secs.unwrap_or(DEFAULT_INTERVAL_SECS));
 
     tracing::info!(interval_secs = reminder_interval.as_secs(), "daemon.start",);
@@ -86,7 +308,9 @@ pub fn run(
 
     // Start the REST sync master server (if configured) before entering the loop.
     #[cfg(feature = "sync")]
-    spawn_rest_server_thread(conn, config)?;
+    if let Err(e) = spawn_rest_server_thread(conn, config) {
+        tracing::warn!(error = %e, "daemon: failed to start REST server");
+    };
 
     let ops = ReminderOps::new(Arc::clone(conn));
 

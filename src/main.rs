@@ -173,8 +173,8 @@ fn run() -> anyhow::Result<()> {
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
-        Some(Commands::Daemon { interval }) => {
-            cli::daemon::run(&conn, interval, &config)?;
+        Some(Commands::Daemon { command }) => {
+            cli::daemon::run(&command, &config)?;
         }
         // Handled above before the DB opens.
         Some(

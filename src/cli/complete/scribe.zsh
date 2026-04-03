@@ -333,7 +333,21 @@ _scribe() {
         _describe -t commands 'service subcommands' s
       fi ;;
     (daemon)
-      _arguments '--interval=[Polling interval in seconds]:seconds: ' ;;
+      if (( CURRENT == 1 )); then
+        local -a s; s=(
+          'run:Run the background reminder daemon'
+          'restart:Restart the daemon service'
+          'reinstall:Reinstall the daemon service (after upgrades)'
+        )
+        _describe -t commands 'daemon subcommands' s
+      else
+        case $words[1] in
+        (run)
+          _arguments '--interval=[Polling interval in seconds]:seconds: ' ;;
+        (restart|reinstall)
+          ;;
+        esac
+      fi ;;
     (completions)
       _values 'shell' bash zsh fish elvish powershell ;;
     esac ;;
