@@ -4,10 +4,12 @@
   <img src=".github/assets/scribe-logo.png" alt="Scribe logo" width="400" />
 </p>
 
-[![Build status](https://github.com/johan-steffens/scribe/actions/workflows/release.yml/badge.svg)](https://github.com/johan-steffens/scribe/actions)
-[![Version](https://img.shields.io/github/v/release/johan-steffens/scribe)](https://github.com/johan-steffens/scribe/releases)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange)](https://www.rust-lang.org)
-[![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center">
+  <a href="https://github.com/johan-steffens/scribe/actions"><img src="https://github.com/johan-steffens/scribe/actions/workflows/release.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/johan-steffens/scribe/releases"><img src="https://img.shields.io/github/v/release/johan-steffens/scribe" alt="Version"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.85%2B-orange" alt="Rust"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+</p>
 
 A keyboard-driven CLI and TUI for managing projects, tasks, todos, time
 tracking, reminders, and quick captures — all in a single SQLite file you
@@ -17,7 +19,6 @@ when you want to.
 Scribe is **AI-ready** — connect it to your coding agent and manage your
 productivity through conversation. Ask your agent to add tasks, review your
 tracker, process your inbox, or schedule reminders using plain English.
-Your data stays local unless you enable sync.
 
 ---
 
