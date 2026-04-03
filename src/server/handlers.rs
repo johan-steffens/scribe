@@ -11,10 +11,13 @@
 
 // DOCUMENTED-MAGIC: Dead code until the daemon wires the server in a later task.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use rusqlite::Connection;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use crate::sync::{engine::SyncEngine, snapshot::StateSnapshot};
 
@@ -35,6 +38,33 @@ pub struct ServerState {
     pub(crate) snapshot: Arc<RwLock<StateSnapshot>>,
     /// The expected Bearer token used by the authentication middleware.
     pub(crate) secret: String,
+    /// Path to the database file for re-reading state.
+    pub(crate) db_path: PathBuf,
+    /// Machine ID used when reading from the database.
+    pub(crate) machine_id: Uuid,
+}
+
+impl ServerState {
+    /// Re-reads the snapshot from the database, refreshing local state.
+    ///
+    /// This is called periodically to pick up changes made directly on the
+    /// master (e.g., via `scribe reminder create`).
+    pub async fn refresh_from_db(&self) {
+        let db_path = self.db_path.clone();
+        let machine_id = self.machine_id;
+        let snapshot = tokio::task::spawn_blocking(move || {
+            let conn = Connection::open(&db_path)?;
+            let conn = Arc::new(std::sync::Mutex::new(conn));
+            StateSnapshot::from_db(&conn, machine_id)
+        })
+        .await
+        .ok();
+        if let Some(Ok(snap)) = snapshot {
+            let mut guard = self.snapshot.write().await;
+            *guard = snap;
+            tracing::debug!("server: refreshed snapshot from database");
+        }
+    }
 }
 
 impl std::fmt::Debug for ServerState {
@@ -43,6 +73,8 @@ impl std::fmt::Debug for ServerState {
         // token leakage through `tracing`/`Debug` output (M-PUBLIC-DEBUG).
         f.debug_struct("ServerState")
             .field("snapshot", &"<RwLock<StateSnapshot>>")
+            .field("db_path", &self.db_path)
+            .field("machine_id", &self.machine_id)
             .field("secret", &"<redacted>")
             .finish()
     }
@@ -53,6 +85,8 @@ impl Clone for ServerState {
         Self {
             snapshot: Arc::clone(&self.snapshot),
             secret: self.secret.clone(),
+            db_path: self.db_path.clone(),
+            machine_id: self.machine_id,
         }
     }
 }

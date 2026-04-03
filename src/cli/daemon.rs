@@ -229,6 +229,7 @@ fn spawn_rest_server_thread(
     config: &crate::config::Config,
 ) -> anyhow::Result<()> {
     use crate::config::{RestRole, SyncProvider};
+    use crate::server::ServerConfig;
     use crate::sync::keychain::KeychainStore;
 
     if !config.sync.enabled
@@ -242,10 +243,20 @@ fn spawn_rest_server_thread(
         .map_err(|e| anyhow::anyhow!("could not read REST secret from keychain: {e}"))?;
     let port = config.sync.rest.port;
     let initial = StateSnapshot::from_db(conn, config.machine_id())?;
+    let server_config = ServerConfig {
+        db_path: config.db_path(),
+        machine_id: config.machine_id(),
+        refresh_interval_secs: config.sync.interval_secs,
+    };
 
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("invariant: tokio runtime must be created");
-        let (_bound_port, handle) = rt.block_on(crate::server::start_server(port, secret, initial));
+        let (_bound_port, handle) = rt.block_on(crate::server::start_server(
+            port,
+            secret,
+            initial,
+            server_config,
+        ));
         rt.block_on(handle)
             .expect("invariant: REST server task must not fail");
     });
