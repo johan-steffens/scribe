@@ -129,6 +129,7 @@ impl SyncEngine {
         tracing::info!(
             provider = %self.provider_name,
             local_entities = local.entities(),
+            local_hash = %local_hash,
             "sync: starting pull phase"
         );
 
@@ -141,7 +142,15 @@ impl SyncEngine {
                     "sync: pull succeeded, merging"
                 );
                 let mut merged = local;
+                tracing::debug!(
+                    before_merge_entities = merged.entities(),
+                    "sync: before merge"
+                );
                 Self::merge_into(&mut merged, &remote);
+                tracing::debug!(
+                    after_merge_entities = merged.entities(),
+                    "sync: after merge"
+                );
                 let merged_hash = merged.content_hash();
                 if merged_hash == remote_hash {
                     tracing::info!("sync: content unchanged, skipping push");
@@ -149,6 +158,7 @@ impl SyncEngine {
                     tracing::info!(
                         merged_entities = merged.entities(),
                         merged_hash = %merged_hash,
+                        remote_hash = %remote_hash,
                         "sync: content changed, pushing"
                     );
                     self.provider.push(&merged).await?;
@@ -246,6 +256,13 @@ fn merge_entities<T: Clone>(
     slug_of: impl Fn(&T) -> &str,
     remote_wins: impl Fn(&T, &T) -> bool,
 ) {
+    let initial_local_len = local.len();
+    tracing::debug!(
+        initial_local_len,
+        remote_len = remote.len(),
+        "merge: starting"
+    );
+
     // Build an index: slug → position in `local`.
     let mut local_index: HashMap<String, usize> = local
         .iter()
@@ -253,16 +270,29 @@ fn merge_entities<T: Clone>(
         .map(|(i, e)| (slug_of(e).to_owned(), i))
         .collect();
 
+    let mut added_count = 0;
+    let mut replaced_count = 0;
+
     for remote_entity in remote {
         let slug = slug_of(remote_entity).to_owned();
         if let Some(idx) = local_index.get(&slug).copied() {
             if remote_wins(remote_entity, &local[idx]) {
                 local[idx] = remote_entity.clone();
+                replaced_count += 1;
             }
         } else {
             let new_idx = local.len();
             local.push(remote_entity.clone());
             local_index.insert(slug, new_idx);
+            added_count += 1;
         }
     }
+
+    tracing::debug!(
+        initial_local_len,
+        final_local_len = local.len(),
+        added_count,
+        replaced_count,
+        "merge: complete"
+    );
 }

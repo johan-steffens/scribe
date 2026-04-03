@@ -145,12 +145,24 @@ impl StateSnapshot {
             SqliteTodos,
         };
 
+        tracing::debug!(
+            projects = self.projects.len(),
+            tasks = self.tasks.len(),
+            todos = self.todos.len(),
+            time_entries = self.time_entries.len(),
+            reminders = self.reminders.len(),
+            capture_items = self.capture_items.len(),
+            "write_to_db: starting"
+        );
+
         SqliteProjects::new(Arc::clone(conn)).upsert_all(&self.projects)?;
         SqliteTasks::new(Arc::clone(conn)).upsert_all(&self.tasks)?;
         SqliteTodos::new(Arc::clone(conn)).upsert_all(&self.todos)?;
         SqliteTimeEntries::new(Arc::clone(conn)).upsert_all(&self.time_entries)?;
         SqliteReminders::new(Arc::clone(conn)).upsert_all(&self.reminders)?;
         SqliteCaptureItems::new(Arc::clone(conn)).upsert_all(&self.capture_items)?;
+
+        tracing::debug!("write_to_db: complete");
         Ok(())
     }
 
