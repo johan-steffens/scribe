@@ -4,60 +4,94 @@
   <img src=".github/assets/scribe-logo.png" alt="Scribe logo" width="400" />
 </p>
 
-Scribe is a personal productivity tool for the terminal. It keeps projects,
-tasks, todos, time entries, a quick-capture inbox, and reminders in a single
-local SQLite database, and exposes them through both a scriptable CLI and a
-keyboard-driven full-screen TUI. Everything works fully offline by default;
-optional sync lets you mirror your state across multiple machines using a
-provider of your choice.
+A keyboard-driven CLI and TUI for managing projects, tasks, todos, time
+tracking, reminders, and quick captures — all in a single SQLite file you
+own. No accounts, no cloud lock-in, no monthly fees. Sync across machines
+when you want to.
 
 ---
 
-## Features
+## Why Scribe?
 
-- **Projects** — group all work into named projects with status tracking.
-- **Tasks** — priority levels (`low`, `medium`, `high`, `urgent`), status
-  (`todo`, `in_progress`, `done`, `cancelled`), and optional due dates.
-- **Todos** — lightweight checklist items; simpler than tasks, no priority or
-  due date.
-- **Time tracking** — start/stop timers linked to tasks or projects; daily and
-  weekly reports.
-- **Quick capture** — dump a thought into the inbox with one command; process
-  it later.
-- **Reminders** — scheduled reminders with desktop notifications; delivered
-  on startup, in real time while the TUI is open, and via `scribe daemon` for
-  continuous background delivery. On macOS notifications appear via Script
-  Editor (System Settings → Notifications → Script Editor to configure).
-- **TUI** — full-screen keyboard-driven interface (`scribe` with no arguments).
-- **CLI** — every operation is also a scriptable subcommand.
-- **Tab completion** — static (subcommands, flags, enum values) and dynamic
-  (live slug lookup from the database) for zsh and fish; static only for bash.
-- **Machine-readable output** — every subcommand accepts `--output json`.
-- **Offline-first** — all data is in a single SQLite file you own.
-- **Optional sync** — mirror your state across machines via GitHub Gist, S3-compatible
-  storage, iCloud Drive, JSONBin.io, Dropbox, a self-hosted REST master, or any local
-  file path. Sync is off by default; run `scribe sync configure` to enable it. Secrets
-  are stored in the OS keychain, never in the config file.
+- **Everything in one place** — not five different apps held together with
+  Zapier. Projects, tasks, todos, time entries, reminders, and a quick-capture
+  inbox.
+- **Your data stays yours** — single SQLite file. Copy it, back it up,
+  open it in any SQLite browser. No proprietary formats.
+- **Works offline** — full functionality without an internet connection.
+- **Sync when you want it** — GitHub Gist, S3, iCloud, Dropbox, or your own
+  self-hosted server. Secrets live in your OS keychain.
+- **Built for keyboard warriors** — scriptable CLI for automation, full TUI for
+  interactive work, shell completions for fast input.
+- **AI agent-ready** — MCP server exposes your data as tools to coding agents
+  (Claude Code, Cursor, OpenCode, etc.).
 
 ---
 
 ## Quick Start
 
 ```sh
-# 1. Download the binary for your platform (see Installation below)
-#    or install from source with all features:
-cargo install --path . --features mcp,sync
+# Install (pre-built binary or from source)
+curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-macos-aarch64
+chmod +x scribe && sudo mv scribe /usr/local/bin/
 
-# 2. Run the setup wizard (optional but recommended)
+# Or from source: cargo install --path . --features mcp,sync
+
+# Run the setup wizard
 scribe setup --wizard
 
-# 3. Create a project and a task
-scribe project add payments --name "Payments Integration"
-scribe task add "Fix login bug" --project payments --priority high
-
-# 4. Open the TUI
+# Open the TUI
 scribe
+
+# Or use the CLI directly
+scribe task add "Review PR" --priority high --project myproject
+scribe track start --task mytask
+scribe capture "Remember to call mom"
 ```
+
+---
+
+## Core Concepts
+
+**Projects** group related work. **Tasks** have priority, status, and due dates.
+**Todos** are lightweight checklists. **Time tracking** links timers to tasks
+or projects. **Reminders** fire desktop notifications at scheduled times.
+**Capture** grabs fleeting thoughts into the inbox for processing later.
+
+Everything has slugs (`my-task-20260403`) for fast CLI and completion lookup.
+
+---
+
+## TUI
+
+Run `scribe` (no arguments) to open the full-screen interface:
+
+| Key | Action |
+|-----|--------|
+| `d/p/t/o/r/i/m` | Switch views (Dashboard/Projects/Tasks/Todos/Tracker/Inbox/Reminders) |
+| `n` | New item |
+| `e` | Edit selected |
+| `Space` | Toggle done / start timer |
+| `?` | Help |
+| `q` | Quit |
+
+---
+
+## CLI Overview
+
+```sh
+scribe project add myproject --name "My Project"
+scribe task add "Build feature" --project myproject --priority high
+scribe todo add "Review PRs" --project myproject
+scribe track start --task mytask
+scribe track report --week
+scribe capture "Fix that bug later"
+scribe reminder add --project myproject --at "tomorrow 9am"
+scribe inbox process <slug>
+scribe sync configure --provider gist
+```
+
+Every subcommand supports `--output json` for scripting.
 
 ---
 
@@ -65,361 +99,112 @@ scribe
 
 ### Pre-built binary (recommended)
 
-Download the latest binary from the
-[Releases page](https://github.com/JohanSteffens_capitec/scribe/releases/latest),
-make it executable, and move it onto your `$PATH`:
-
 ```sh
-# macOS (Apple Silicon)
-curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-macos-aarch64
-chmod +x scribe && sudo mv scribe /usr/local/bin/
+# macOS ARM64
+curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-macos-aarch64
 
-# Linux (x86_64)
-curl -Lo scribe https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/scribe-linux-x86_64
+# macOS Intel
+curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-macos-x86_64
+
+# Linux
+curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-linux-x86_64
+
 chmod +x scribe && sudo mv scribe /usr/local/bin/
 ```
 
-Pre-built binaries include the MCP server and sync features (`scribe mcp`, `scribe sync`).
-
-Verify the download against the published checksums:
-
-```sh
-curl -Lo SHA256SUMS.txt https://github.com/JohanSteffens_capitec/scribe/releases/latest/download/SHA256SUMS.txt
-sha256sum --check --ignore-missing SHA256SUMS.txt
-```
+Binaries include MCP server and sync features. Verify against checksums in
+`SHA256SUMS.txt` on the releases page.
 
 ### From source
 
-Requires Rust 1.85 or later (stable, edition 2024).
-
-```sh
-git clone https://github.com/JohanSteffens_capitec/scribe.git
-cd scribe
-cargo install --path .
-```
-
-To include the MCP server and sync:
+Requires Rust 1.85+ (edition 2024).
 
 ```sh
 cargo install --path . --features mcp,sync
 ```
 
-To include only the MCP server:
+---
+
+## Background Daemon
+
+For continuous reminder notifications and auto-sync, install the daemon service:
 
 ```sh
-cargo install --path . --features mcp
+scribe setup --wizard   # or:
+scribe service install  # install only
+
+# Daemon runs in background, auto-syncs every 60s if sync is enabled
+scribe daemon restart   # restart after config changes
+scribe daemon reinstall # reinstall after upgrades
 ```
-
-### Shell completions
-
-Scribe ships with both **static** completions (subcommand names, flag names,
-and enum values) generated by `clap_complete` and **dynamic** completions that
-query your live database for slug candidates with human-readable hints.
-
-Run `scribe completions <shell>` to print the completion script, then follow
-the per-shell setup below.
-
-```sh
-# zsh — write to a directory in your $fpath, then enable compinit
-scribe completions zsh > ~/.zfunc/_scribe
-echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc
-echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
-# Reload your shell or run: source ~/.zshrc
-
-# zsh with Zim — place the file in the zsh-completions src directory (already in fpath)
-# Use >! to overwrite if the file already exists (zsh noclobber)
-scribe completions zsh >! ~/.zim/modules/zsh-completions/src/_scribe
-rm -f ~/.zcompdump ~/.zcompdump.dat ~/.zcompdump.zwc
-zimfw build
-# Open a new terminal for changes to take effect
-
-# bash — append to the bash completion file
-scribe completions bash >> ~/.bash_completion
-
-# fish — write to the fish completions directory
-scribe completions fish > ~/.config/fish/completions/scribe.fish
-```
-
-Supported shells: `bash`, `zsh`, `fish`, `elvish`, `powershell`.
-
-> **Note:** bash completions include static flag/subcommand completions only.
-> Dynamic slug completion (live DB lookup) is available for **zsh and fish**
-> only; the bash completion API makes slug patching substantially more complex.
 
 ---
 
 ## Configuration
 
-The configuration file lives at `~/.config/scribe/config.toml`
-(or `$XDG_CONFIG_HOME/scribe/config.toml`). The file is optional — if it does
-not exist all defaults apply.
+`~/.config/scribe/config.toml` (all settings optional):
 
 ```toml
-[data]
-# Override the database path. Leave empty or omit to use the default.
-db_path = ""
+[sync]
+enabled = true
+provider = "gist"       # gist | s3 | icloud | jsonbin | dropbox | rest | file
+interval_secs = 60
 
 [notifications]
-# Whether to fire desktop notifications for due reminders.
 enabled = true
 
 [display]
-# strftime-compatible date and time format strings used in output.
 date_format = "%Y-%m-%d"
 time_format = "%H:%M"
-
-[sync]
-# Sync is disabled by default. Run `scribe sync configure` to enable it.
-enabled = false
-provider = "gist"      # gist | s3 | icloud | jsonbin | dropbox | rest | file
-interval_secs = 60     # how often the daemon syncs (when running as a service)
 ```
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `data.db_path` | `~/.local/share/scribe/scribe.db` | Override the database file path. |
-| `notifications.enabled` | `true` | Enable desktop notifications for fired reminders. |
-| `display.date_format` | `%Y-%m-%d` | `strftime` format used when displaying dates. |
-| `display.time_format` | `%H:%M` | `strftime` format used when displaying times. |
-| `sync.enabled` | `false` | Enable state sync. Run `scribe sync configure` to set up. |
-| `sync.provider` | `gist` | Active sync provider. |
-| `sync.interval_secs` | `60` | Daemon sync interval in seconds. |
-
-Provider-specific non-secret settings (endpoint URLs, bucket names, file paths, etc.) are
-also stored in `config.toml`. Secrets (tokens, access keys, shared secrets) are stored
-exclusively in the **OS keychain** — never in the config file.
-
----
-
-## Data storage
-
-The SQLite database is stored at `~/.local/share/scribe/scribe.db`
-(or `$XDG_DATA_HOME/scribe/scribe.db`).
-
-- **Backup**: copy the file — `cp ~/.local/share/scribe/scribe.db ~/backups/`.
-- **Inspect**: open with any SQLite browser (e.g. `sqlite3`, DB Browser for
-  SQLite) — the schema is straightforward and human-readable.
-- **Override path**: set `data.db_path` in `config.toml` or point
-  `SCRIBE_TEST_DB` to an alternate path (used by integration tests).
-
----
-
-## TUI key bindings reference
-
-### Global (all views)
-
-| Key | Action |
-|-----|--------|
-| `d` | Switch to Dashboard |
-| `p` | Switch to Projects |
-| `t` | Switch to Tasks |
-| `o` | Switch to Todos |
-| `r` | Switch to Tracker |
-| `i` | Switch to Inbox |
-| `m` | Switch to Reminders |
-| `j` / `Down` | Move selection down |
-| `k` / `Up` | Move selection up |
-| `/` | Enter filter mode |
-| `Esc` | Clear error / close help / exit filter |
-| `?` | Toggle help overlay |
-| `q` / `Ctrl-C` | Quit |
-
-### Normal mode (list views)
-
-| Key | Action |
-|-----|--------|
-| `n` | New item |
-| `e` | Edit selected item |
-| `D` | Archive / delete selected item (confirmation required) |
-| `Space` | Toggle done (todos) / start or stop timer (tracker) |
-| `Enter` | Process selected item (inbox) |
-| `v` | Move selected todo to another project (Todos view only) |
-
-### Filter mode
-
-| Key | Action |
-|-----|--------|
-| Any character | Append to filter string |
-| `Backspace` | Remove last character |
-| `Enter` | Confirm filter, return to normal mode |
-| `Esc` | Clear filter, return to normal mode |
-
-### Forms and confirmation dialogs
-
-| Key | Action |
-|-----|--------|
-| `Tab` | Next field |
-| `Shift-Tab` | Previous field |
-| `Enter` | Submit form |
-| `Esc` | Cancel |
-| `y` / `Enter` | Confirm dialog |
-| `n` / `Esc` | Cancel dialog |
-
----
-
-## CLI quick reference
-
-```
-scribe
-├── project
-│   ├── add     <slug> --name <name> [--desc <text>] [--output json]
-│   ├── list    [--status active|paused|completed] [--archived] [--output json]
-│   ├── show    <slug> [--output json]
-│   ├── edit    <slug> [--new-slug <s>] [--name <n>] [--desc <t>] [--status <s>] [--output json]
-│   ├── archive <slug> [--output json]
-│   ├── restore <slug> [--output json]
-│   └── delete  <slug> [--output json]
-├── task
-│   ├── add     <title> [--project <slug>] [--priority low|medium|high|urgent] [--due YYYY-MM-DD] [--output json]
-│   ├── list    [--project <slug>] [--status <s>] [--priority <p>] [--archived] [--output json]
-│   ├── show    <slug> [--output json]
-│   ├── edit    <slug> [--title <t>] [--status <s>] [--priority <p>] [--due <d>] [--output json]
-│   ├── move    <slug> --project <slug> [--output json]
-│   ├── done    <slug> [--output json]
-│   ├── archive <slug> [--output json]
-│   ├── restore <slug> [--output json]
-│   └── delete  <slug> [--output json]
-├── todo
-│   ├── add     <title> [--project <slug>] [--output json]
-│   ├── list    [--project <slug>] [--all] [--archived] [--output json]
-│   ├── show    <slug> [--output json]
-│   ├── move    <slug> --project <slug> [--output json]
-│   ├── done    <slug> [--output json]
-│   ├── archive <slug> [--output json]
-│   ├── restore <slug> [--output json]
-│   └── delete  <slug> [--output json]
-├── track
-│   ├── start   [--task <slug>] [--project <slug>] [--note <text>] [--output json]
-│   ├── stop    [--output json]
-│   ├── status  [--output json]
-│   └── report  [--today] [--week] [--project <slug>] [--output json]
-├── capture     <text> [--output json]
-├── inbox
-│   ├── list    [--all] [--output json]
-│   └── process <slug> [--output json]
-├── reminder
-│   ├── add     --project <slug> --at <datetime> [--task <slug>] [--message <text>] [--output json]
-│   ├── list    [--project <slug>] [--archived] [--output json]
-│   ├── show    <slug> [--output json]
-│   ├── archive <slug> [--output json]
-│   ├── restore <slug> [--output json]
-│   └── delete  <slug> [--output json]
-├── setup       [--wizard] [--status]
-├── service
-│   ├── install
-│   ├── uninstall
-│   └── status
-├── sync
-│   ├── configure [--provider <name>] [--remove] [--output json]
-│   ├── status    [--output json]
-│   └── (bare)    [--output json]  — run a one-shot manual sync
-└── agent
-    └── install [--output json]
-```
-
-Running `scribe` with no subcommand opens the TUI.
-
----
-
-## Agent integration
-
-Scribe integrates with AI coding agents (Claude Code, OpenCode, Cursor, etc.)
-in two ways:
-
-**Skill file** — teaches the agent Scribe's commands and workflows. The setup
-wizard installs this automatically, or run it manually:
-
-    scribe agent install
-
-**MCP server** — exposes all Scribe data as tools and resources the agent can
-call directly (requires building with the `mcp` feature):
-
-    cargo install --path . --features mcp
-    # Then add the printed config snippet to your agent's MCP configuration.
+Secrets (tokens, keys) go in the **OS keychain**, never the config file.
 
 ---
 
 ## Sync
 
-Scribe can mirror your full state (projects, tasks, todos, time entries,
-reminders, capture items) to a remote provider so your data stays in sync
-across multiple machines. Sync is **off by default**.
-
-### Setup
+Sync mirrors your full state to a provider of your choice. Off by default.
 
 ```sh
-# Interactive wizard — picks up where `scribe setup` left off
-scribe sync configure
-
-# Or specify the provider directly
 scribe sync configure --provider gist
-```
+# Follow the prompts (GitHub token stored in keychain)
 
-### Supported providers
+# Or self-host the REST master (one machine = master, others = clients)
+scribe sync configure --provider rest
+```
 
 | Provider | Notes |
 |---|---|
-| `gist` | GitHub Gist (free, recommended — requires a GitHub account) |
-| `s3` | Any S3-compatible store: AWS S3, Cloudflare R2, MinIO, etc. |
-| `icloud` | iCloud Drive file path (macOS only, no extra credentials needed) |
-| `jsonbin` | JSONBin.io free-tier JSON storage |
-| `dropbox` | Dropbox API v2 |
-| `rest` | Self-hosted master server (runs inside the Scribe daemon) |
-| `file` | Custom local or network file path (Dropbox folder, NFS, Syncthing, etc.) |
+| `gist` | GitHub Gist — free, recommended |
+| `s3` | AWS S3, Cloudflare R2, MinIO, any S3-compatible store |
+| `icloud` | iCloud Drive (macOS, no credentials) |
+| `rest` | Self-hosted master server via `scribe daemon` |
+| `file` | Local/network path (Dropbox, NFS, Syncthing) |
 
-### How it works
+---
 
-- **Pull → merge → push.** On each sync cycle Scribe pulls the remote snapshot,
-  merges it with local state (field-level, last-write-wins on conflicts keyed by
-  `updated_at`), then pushes the merged result back.
-- **Secrets in the keychain.** API tokens and shared secrets are stored in the
-  OS keychain (macOS Keychain, Linux libsecret, Windows Credential Manager) —
-  never in `config.toml`.
-- **Automatic sync via daemon.** If you have the background service installed
-  (`scribe service install`), sync runs automatically every `sync.interval_secs`
-  seconds (default: 60). Without the service, run `scribe sync` manually.
+## AI Agent Integration
 
-### Self-hosted REST master
-
-One machine runs the master; all others are clients:
+**Skill files** teach agents Scribe's commands. Run once:
 
 ```sh
-# On the master machine
-scribe sync configure --provider rest
-# → select Master, choose a port, secret is auto-generated and printed once
-
-# On each client machine
-scribe sync configure --provider rest
-# → select Client, enter the master URL and the shared secret
+scribe agent install
 ```
 
-The master's HTTP server is started automatically by the daemon.
-
-### Status
+**MCP server** (build with `mcp` feature) exposes all data as tools:
 
 ```sh
-scribe sync status
+cargo install --path . --features mcp
+# Copy the printed MCP config snippet to your agent's config
 ```
 
 ---
 
-## Contributing / Development
+## Data
 
-```sh
-# Build
-cargo build
-
-# Run tests
-cargo test
-
-# Lint (zero warnings required)
-cargo clippy -- -D warnings
-
-# Format
-cargo fmt
-```
-
-The project targets `cargo clippy -- -D warnings` passing on every commit.
+Your data lives at `~/.local/share/scribe/scribe.db`. Backup with `cp`, inspect
+with `sqlite3`, move with `db_path` in config.
 
 ---
 
