@@ -65,6 +65,21 @@ impl ServerState {
             tracing::debug!("server: refreshed snapshot from database");
         }
     }
+
+    /// Writes the current snapshot to the database.
+    ///
+    /// This is called after merging to persist changes from sync clients.
+    pub async fn write_to_db(&self) {
+        let snap = self.snapshot.read().await.clone();
+        let db_path = self.db_path.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            let conn = Connection::open(&db_path)?;
+            let conn = Arc::new(std::sync::Mutex::new(conn));
+            snap.write_to_db(&conn)
+        })
+        .await;
+        tracing::debug!("server: wrote snapshot to database");
+    }
 }
 
 impl std::fmt::Debug for ServerState {
@@ -105,8 +120,9 @@ pub async fn get_state(State(state): State<ServerState>) -> impl IntoResponse {
 /// Merges the uploaded snapshot into local state and returns the merged result.
 ///
 /// Acquires an exclusive write lock, applies
-/// [`SyncEngine::merge_into`] with last-write-wins semantics, and serialises the
-/// post-merge snapshot as the response body.
+/// [`SyncEngine::merge_into`] with last-write-wins semantics, persists the
+/// merged result to the database, and serialises the post-merge snapshot as
+/// the response body.
 ///
 /// # Errors
 ///
@@ -119,5 +135,8 @@ pub async fn put_state(
 ) -> Result<impl IntoResponse, StatusCode> {
     let mut snap = state.snapshot.write().await;
     SyncEngine::merge_into(&mut snap, &remote);
-    Ok(Json(snap.clone()))
+    drop(snap);
+    state.write_to_db().await;
+    let snap = state.snapshot.read().await.clone();
+    Ok(Json(snap))
 }

@@ -141,11 +141,11 @@ fn status(config: &Config) -> anyhow::Result<()> {
 // DOCUMENTED-MAGIC: The label matches the plist filename by convention so
 // that launchctl load/unload and status lookups are consistent.
 #[cfg(target_os = "macos")]
-const LAUNCHD_LABEL: &str = "com.scribe.daemon";
+pub(crate) const LAUNCHD_LABEL: &str = "com.scribe.daemon";
 
 /// Returns `~/Library/LaunchAgents/com.scribe.daemon.plist`.
 #[cfg(target_os = "macos")]
-fn launchd_plist_path() -> anyhow::Result<PathBuf> {
+pub(crate) fn launchd_plist_path() -> anyhow::Result<PathBuf> {
     let home = home_dir()?;
     Ok(home
         .join("Library")
@@ -254,7 +254,7 @@ fn uninstall_launchd(config: &mut Config) -> anyhow::Result<()> {
 
 /// Returns `~/.config/systemd/user/scribe-daemon.service`.
 #[cfg(target_os = "linux")]
-fn systemd_unit_path() -> anyhow::Result<PathBuf> {
+pub(crate) fn systemd_unit_path() -> anyhow::Result<PathBuf> {
     let home = home_dir()?;
     Ok(home
         .join(".config")
