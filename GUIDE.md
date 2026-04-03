@@ -582,10 +582,16 @@ You can also run the daemon manually in a terminal (useful for testing):
 
 ```sh
 # Default 30-second polling interval
-scribe daemon
+scribe daemon run
 
 # Shorter interval for testing
-scribe daemon --interval 10
+scribe daemon run --interval 10
+
+# Restart a running daemon (after config changes, if unresponsive)
+scribe daemon restart
+
+# Reinstall the service (use after upgrading Scribe)
+scribe daemon reinstall
 ```
 
 ---
