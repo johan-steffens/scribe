@@ -46,7 +46,7 @@ pub fn from_config(config: &Config) -> Result<Option<Box<dyn SyncProvider>>, Syn
             let gist_id = if config.sync.gist.gist_id.is_empty() {
                 None
             } else {
-                Some(config.sync.gist.gist_id.clone())
+                Some(config.sync.gist.gist_id.as_str())
             };
             Box::new(gist::GistProvider::new(gist_id)?)
         }

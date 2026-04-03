@@ -73,32 +73,31 @@ impl GistProvider {
     /// Creates a new `GistProvider`.
     ///
     /// `gist_id` is `None` on first use and populated after the initial push.
-    /// The gist_id is persisted to disk when a new Gist is created, so
+    /// The `gist_id` is persisted to disk when a new Gist is created, so
     /// subsequent runs will update the same Gist rather than creating new ones.
     ///
     /// # Errors
     ///
     /// Returns [`SyncError::Transport`] if the HTTP client cannot be built
     /// (e.g. TLS initialisation fails).
-    pub fn new(gist_id: Option<String>) -> Result<Self, SyncError> {
+    pub fn new(gist_id: Option<&str>) -> Result<Self, SyncError> {
         let client = reqwest::Client::builder()
             .user_agent(super::USER_AGENT)
             .build()
             .map_err(|e| SyncError::Transport(format!("failed to build HTTP client: {e}")))?;
 
-        // If no gist_id provided by config, check the persisted file
         let resolved_gist_id = if gist_id.is_some() {
-            gist_id.clone()
+            gist_id.map(String::from)
         } else {
             Self::load_persisted_gist_id()
         };
 
         match (&gist_id, &resolved_gist_id) {
             (Some(id), _) => {
-                tracing::debug!(gist_id = %id, "GistProvider created with config gist_id")
+                tracing::debug!(gist_id = %id, "GistProvider created with config gist_id");
             }
             (None, Some(id)) => {
-                tracing::debug!(gist_id = %id, "GistProvider created with persisted gist_id from file")
+                tracing::debug!(gist_id = %id, "GistProvider created with persisted gist_id from file");
             }
             (None, None) => tracing::debug!(
                 "GistProvider created with no gist_id — will create new gist on first push"
@@ -111,19 +110,15 @@ impl GistProvider {
         })
     }
 
-    /// Returns the path where we persist the gist_id across restarts.
+    /// Returns the path where we persist the `gist_id` across restarts.
     fn gist_id_path() -> Option<std::path::PathBuf> {
         directories::ProjectDirs::from("", "", "scribe").map(|d| d.data_local_dir().join("gist-id"))
     }
 
-    /// Loads the persisted gist_id from disk, if one exists.
+    /// Loads the persisted `gist_id` from disk, if one exists.
     fn load_persisted_gist_id() -> Option<String> {
         let path = Self::gist_id_path()?;
-        let id = std::fs::read_to_string(&path)
-            .ok()?
-            .trim()
-            .to_owned()
-            .into();
+        let id = std::fs::read_to_string(&path).ok()?.trim().to_owned();
         tracing::debug!(gist_id_path = %path.display(), gist_id = %id, "Loaded persisted gist_id from file");
         Some(id)
     }
@@ -143,23 +138,20 @@ impl GistProvider {
 
         if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "scribe") {
             let config_path = proj_dirs.data_local_dir().join("config.toml");
-            if let Ok(content) = std::fs::read_to_string(&config_path) {
-                if let Ok(mut toml_content) = content.parse::<toml::Table>() {
-                    if let Some(sync) = toml_content.get_mut("sync").and_then(|s| s.as_table_mut())
-                    {
-                        if let Some(gist) = sync.get_mut("gist").and_then(|g| g.as_table_mut()) {
-                            gist.insert(
-                                "gist_id".to_string(),
-                                toml::Value::String(gist_id.to_string()),
-                            );
-                            if let Ok(new_content) = toml::to_string(&toml_content) {
-                                if std::fs::write(&config_path, new_content).is_ok() {
-                                    tracing::info!(config_path = %config_path.display(), gist_id, "Updated gist_id in config.toml");
-                                } else {
-                                    tracing::error!(config_path = %config_path.display(), "Failed to write gist_id to config.toml");
-                                }
-                            }
-                        }
+            if let Ok(content) = std::fs::read_to_string(&config_path)
+                && let Ok(mut toml_content) = content.parse::<toml::Table>()
+                && let Some(sync) = toml_content.get_mut("sync").and_then(|s| s.as_table_mut())
+                && let Some(gist) = sync.get_mut("gist").and_then(|g| g.as_table_mut())
+            {
+                gist.insert(
+                    "gist_id".to_string(),
+                    toml::Value::String(gist_id.to_string()),
+                );
+                if let Ok(new_content) = toml::to_string(&toml_content) {
+                    if std::fs::write(&config_path, new_content).is_ok() {
+                        tracing::info!(config_path = %config_path.display(), gist_id, "Updated gist_id in config.toml");
+                    } else {
+                        tracing::error!(config_path = %config_path.display(), "Failed to write gist_id to config.toml");
                     }
                 }
             } else {

@@ -453,7 +453,7 @@ impl Config {
     ///
     /// # Panics
     ///
-    /// Panics if a newly generated machine_id cannot be stored in memory
+    /// Panics if a newly generated `machine_id` cannot be stored in memory
     /// after creation (indicates a programming bug).
     ///
     /// # Examples
