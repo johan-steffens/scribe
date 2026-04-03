@@ -209,6 +209,7 @@ impl KeychainStore {
     }
 
     /// Returns the path to the keychain bootstrap JSON file.
+    #[must_use]
     pub fn bootstrap_path() -> Option<std::path::PathBuf> {
         directories::ProjectDirs::from("", "", "scribe")
             .map(|d| d.data_local_dir().join("keychain-bootstrap.json"))
@@ -226,10 +227,10 @@ impl KeychainStore {
         }
 
         let mut map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(existing) = serde_json::from_str(&content) {
-                map = existing;
-            }
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(existing) = serde_json::from_str(&content)
+        {
+            map = existing;
         }
 
         map.insert(format!("{provider}.{field}"), secret.to_owned());
@@ -257,27 +258,26 @@ impl KeychainStore {
             return;
         }
 
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(secrets) =
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(secrets) =
                 serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
-            {
-                for (key, value) in secrets {
-                    let parts: Vec<&str> = key.split('.').collect();
-                    if parts.len() == 2 {
-                        let service = Self::service_name(parts[0], parts[1]);
-                        let entry = Entry::new(&service, KEYCHAIN_USERNAME);
-                        match entry {
-                            Ok(e) => match e.set_password(&value) {
-                                Ok(()) => {
-                                    tracing::info!(service, "keychain.bootstrap.applied");
-                                }
-                                Err(e) => {
-                                    tracing::error!("set_password error: {:?}", e);
-                                }
-                            },
-                            Err(e) => {
-                                tracing::error!("Entry::new error: {:?}", e);
+        {
+            for (key, value) in secrets {
+                let parts: Vec<&str> = key.split('.').collect();
+                if parts.len() == 2 {
+                    let service = Self::service_name(parts[0], parts[1]);
+                    let entry = Entry::new(&service, KEYCHAIN_USERNAME);
+                    match entry {
+                        Ok(e) => match e.set_password(&value) {
+                            Ok(()) => {
+                                tracing::info!(service, "keychain.bootstrap.applied");
                             }
+                            Err(e) => {
+                                tracing::error!("set_password error: {:?}", e);
+                            }
+                        },
+                        Err(e) => {
+                            tracing::error!("Entry::new error: {:?}", e);
                         }
                     }
                 }

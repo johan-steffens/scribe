@@ -278,8 +278,8 @@ fn configure_gist(config: &mut crate::config::Config, gist_id: Option<&str>) -> 
     println!("GitHub PAT stored in keychain.");
 
     if let Some(id) = gist_id {
-        config.sync.gist.gist_id = id.to_owned();
-        println!("Using existing Gist ID: {}", id);
+        config.sync.gist.gist_id = id.to_string();
+        println!("Using existing Gist ID: {id}");
     } else {
         println!("No Gist ID provided — a new private Gist will be created on first sync.");
     }
