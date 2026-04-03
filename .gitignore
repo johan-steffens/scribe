@@ -1,1 +1,5 @@
 /target
+
+# Agent workspace files
+/plans/
+/CLAUDE.md

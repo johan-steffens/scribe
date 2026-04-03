@@ -304,7 +304,7 @@ mod tests {
 
         let engine = SyncEngine::new(Box::new(provider), state_path, "mock".to_owned());
         let local = empty_snap();
-        let merged = engine.run_once(local).await.unwrap();
+        let (merged, _summary) = engine.run_once(local).await.unwrap();
         assert_eq!(merged.projects.len(), 1);
         assert_eq!(merged.projects[0].slug, "remote-proj");
     }

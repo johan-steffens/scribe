@@ -17,7 +17,6 @@
 pub mod agent;
 pub mod capture;
 pub mod complete;
-pub mod daemon;
 pub mod inbox;
 pub mod parse;
 pub mod project;
@@ -39,8 +38,6 @@ pub use agent::AgentCommand;
 pub use capture::CaptureCommand;
 #[doc(inline)]
 pub use complete::CompletionShell;
-#[doc(inline)]
-pub use daemon::DaemonCommand;
 #[doc(inline)]
 pub use inbox::InboxCommand;
 #[doc(inline)]
@@ -98,15 +95,6 @@ pub enum Commands {
     Inbox(InboxCommand),
     /// Manage reminders.
     Reminder(ReminderCommand),
-    /// Manage the background reminder notification daemon.
-    ///
-    /// Polls for due reminders and fires OS desktop notifications.
-    /// Intended to be registered with launchd (macOS) or systemd (Linux).
-    Daemon {
-        /// Daemon subcommand.
-        #[command(subcommand)]
-        command: DaemonCommand,
-    },
     /// Configure Scribe features interactively (first-run wizard).
     ///
     /// On first run, presents a wizard to set up optional features such as

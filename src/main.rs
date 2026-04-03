@@ -99,9 +99,11 @@ fn run() -> anyhow::Result<()> {
         return cli::setup::run(args, &mut config);
     }
 
-    // `scribe service <cmd>` — no DB access needed.
-    if let Some(Commands::Service { command: ref cmd }) = cli.command {
-        return cli::service::run(cmd, &mut config);
+    // `scribe service <cmd>` (except `run`) — no DB access needed.
+    if let Some(Commands::Service { command: ref cmd }) = cli.command
+        && !matches!(cmd, cli::ServiceCommand::Run { .. })
+    {
+        return cli::service::run(cmd, &mut config, None);
     }
 
     // `scribe agent install` — no DB access needed.
@@ -173,16 +175,11 @@ fn run() -> anyhow::Result<()> {
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
-        Some(Commands::Daemon { command }) => {
-            cli::daemon::run(&command, &config)?;
+        Some(Commands::Service { command }) => {
+            cli::service::run(&command, &mut config, Some(&conn))?;
         }
         // Handled above before the DB opens.
-        Some(
-            Commands::Setup(_)
-            | Commands::Service { .. }
-            | Commands::Agent { .. }
-            | Commands::Completions { .. },
-        ) => {}
+        Some(Commands::Setup(_) | Commands::Agent { .. } | Commands::Completions { .. }) => {}
         #[cfg(feature = "sync")]
         Some(Commands::Sync(ref cmd)) => {
             cli::sync::run(cmd, &mut config, Some(&conn))?;

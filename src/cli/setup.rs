@@ -26,7 +26,7 @@ use clap::Args;
 
 use crate::cli::agent::AgentInstallArgs;
 use crate::cli::project::OutputFormat;
-use crate::cli::service::ServiceCommand;
+use crate::cli::service::{ServiceCommand, ServiceState};
 use crate::config::Config;
 
 // ── clap args ──────────────────────────────────────────────────────────────
@@ -70,12 +70,10 @@ pub fn run(args: &SetupArgs, config: &mut Config) -> anyhow::Result<()> {
 pub fn print_status(config: &Config) {
     println!("Scribe setup status");
     println!("-------------------");
+    println!();
 
-    let daemon = if config.setup.daemon_service_installed {
-        "installed"
-    } else {
-        "not installed  (run `scribe service install`)"
-    };
+    crate::cli::service::status(config);
+    println!();
 
     let agents = if config.setup.agent_installed {
         "installed"
@@ -83,7 +81,6 @@ pub fn print_status(config: &Config) {
         "not installed  (run `scribe agent install`)"
     };
 
-    println!("  Daemon service:    {daemon}");
     println!("  Agent integration: {agents}");
     #[cfg(feature = "sync")]
     print_sync_status(config);
@@ -109,6 +106,66 @@ fn print_sync_status(config: &Config) {
     println!("  Sync:              {sync_status}");
 }
 
+// ── repair detection ───────────────────────────────────────────────────────
+
+fn check_and_offer_repair(config: &mut Config) -> anyhow::Result<Option<bool>> {
+    let state = ServiceState::check(config);
+
+    if !state.has_discrepancy() {
+        return Ok(None);
+    }
+
+    println!("⚠ WARNING: Broken service state detected!");
+    println!();
+
+    if state.config_says_installed && !state.file_exists {
+        println!("The daemon service is marked as installed in your config,");
+        println!("but the service definition file is missing from disk.");
+        println!();
+        println!("This can happen after a binary upgrade or manual file deletion.");
+    } else if !state.config_says_installed && state.file_exists {
+        println!("A daemon service file exists on disk,");
+        println!("but your config does not have it marked as installed.");
+        println!();
+        println!("This can happen after an incomplete uninstall.");
+    }
+
+    println!();
+    println!("Would you like to repair this now?");
+
+    let repair = prompt_yes_no_default("  [R]epair / [C]ancel", 'r')?;
+
+    if repair {
+        println!();
+        let service_cmd = if state.config_says_installed {
+            ServiceCommand::Reinstall
+        } else {
+            ServiceCommand::Uninstall
+        };
+        crate::cli::service::run(&service_cmd, config, None)?;
+    }
+
+    Ok(Some(repair))
+}
+
+fn prompt_yes_no_default(prompt: &str, default: char) -> anyhow::Result<bool> {
+    use std::io::Write;
+
+    let hint = "[R/c]";
+    print!("{prompt} {hint} ");
+    std::io::stdout().flush()?;
+
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+
+    let trimmed = line.trim().to_lowercase();
+    Ok(match trimmed.as_str() {
+        "r" | "repair" => true,
+        "c" | "cancel" => false,
+        _ => default == 'r',
+    })
+}
+
 // ── wizard ─────────────────────────────────────────────────────────────────
 
 /// Runs the interactive setup wizard.
@@ -120,7 +177,13 @@ fn run_wizard(config: &mut Config) -> anyhow::Result<()> {
     println!("Press Enter to accept the default shown in [brackets].");
     println!();
 
-    let mut anything_done = false;
+    let repair_done = check_and_offer_repair(config)?;
+    if repair_done == Some(false) {
+        println!("Setup cancelled.");
+        return Ok(());
+    }
+
+    let mut anything_done = repair_done == Some(true);
 
     // ── Step 1: daemon service ─────────────────────────────────────────────
     if config.setup.daemon_service_installed {
@@ -141,7 +204,7 @@ fn run_wizard(config: &mut Config) -> anyhow::Result<()> {
 
         if prompt_yes_no("      Install the daemon service?", true)? {
             println!();
-            crate::cli::service::run(&ServiceCommand::Install, config)?;
+            crate::cli::service::run(&ServiceCommand::Install, config, None)?;
             anything_done = true;
         } else {
             println!("      Skipped. You can install later with `scribe service install`.");

@@ -139,8 +139,9 @@ scribe setup --wizard   # or:
 scribe service install  # install only
 
 # Daemon runs in background, auto-syncs every 60s if sync is enabled
-scribe daemon restart   # restart after config changes
-scribe daemon reinstall # reinstall after upgrades
+scribe service status   # check if daemon is running
+scribe service restart  # restart after config changes
+scribe service reinstall # reinstall after upgrades
 ```
 
 ---

@@ -21,9 +21,12 @@
 pub mod migrations;
 
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
+
+use crate::sync::SyncSummary;
 
 /// Opens (or creates) the `SQLite` database at `path` and runs all pending migrations.
 ///
@@ -85,7 +88,6 @@ pub fn open(path: &Path) -> anyhow::Result<Connection> {
 /// let conn = scribe::db::open_in_memory().expect("in-memory DB failed");
 /// ```
 // Used in unit tests and #[cfg(test)] blocks throughout the crate.
-// Not dead code — rustc only sees it unused in the binary target.
 #[allow(dead_code, reason = "used in test modules throughout the crate")]
 pub fn open_in_memory() -> anyhow::Result<Connection> {
     let mut conn = Connection::open_in_memory()?;
@@ -93,6 +95,40 @@ pub fn open_in_memory() -> anyhow::Result<Connection> {
     let migrations = Migrations::new(migrations::all());
     migrations.to_latest(&mut conn)?;
     Ok(conn)
+}
+
+const SYNC_SUMMARY_KEY: &str = "sync_summary";
+
+pub fn load_sync_summary(conn: &Arc<Mutex<Connection>>) -> Option<SyncSummary> {
+    let conn = conn.lock().ok()?;
+    let result: rusqlite::Result<String> = conn.query_row(
+        "SELECT value FROM sync_metadata WHERE key = ?",
+        [SYNC_SUMMARY_KEY],
+        |row| row.get(0),
+    );
+    result
+        .ok()
+        .and_then(|json| serde_json::from_str(&json).ok())
+}
+
+/// Stores the sync summary in the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection fails or the JSON serialization fails.
+pub fn save_sync_summary(
+    conn: &Arc<Mutex<Connection>>,
+    summary: &SyncSummary,
+) -> anyhow::Result<()> {
+    let json = serde_json::to_string(summary)?;
+    let conn = conn
+        .lock()
+        .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO sync_metadata (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+        [SYNC_SUMMARY_KEY, &json],
+    )?;
+    Ok(())
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────
