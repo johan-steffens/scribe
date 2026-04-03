@@ -451,6 +451,11 @@ impl Config {
     /// Returns an error if the file exists but cannot be read or contains
     /// invalid TOML.
     ///
+    /// # Panics
+    ///
+    /// Panics if a newly generated machine_id cannot be stored in memory
+    /// after creation (indicates a programming bug).
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -479,8 +484,9 @@ impl Config {
 
         #[cfg(feature = "sync")]
         if cfg.machine_id.is_none() {
-            cfg.machine_id = Some(uuid::Uuid::new_v4());
-            tracing::info!(machine_id = %cfg.machine_id.unwrap(), "generated new machine_id");
+            let machine_id = uuid::Uuid::new_v4();
+            cfg.machine_id = Some(machine_id);
+            tracing::info!(machine_id = %machine_id, "generated new machine_id");
             if let Err(e) = cfg.save() {
                 tracing::warn!(error = %e, "failed to persist machine_id");
             }
