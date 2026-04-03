@@ -92,26 +92,38 @@ impl GistProvider {
         } else {
             Self::load_persisted_gist_id()
         };
-        
+
         match (&gist_id, &resolved_gist_id) {
-            (Some(id), _) => tracing::debug!(gist_id = %id, "GistProvider created with config gist_id"),
-            (None, Some(id)) => tracing::debug!(gist_id = %id, "GistProvider created with persisted gist_id from file"),
-            (None, None) => tracing::debug!("GistProvider created with no gist_id — will create new gist on first push"),
+            (Some(id), _) => {
+                tracing::debug!(gist_id = %id, "GistProvider created with config gist_id")
+            }
+            (None, Some(id)) => {
+                tracing::debug!(gist_id = %id, "GistProvider created with persisted gist_id from file")
+            }
+            (None, None) => tracing::debug!(
+                "GistProvider created with no gist_id — will create new gist on first push"
+            ),
         }
 
-        Ok(Self { gist_id: resolved_gist_id, client })
+        Ok(Self {
+            gist_id: resolved_gist_id,
+            client,
+        })
     }
 
     /// Returns the path where we persist the gist_id across restarts.
     fn gist_id_path() -> Option<std::path::PathBuf> {
-        directories::ProjectDirs::from("", "", "scribe")
-            .map(|d| d.data_local_dir().join("gist-id"))
+        directories::ProjectDirs::from("", "", "scribe").map(|d| d.data_local_dir().join("gist-id"))
     }
 
     /// Loads the persisted gist_id from disk, if one exists.
     fn load_persisted_gist_id() -> Option<String> {
         let path = Self::gist_id_path()?;
-        let id = std::fs::read_to_string(&path).ok()?.trim().to_owned().into();
+        let id = std::fs::read_to_string(&path)
+            .ok()?
+            .trim()
+            .to_owned()
+            .into();
         tracing::debug!(gist_id_path = %path.display(), gist_id = %id, "Loaded persisted gist_id from file");
         Some(id)
     }
@@ -133,9 +145,13 @@ impl GistProvider {
             let config_path = proj_dirs.data_local_dir().join("config.toml");
             if let Ok(content) = std::fs::read_to_string(&config_path) {
                 if let Ok(mut toml_content) = content.parse::<toml::Table>() {
-                    if let Some(sync) = toml_content.get_mut("sync").and_then(|s| s.as_table_mut()) {
+                    if let Some(sync) = toml_content.get_mut("sync").and_then(|s| s.as_table_mut())
+                    {
                         if let Some(gist) = sync.get_mut("gist").and_then(|g| g.as_table_mut()) {
-                            gist.insert("gist_id".to_string(), toml::Value::String(gist_id.to_string()));
+                            gist.insert(
+                                "gist_id".to_string(),
+                                toml::Value::String(gist_id.to_string()),
+                            );
                             if let Ok(new_content) = toml::to_string(&toml_content) {
                                 if std::fs::write(&config_path, new_content).is_ok() {
                                     tracing::info!(config_path = %config_path.display(), gist_id, "Updated gist_id in config.toml");
@@ -235,7 +251,10 @@ impl SyncProvider for GistProvider {
                     tracing::info!(gist_id = %id, "gist.push: new gist created, persisting ID");
                     Self::persist_new_gist_id(id);
                 } else {
-                    tracing::warn!("gist.push: new gist created but no id in response: {:?}", body);
+                    tracing::warn!(
+                        "gist.push: new gist created but no id in response: {:?}",
+                        body
+                    );
                 }
             } else {
                 tracing::error!("gist.push: failed to parse new gist response");
@@ -311,13 +330,10 @@ impl SyncProvider for GistProvider {
             )));
         }
 
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| {
-                tracing::error!(error = %e, "gist.pull: failed to parse JSON response");
-                SyncError::Transport(format!("failed to parse response: {e}"))
-            })?;
+        let body: Value = response.json().await.map_err(|e| {
+            tracing::error!(error = %e, "gist.pull: failed to parse JSON response");
+            SyncError::Transport(format!("failed to parse response: {e}"))
+        })?;
 
         let content = body["files"][GIST_FILE_NAME]["content"]
             .as_str()
@@ -328,7 +344,10 @@ impl SyncProvider for GistProvider {
                 ))
             })?;
 
-        tracing::info!(content_len = content.len(), "gist.pull: parsed snapshot from gist");
+        tracing::info!(
+            content_len = content.len(),
+            "gist.pull: parsed snapshot from gist"
+        );
 
         serde_json::from_str(content).map_err(|e| {
             tracing::error!(error = %e, "gist.pull: failed to parse snapshot JSON");
