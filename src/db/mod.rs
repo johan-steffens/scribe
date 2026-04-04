@@ -134,6 +134,17 @@ pub fn save_sync_summary(
     Ok(())
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the db module.
+    //!
+    //! Re-exports [`super::open_in_memory`] for convenience.
+
+    pub use super::open_in_memory;
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

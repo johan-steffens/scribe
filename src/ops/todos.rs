@@ -239,6 +239,26 @@ impl TodoOps {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the todo ops module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::TodoOps`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`TodoOps`] backed by an in-memory database.
+    #[must_use]
+    pub fn ops() -> TodoOps {
+        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
+        TodoOps::new(conn)
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -412,6 +412,38 @@ impl SqliteTimeEntries {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the time entry store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteTimeEntries`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`SqliteTimeEntries`] backed by an in-memory database.
+    #[must_use]
+    pub fn store() -> SqliteTimeEntries {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteTimeEntries::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewTimeEntry`] for testing purposes.
+    #[must_use]
+    pub fn new_entry(slug: &str) -> NewTimeEntry {
+        NewTimeEntry {
+            slug: slug.to_owned(),
+            project_id: ProjectId(1),
+            task_id: None,
+            started_at: Utc::now(),
+            note: None,
+        }
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

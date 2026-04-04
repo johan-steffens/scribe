@@ -188,6 +188,38 @@ impl SqliteCaptureItems {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the capture store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteCaptureItems`] instances against an in-memory database.
+
+    use chrono::Utc;
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`SqliteCaptureItems`] backed by an in-memory database.
+    #[must_use]
+    pub fn store() -> SqliteCaptureItems {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteCaptureItems::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewCaptureItem`] for testing purposes.
+    #[must_use]
+    pub fn new_item(slug: &str, body: &str) -> NewCaptureItem {
+        NewCaptureItem {
+            slug: slug.to_owned(),
+            body: body.to_owned(),
+            created_at: Utc::now(),
+        }
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -257,6 +257,36 @@ impl Todos for SqliteTodos {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the todo store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteTodos`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`SqliteTodos`] backed by an in-memory database.
+    #[must_use]
+    pub fn store() -> SqliteTodos {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteTodos::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewTodo`] for testing purposes.
+    #[must_use]
+    pub fn new_todo(slug: &str, title: &str) -> NewTodo {
+        NewTodo {
+            slug: slug.to_owned(),
+            project_id: ProjectId(1),
+            title: title.to_owned(),
+        }
+    }
+}
+
 #[cfg(feature = "sync")]
 impl SqliteTodos {
     /// Returns every todo row, including archived and done ones.

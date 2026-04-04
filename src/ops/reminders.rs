@@ -226,6 +226,32 @@ impl ReminderOps {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the reminder ops module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::ReminderOps`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`ReminderOps`] backed by an in-memory database.
+    #[must_use]
+    pub fn ops() -> ReminderOps {
+        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
+        ReminderOps::new(conn)
+    }
+
+    /// Returns a [`DateTime<Utc>`] one hour in the future.
+    #[must_use]
+    pub fn future() -> DateTime<Utc> {
+        Utc::now() + chrono::Duration::hours(1)
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -166,6 +166,37 @@ impl ProjectOps {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the project ops module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::ProjectOps`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`ProjectOps`] backed by an in-memory database.
+    #[must_use]
+    pub fn ops() -> ProjectOps {
+        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
+        ProjectOps::new(&conn)
+    }
+
+    /// Creates a new [`NewProject`] with the given slug.
+    #[must_use]
+    pub fn new_project(slug: &str) -> NewProject {
+        NewProject {
+            slug: slug.to_owned(),
+            name: slug.to_owned(),
+            description: None,
+            status: ProjectStatus::Active,
+        }
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

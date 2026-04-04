@@ -5,8 +5,6 @@
 
 use std::path::PathBuf;
 
-use crate::config::SetupConfig;
-
 /// A test configuration with optional overrides for the database path.
 ///
 /// This struct simplifies creating a [`crate::config::Config`] in tests where
@@ -28,8 +26,6 @@ use crate::config::SetupConfig;
 pub struct TestConfig {
     /// Inner config that will be returned via `as_config()`.
     config: crate::config::Config,
-    /// Optional override for the database path.
-    db_path: Option<PathBuf>,
 }
 
 impl TestConfig {
@@ -38,7 +34,6 @@ impl TestConfig {
     pub fn new() -> Self {
         Self {
             config: crate::config::Config::default(),
-            db_path: None,
         }
     }
 
@@ -51,11 +46,8 @@ impl TestConfig {
     pub fn with_db_path(db_path: impl Into<PathBuf>) -> Self {
         let db_path = db_path.into();
         let mut config = crate::config::Config::default();
-        config.db_path = Some(db_path.clone());
-        Self {
-            config,
-            db_path: Some(db_path),
-        }
+        config.db_path = Some(db_path);
+        Self { config }
     }
 
     /// Creates a new test config for a temporary file database.

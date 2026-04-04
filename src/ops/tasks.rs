@@ -179,6 +179,26 @@ impl TaskOps {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the task ops module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::TaskOps`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`TaskOps`] backed by an in-memory database.
+    #[must_use]
+    pub fn ops() -> TaskOps {
+        let conn = open_in_memory().expect("in-memory db");
+        TaskOps::new(Arc::new(Mutex::new(conn)))
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

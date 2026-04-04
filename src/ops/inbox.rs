@@ -70,7 +70,7 @@ pub enum ProcessAction {
 /// # use scribe::ops::InboxOps;
 /// # use scribe::db::open_in_memory;
 /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-/// let ops = InboxOps::new(conn);
+/// let ops = InboxOps::new(&conn);
 /// ```
 #[derive(Clone, Debug)]
 pub struct InboxOps {
@@ -254,6 +254,26 @@ impl InboxOps {
         }
 
         self.captures.mark_processed(item_slug)
+    }
+}
+
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the inbox ops module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::InboxOps`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs an [`InboxOps`] backed by an in-memory database.
+    #[must_use]
+    pub fn ops() -> InboxOps {
+        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
+        InboxOps::new(&conn)
     }
 }
 

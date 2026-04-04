@@ -376,6 +376,26 @@ impl SqliteProjects {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the project store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteProjects`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`SqliteProjects`] backed by an in-memory database.
+    #[must_use]
+    pub fn store() -> SqliteProjects {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteProjects::new(Arc::new(Mutex::new(conn)))
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

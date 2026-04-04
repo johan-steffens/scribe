@@ -238,6 +238,26 @@ impl TrackerOps {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the tracker ops module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::TrackerOps`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`TrackerOps`] backed by an in-memory database.
+    #[must_use]
+    pub fn ops() -> TrackerOps {
+        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
+        TrackerOps::new(conn)
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

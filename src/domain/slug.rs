@@ -236,6 +236,17 @@ fn random_suffix() -> String {
     out
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the slug module.
+    //!
+    //! Re-exports slug generation and uniqueness utilities for external tests.
+
+    pub use super::{SlugError, ensure_unique, generate};
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -424,6 +424,39 @@ impl SqliteReminders {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the reminder store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteReminders`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`SqliteReminders`] backed by an in-memory database.
+    #[must_use]
+    pub fn store() -> SqliteReminders {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteReminders::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewReminder`] for testing purposes.
+    #[must_use]
+    pub fn new_reminder(slug: &str) -> NewReminder {
+        NewReminder {
+            slug: slug.to_owned(),
+            project_id: ProjectId(1),
+            task_id: None,
+            remind_at: Utc::now(),
+            message: Some("Reminder message".to_owned()),
+            persistent: false,
+        }
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

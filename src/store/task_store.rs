@@ -332,6 +332,43 @@ impl Tasks for SqliteTasks {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+pub mod testing {
+    //! Test helpers for the task store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteTasks`] instances against an in-memory database.
+
+    use super::*;
+    use crate::db::open_in_memory;
+
+    /// The seeded quick-capture project ID used in tests.
+    pub const QC_PROJECT_ID: ProjectId = ProjectId(1);
+
+    /// Constructs a [`SqliteTasks`] backed by an in-memory database.
+    #[must_use]
+    pub fn store() -> SqliteTasks {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteTasks::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewTask`] for testing purposes.
+    #[must_use]
+    pub fn new_task(slug: &str, title: &str) -> NewTask {
+        NewTask {
+            slug: slug.to_owned(),
+            project_id: QC_PROJECT_ID,
+            title: title.to_owned(),
+            description: None,
+            status: TaskStatus::Todo,
+            priority: TaskPriority::Medium,
+            due_date: None,
+        }
+    }
+}
+
 #[cfg(feature = "sync")]
 impl SqliteTasks {
     /// Returns every task row, including archived ones.
