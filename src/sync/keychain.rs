@@ -95,7 +95,7 @@ impl KeychainStore {
             return Ok(secret);
         }
 
-        #[cfg(any(test, feature = "test-util"))]
+        #[cfg(test)]
         {
             // In tests, we NEVER fall back to the real OS keychain to avoid prompts.
             Err(SyncError::Keychain(format!(
@@ -104,7 +104,7 @@ impl KeychainStore {
             )))
         }
 
-        #[cfg(not(any(test, feature = "test-util")))]
+        #[cfg(not(test))]
         {
             let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
                 SyncError::Keychain(format!(
