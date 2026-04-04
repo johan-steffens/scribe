@@ -20,10 +20,12 @@
 pub mod migrations;
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
+
+#[cfg(feature = "sync")]
+use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "sync")]
 use crate::sync::SyncSummary;
@@ -97,6 +99,7 @@ pub fn open_in_memory() -> anyhow::Result<Connection> {
     Ok(conn)
 }
 
+#[cfg(feature = "sync")]
 const SYNC_SUMMARY_KEY: &str = "sync_summary";
 
 #[cfg(feature = "sync")]

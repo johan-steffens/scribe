@@ -76,3 +76,10 @@ pub use crate::store::capture_store::testing as capture_store;
 /// Re-exports from `crate::domain::slug::testing`.
 #[doc(inline)]
 pub use crate::domain::slug::testing as slug;
+
+// ── MCP re-exports ───────────────────────────────────────────────────────────
+
+#[cfg(feature = "mcp")]
+/// Re-exports from `crate::mcp::server::testing`.
+#[doc(inline)]
+pub use crate::mcp::server::testing as mcp;

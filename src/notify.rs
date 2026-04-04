@@ -37,12 +37,29 @@ const NOTIFICATION_TITLE: &str = "Scribe Reminder";
 /// ```
 pub fn fire(reminder: &Reminder) {
     let body = reminder.message.as_deref().unwrap_or("Reminder due");
-    fire_impl(reminder, body);
+
+    #[cfg(any(test, feature = "test-util"))]
+    {
+        // In tests, we NEVER fire real OS notifications to avoid blocking or
+        // side effects. We just log that it would have fired.
+        tracing::info!(
+            title = NOTIFICATION_TITLE,
+            reminder.slug = %reminder.slug,
+            body = %body,
+            persistent = %reminder.persistent,
+            "reminder.notification.mock_fired",
+        );
+    }
+
+    #[cfg(not(any(test, feature = "test-util")))]
+    {
+        fire_impl(reminder, body);
+    }
 }
 
 // ── macOS — osascript ──────────────────────────────────────────────────────
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", not(any(test, feature = "test-util"))))]
 fn fire_impl(reminder: &Reminder, body: &str) {
     use std::process::Command;
 
@@ -92,7 +109,7 @@ fn fire_impl(reminder: &Reminder, body: &str) {
 
 // ── Linux / Windows — notify-rust ─────────────────────────────────────────
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), not(any(test, feature = "test-util"))))]
 fn fire_impl(reminder: &Reminder, body: &str) {
     let result = notify_rust::Notification::new()
         .appname("Scribe")

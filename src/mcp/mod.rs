@@ -30,6 +30,13 @@
 pub mod server;
 
 #[cfg(feature = "mcp")]
+pub use server::{
+    CaptureParams, InboxProcessParams, ProjectCreateParams, ProjectSlugParam, ReminderCreateParams,
+    ReminderListParams, ReminderSlugParam, TaskCreateParams, TaskListParams, TaskSlugParam,
+    TimerStartParams, TodoCreateParams, TodoListParams, TodoSlugParam, TrackReportParams,
+};
+
+#[cfg(feature = "mcp")]
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "mcp")]

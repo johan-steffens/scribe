@@ -4,7 +4,7 @@
 //! correctly handles complex sync scenarios including:
 //! - Bidirectional sync with remote having newer and local having newer data
 //! - Multi-entity sync across all domain types
-//! - Insert-only semantics for TimeEntry, Reminder, and CaptureItem
+//! - Insert-only semantics for `TimeEntry`, `Reminder`, and `CaptureItem`
 //! - Idempotent push avoidance when content hash is unchanged
 //! - Full round-trip sync cycles
 
@@ -48,7 +48,7 @@ fn empty_snap() -> StateSnapshot {
     }
 }
 
-/// Creates a project with the given slug, name, and updated_at timestamp.
+/// Creates a project with the given slug, name, and `updated_at` timestamp.
 fn make_project(slug: &str, name: &str, updated_secs_ago: i64) -> Project {
     let t = Utc::now() - Duration::seconds(updated_secs_ago);
     Project {
@@ -99,7 +99,7 @@ fn make_todo(slug: &str, project_slug: &str, updated_secs_ago: i64) -> Todo {
     }
 }
 
-/// Creates a time entry (uses insert-or-keep semantics, no updated_at conflict).
+/// Creates a time entry (uses insert-or-keep semantics, no `updated_at` conflict).
 fn make_time_entry(slug: &str, project_slug: &str) -> TimeEntry {
     let now = Utc::now();
     TimeEntry {
@@ -117,7 +117,7 @@ fn make_time_entry(slug: &str, project_slug: &str) -> TimeEntry {
     }
 }
 
-/// Creates a reminder (uses insert-or-keep semantics, no updated_at conflict).
+/// Creates a reminder (uses insert-or-keep semantics, no `updated_at` conflict).
 fn make_reminder(slug: &str, project_slug: &str) -> Reminder {
     Reminder {
         id: ReminderId(1),
@@ -268,13 +268,15 @@ fn sync_state_save_creates_parent_directories() {
 
 #[test]
 fn sync_summary_total_pulled_counts_all_entity_types() {
-    let mut summary = SyncSummary::default();
-    summary.projects_added = 1;
-    summary.tasks_added = 2;
-    summary.todos_added = 3;
-    summary.time_entries_added = 4;
-    summary.reminders_added = 5;
-    summary.capture_items_added = 6;
+    let summary = SyncSummary {
+        projects_added: 1,
+        tasks_added: 2,
+        todos_added: 3,
+        time_entries_added: 4,
+        reminders_added: 5,
+        capture_items_added: 6,
+        ..Default::default()
+    };
 
     assert_eq!(summary.total_pulled(), 1 + 2 + 3 + 4 + 5 + 6);
 }
@@ -405,13 +407,11 @@ fn merge_task_remote_newer_wins() {
     let age_seconds = (Utc::now() - task_updated_at).num_seconds();
     assert!(
         age_seconds < 20,
-        "merged task should have remote's recent timestamp (~10s), but is {} seconds old",
-        age_seconds
+        "merged task should have remote's recent timestamp (~10s), but is {age_seconds} seconds old"
     );
     assert!(
         age_seconds >= 5,
-        "merged task should have remote's timestamp (~10s old), but seems too recent: {} seconds",
-        age_seconds
+        "merged task should have remote's timestamp (~10s old), but seems too recent: {age_seconds} seconds"
     );
 }
 
@@ -428,13 +428,11 @@ fn merge_task_local_newer_preserved() {
     let age_seconds = (Utc::now() - task_updated_at).num_seconds();
     assert!(
         age_seconds < 20,
-        "merged task should have local's recent timestamp (~10s), but is {} seconds old",
-        age_seconds
+        "merged task should have local's recent timestamp (~10s), but is {age_seconds} seconds old"
     );
     assert!(
         age_seconds >= 5,
-        "merged task should have local's timestamp (~10s old), but seems too recent: {} seconds",
-        age_seconds
+        "merged task should have local's timestamp (~10s old), but seems too recent: {age_seconds} seconds"
     );
 }
 
@@ -464,13 +462,11 @@ fn merge_todo_remote_newer_wins() {
     let age_seconds = (Utc::now() - todo_updated_at).num_seconds();
     assert!(
         age_seconds < 20,
-        "merged todo should have remote's recent timestamp (~10s), but is {} seconds old",
-        age_seconds
+        "merged todo should have remote's recent timestamp (~10s), but is {age_seconds} seconds old"
     );
     assert!(
         age_seconds >= 5,
-        "merged todo should have remote's timestamp (~10s old), but seems too recent: {} seconds",
-        age_seconds
+        "merged todo should have remote's timestamp (~10s old), but seems too recent: {age_seconds} seconds"
     );
 }
 

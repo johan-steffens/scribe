@@ -265,13 +265,11 @@ fn test_navigation_does_not_corrupt_buffer_area() {
         let area = buffer_area(&buf);
         assert_eq!(
             area.width, width,
-            "width should remain {} after navigating to {:?}",
-            width, expected_view
+            "width should remain {width} after navigating to {expected_view:?}"
         );
         assert_eq!(
             area.height, height,
-            "height should remain {} after navigating to {:?}",
-            height, expected_view
+            "height should remain {height} after navigating to {expected_view:?}"
         );
     }
 }

@@ -8,3 +8,12 @@ mod engine_tests;
 
 #[cfg(feature = "sync")]
 mod provider_tests;
+
+#[cfg(feature = "sync")]
+mod s3_tests;
+
+#[cfg(feature = "sync")]
+mod dropbox_tests;
+
+#[cfg(feature = "sync")]
+mod jsonbin_tests;

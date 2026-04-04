@@ -173,7 +173,7 @@ jobs:
           CHANGELOG=""
           if [[ -n "$LAST_TAG" ]]; then
             # Collect commits between last tag and this version
-            CHANGELOG=$(git log --format="|%s" "$LAST_TAG..HEAD" 2>/dev/null | grep "^|" || true)
+            CHANGELOG=$(git log --format="|%s" "$LAST_TAG..HEAD" 2>/dev/null | grep "^|" | grep -v "Merge pull request" || true)
           fi
 
           # Build categorized changelog
