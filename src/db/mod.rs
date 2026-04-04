@@ -77,7 +77,7 @@ pub fn open(path: &Path) -> anyhow::Result<Connection> {
 
 /// Opens an in-memory `SQLite` database and runs all pending migrations.
 ///
-/// Intended for unit tests and the `test-util` feature. Each call returns an
+/// Intended for unit tests. Each call returns an
 /// independent, isolated DB instance — data is never persisted to disk.
 ///
 /// # Errors
@@ -89,7 +89,7 @@ pub fn open(path: &Path) -> anyhow::Result<Connection> {
 /// ```
 /// let conn = scribe::db::open_in_memory().expect("in-memory DB failed");
 /// ```
-// Used in unit tests and #[cfg(feature = "test-util")] blocks throughout the crate.
+// Used in unit tests and #[cfg(test)] blocks throughout the crate.
 #[allow(dead_code, reason = "used in test modules throughout the crate")]
 pub fn open_in_memory() -> anyhow::Result<Connection> {
     let mut conn = Connection::open_in_memory()?;
@@ -138,7 +138,6 @@ pub fn save_sync_summary(
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the db module.
     //!

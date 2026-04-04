@@ -237,7 +237,6 @@ fn random_suffix() -> String {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the slug module.
     //!

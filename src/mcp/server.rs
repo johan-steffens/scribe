@@ -818,7 +818,6 @@ fn read_resource_contents(server: &ScribeMcpServer, uri: &str) -> ResourceConten
 
 // ── Testing utilities ────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the MCP server.
     //!

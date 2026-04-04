@@ -167,7 +167,6 @@ impl ProjectOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the project ops module.
     //!

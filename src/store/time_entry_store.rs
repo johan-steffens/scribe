@@ -413,7 +413,6 @@ impl SqliteTimeEntries {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the time entry store module.
     //!

@@ -103,7 +103,7 @@ tests/
 
 **Note:** `src/` is primarily test-free (no `#[test]` blocks). All tests live
 in `tests/`. Internal exposition for testing is provided via a
-`#[cfg(feature = "test-util")] pub mod testing` pattern in each module and
+`#[cfg(test)] pub mod testing` pattern in each module and
 re-exported in `src/testing/mod.rs`.
 
 ## Writing Tests
@@ -138,7 +138,7 @@ fn test_my_function() {
 Internal types are exposed for testing via the `testing` module in each module:
 
 ```rust
-#[cfg(feature = "test-util")]
+#[cfg(test)]
 pub mod testing {
     pub use crate::ops::todos::TodoOps; // etc.
 }

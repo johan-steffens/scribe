@@ -19,7 +19,6 @@ pub mod store;
 pub mod sync;
 pub mod tui;
 
-#[cfg(feature = "test-util")]
 pub mod testing;
 
 use std::sync::{Arc, Mutex};

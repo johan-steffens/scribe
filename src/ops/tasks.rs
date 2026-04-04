@@ -180,7 +180,6 @@ impl TaskOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the task ops module.
     //!
