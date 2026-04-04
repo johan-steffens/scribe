@@ -16,6 +16,8 @@
 // Re-exports child modules for convenient access.
 pub mod config;
 pub mod db;
+#[cfg(feature = "sync")]
+pub mod keychain;
 
 // ── ops layer re-exports ─────────────────────────────────────────────────
 

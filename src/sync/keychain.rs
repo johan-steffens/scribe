@@ -96,19 +96,31 @@ impl KeychainStore {
             return Ok(secret);
         }
 
-        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
-            SyncError::Keychain(format!(
-                "sync requires a keychain daemon to store secrets securely. \
-                 Install and start gnome-keyring or kwallet, then re-run \
-                 `scribe sync configure`. (detail: {e})"
-            ))
-        })?;
-        entry.get_password().map_err(|e| {
-            SyncError::Keychain(format!(
-                "secret '{service}' not found in keychain — run \
-                 `scribe sync configure` to set it up. (detail: {e})"
-            ))
-        })
+        #[cfg(any(test, feature = "test-util"))]
+        {
+            // In tests, we NEVER fall back to the real OS keychain to avoid prompts.
+            return Err(SyncError::Keychain(format!(
+                "secret '{service}' not found in mock keychain (bootstrap file). \
+                 Ensure you called scribe::testing::keychain::set_secret() in your test setup."
+            )));
+        }
+
+        #[cfg(not(any(test, feature = "test-util")))]
+        {
+            let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+                SyncError::Keychain(format!(
+                    "sync requires a keychain daemon to store secrets securely. \
+                     Install and start gnome-keyring or kwallet, then re-run \
+                     `scribe sync configure`. (detail: {e})"
+                ))
+            })?;
+            entry.get_password().map_err(|e| {
+                SyncError::Keychain(format!(
+                    "secret '{service}' not found in keychain — run \
+                     `scribe sync configure` to set it up. (detail: {e})"
+                ))
+            })
+        }
     }
 
     /// Retrieves a secret from the OS keychain, optionally failing silently
@@ -132,30 +144,40 @@ impl KeychainStore {
             return Ok(Some(secret));
         }
 
-        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
-            SyncError::Keychain(format!(
-                "sync requires a keychain daemon to store secrets securely. \
-                 Install and start gnome-keyring or kwallet, then re-run \
-                 `scribe sync configure`. (detail: {e})"
-            ))
-        })?;
-        match entry.get_password() {
-            Ok(p) => Ok(Some(p)),
-            Err(keyring::Error::NoEntry) => {
-                Self::apply_bootstrap();
-                match entry.get_password() {
-                    Ok(p) => Ok(Some(p)),
-                    Err(keyring::Error::NoEntry) => Ok(None),
-                    Err(e) => Err(SyncError::Keychain(format!(
-                        "could not read from keychain after bootstrap: {e}"
-                    ))),
+        #[cfg(any(test, feature = "test-util"))]
+        {
+            // In tests, we NEVER fall back to the real OS keychain.
+            return Ok(None);
+        }
+
+        #[cfg(not(any(test, feature = "test-util")))]
+        {
+            let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+                SyncError::Keychain(format!(
+                    "sync requires a keychain daemon to store secrets securely. \
+                     Install and start gnome-keyring or kwallet, then re-run \
+                     `scribe sync configure`. (detail: {e})"
+                ))
+            })?;
+            match entry.get_password() {
+                Ok(p) => Ok(Some(p)),
+                Err(keyring::Error::NoEntry) => {
+                    Self::apply_bootstrap();
+                    match entry.get_password() {
+                        Ok(p) => Ok(Some(p)),
+                        Err(keyring::Error::NoEntry) => Ok(None),
+                        Err(e) => Err(SyncError::Keychain(format!(
+                            "could not read from keychain after bootstrap: {e}"
+                        ))),
+                    }
                 }
+                Err(e) => Err(SyncError::Keychain(format!(
+                    "could not read from keychain: {e}"
+                ))),
             }
-            Err(e) => Err(SyncError::Keychain(format!(
-                "could not read from keychain: {e}"
-            ))),
         }
     }
+
 
     /// Retrieves a secret from the bootstrap file, if present.
     fn get_from_bootstrap(provider: &str, field: &str) -> Option<String> {
@@ -192,25 +214,38 @@ impl KeychainStore {
         let field_ref = field.as_ref();
         let secret_ref = secret.as_ref();
 
-        let service = Self::service_name(provider_ref, field_ref);
-        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
-            SyncError::Keychain(format!(
-                "sync requires a keychain daemon to store secrets securely. \
-                 Install and start gnome-keyring or kwallet, then re-run \
-                 `scribe sync configure`. (detail: {e})"
-            ))
-        })?;
-        entry
-            .set_password(secret_ref)
-            .map_err(|e| SyncError::Keychain(format!("could not write to keychain: {e}")))?;
+        #[cfg(any(test, feature = "test-util"))]
+        {
+            // In tests, we only update the bootstrap file (our mock store).
+            Self::update_bootstrap(provider_ref, field_ref, secret_ref);
+            return Ok(());
+        }
 
-        Self::update_bootstrap(provider_ref, field_ref, secret_ref);
-        Ok(())
+        #[cfg(not(any(test, feature = "test-util")))]
+        {
+            let service = Self::service_name(provider_ref, field_ref);
+            let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+                SyncError::Keychain(format!(
+                    "sync requires a keychain daemon to store secrets securely. \
+                     Install and start gnome-keyring or kwallet, then re-run \
+                     `scribe sync configure`. (detail: {e})"
+                ))
+            })?;
+            entry
+                .set_password(secret_ref)
+                .map_err(|e| SyncError::Keychain(format!("could not write to keychain: {e}")))?;
+
+            Self::update_bootstrap(provider_ref, field_ref, secret_ref);
+            Ok(())
+        }
     }
 
     /// Returns the path to the keychain bootstrap JSON file.
     #[must_use]
     pub fn bootstrap_path() -> Option<std::path::PathBuf> {
+        if let Ok(p) = std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP") {
+            return Some(std::path::PathBuf::from(p));
+        }
         directories::ProjectDirs::from("", "", "scribe")
             .map(|d| d.data_local_dir().join("keychain-bootstrap.json"))
     }
@@ -251,40 +286,49 @@ impl KeychainStore {
     /// (or multiple CLI invocations in different contexts) have different
     /// path identities, preventing access to secrets.
     pub fn apply_bootstrap() {
-        let Some(path) = Self::bootstrap_path() else {
-            return;
-        };
-        if !path.exists() {
+        #[cfg(any(test, feature = "test-util"))]
+        {
+            // In tests, we NEVER apply bootstrap to the real OS keychain.
             return;
         }
 
-        if let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(secrets) =
-                serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
+        #[cfg(not(any(test, feature = "test-util")))]
         {
-            for (key, value) in secrets {
-                let parts: Vec<&str> = key.split('.').collect();
-                if parts.len() == 2 {
-                    let service = Self::service_name(parts[0], parts[1]);
-                    let entry = Entry::new(&service, KEYCHAIN_USERNAME);
-                    match entry {
-                        Ok(e) => match e.set_password(&value) {
-                            Ok(()) => {
-                                tracing::info!(service, "keychain.bootstrap.applied");
-                            }
+            let Some(path) = Self::bootstrap_path() else {
+                return;
+            };
+            if !path.exists() {
+                return;
+            }
+
+            if let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(secrets) =
+                    serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
+            {
+                for (key, value) in secrets {
+                    let parts: Vec<&str> = key.split('.').collect();
+                    if parts.len() == 2 {
+                        let service = Self::service_name(parts[0], parts[1]);
+                        let entry = Entry::new(&service, KEYCHAIN_USERNAME);
+                        match entry {
+                            Ok(e) => match e.set_password(&value) {
+                                Ok(()) => {
+                                    tracing::info!(service, "keychain.bootstrap.applied");
+                                }
+                                Err(e) => {
+                                    tracing::error!("set_password error: {:?}", e);
+                                }
+                            },
                             Err(e) => {
-                                tracing::error!("set_password error: {:?}", e);
+                                tracing::error!("Entry::new error: {:?}", e);
                             }
-                        },
-                        Err(e) => {
-                            tracing::error!("Entry::new error: {:?}", e);
                         }
                     }
                 }
             }
+            // Delete after consuming
+            let _ = std::fs::remove_file(&path);
         }
-        // Delete after consuming
-        let _ = std::fs::remove_file(&path);
     }
 
     /// Removes a secret from the OS keychain.
@@ -300,19 +344,47 @@ impl KeychainStore {
     /// keychain daemon) or when the deletion fails for a reason other than the
     /// entry being absent.
     pub fn remove(provider: impl AsRef<str>, field: impl AsRef<str>) -> Result<(), SyncError> {
-        let service = Self::service_name(provider, field);
-        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
-            SyncError::Keychain(format!(
-                "sync requires a keychain daemon to store secrets securely. \
-                 Install and start gnome-keyring or kwallet, then re-run \
-                 `scribe sync configure`. (detail: {e})"
-            ))
-        })?;
-        match entry.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(SyncError::Keychain(format!(
-                "could not remove keychain entry '{service}': {e}"
-            ))),
+        let provider_ref = provider.as_ref();
+        let field_ref = field.as_ref();
+
+        #[cfg(any(test, feature = "test-util"))]
+        {
+            // In tests, we only clear from the bootstrap file (our mock store).
+            // We do this by setting it to an empty string or removing from the map.
+            // Simplified: we just don't allow falling back to real keychain.
+            let path = Self::bootstrap_path();
+            if let Some(p) = path
+                && p.exists()
+            {
+                if let Ok(content) = std::fs::read_to_string(&p)
+                    && let Ok(mut secrets) =
+                        serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
+                {
+                    secrets.remove(&format!("{provider_ref}.{field_ref}"));
+                    if let Ok(json) = serde_json::to_string(&secrets) {
+                        let _ = std::fs::write(&p, json);
+                    }
+                }
+            }
+            return Ok(());
+        }
+
+        #[cfg(not(any(test, feature = "test-util")))]
+        {
+            let service = Self::service_name(provider_ref, field_ref);
+            let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+                SyncError::Keychain(format!(
+                    "sync requires a keychain daemon to store secrets securely. \
+                     Install and start gnome-keyring or kwallet, then re-run \
+                     `scribe sync configure`. (detail: {e})"
+                ))
+            })?;
+            match entry.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+                Err(e) => Err(SyncError::Keychain(format!(
+                    "could not remove keychain entry '{service}': {e}"
+                ))),
+            }
         }
     }
 }
