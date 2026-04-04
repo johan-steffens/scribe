@@ -20,6 +20,9 @@ pub mod store;
 pub mod sync;
 pub mod tui;
 
+#[cfg(test)]
+pub mod testing;
+
 use std::sync::{Arc, Mutex};
 
 use clap::Parser;
