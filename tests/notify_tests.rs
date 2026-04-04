@@ -17,8 +17,14 @@ use scribe::notify;
 /// before any `notify::fire` call.
 fn setup_mock() {
     static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| unsafe {
-        std::env::set_var("SCRIBE_MOCK_NOTIFY", "1");
+    INIT.call_once(|| {
+        // SAFETY: Setting env var is safe here because:
+        // 1. Only called once via Once::call_once
+        // 2. Called before any test threads are spawned
+        // 3. Env vars are process-global so this is a one-time initialization
+        unsafe {
+            std::env::set_var("SCRIBE_MOCK_NOTIFY", "1");
+        }
     });
 }
 
