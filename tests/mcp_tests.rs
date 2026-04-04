@@ -15,6 +15,10 @@ use std::sync::{Arc, Mutex};
 use chrono::{Duration, Utc};
 use scribe::db;
 use scribe::domain::{NewProject, ProjectStatus, TaskPriority, TaskStatus};
+use scribe::ops::inbox::ProcessAction;
+use scribe::ops::reminders::CreateReminder;
+use scribe::ops::tasks::CreateTask;
+use scribe::ops::tracker::StartTimer;
 use scribe::ops::{InboxOps, ProjectOps, ReminderOps, TaskOps, TodoOps, TrackerOps};
 
 /// A test harness that wraps an in-memory database and all ops structs.
@@ -188,7 +192,6 @@ fn test_task_ops_create_with_project() {
         })
         .expect("project should be created");
 
-    use scribe::ops::tasks::CreateTask;
     let task = ctx
         .tasks
         .create_task(CreateTask {
@@ -217,7 +220,6 @@ fn test_task_ops_create_without_project_uses_quick_capture() {
         .expect("get project should work");
     assert!(qc.is_some(), "quick-capture project should exist");
 
-    use scribe::ops::tasks::CreateTask;
     let task = ctx
         .tasks
         .create_task(CreateTask {
@@ -354,7 +356,6 @@ fn test_inbox_ops_process_discard() {
         .capture("Item to discard")
         .expect("capture should work");
 
-    use scribe::ops::inbox::ProcessAction;
     let processed = ctx
         .inbox
         .process(&item.slug, ProcessAction::Discard)
@@ -372,7 +373,6 @@ fn test_inbox_ops_process_to_task_requires_project() {
         .capture("Item to convert")
         .expect("capture should work");
 
-    use scribe::ops::inbox::ProcessAction;
     let result = ctx.inbox.process(
         &item.slug,
         ProcessAction::ConvertToTask {
@@ -414,7 +414,6 @@ fn test_tracker_ops_start_and_stop_timer() {
         })
         .expect("project should be created");
 
-    use scribe::ops::tracker::StartTimer;
     let started = ctx
         .tracker
         .start_timer(StartTimer {
@@ -460,7 +459,6 @@ fn test_reminder_ops_create() {
         })
         .expect("project should be created");
 
-    use scribe::ops::reminders::CreateReminder;
     let reminder = ctx
         .reminders
         .create(CreateReminder {
@@ -489,7 +487,6 @@ fn test_reminder_ops_archive() {
         })
         .expect("project should be created");
 
-    use scribe::ops::reminders::CreateReminder;
     let reminder = ctx
         .reminders
         .create(CreateReminder {
