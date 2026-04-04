@@ -9,13 +9,54 @@ on:
       - main
     paths:
       - src/**
+      - tests/**
       - Cargo.toml
       - Cargo.lock
   workflow_dispatch:
 
 jobs:
-  preflight:
-    name: Preflight checks
+  # ── Lint ────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (fmt & clippy)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Run fmt
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ── Test & Coverage ─────────────────────────────────────────────────────────
+  test:
+    name: Test & Coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+
+      - name: Run tests and check coverage
+        run: |
+          # llvm-cov runs the tests while measuring coverage.
+          # We enforce the 55% baseline to prevent regressions.
+          cargo llvm-cov --all-features --workspace --fail-under-lines 55
+
+  # ── Metadata ────────────────────────────────────────────────────────────────
+  metadata:
+    name: metadata
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.validate.outputs.version }}
@@ -46,26 +87,11 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install clippy, rustfmt and llvm-cov
-        run: |
-          rustup component add clippy rustfmt
-          cargo install cargo-llvm-cov --locked
-
-      - name: Run checks
-        run: |
-          cargo fmt --all -- --check
-          cargo clippy --all-targets --all-features -- -D warnings
-          cargo test --all-features
-          # Enforce our new coverage baseline (currently ~55%) to prevent regressions
-          cargo llvm-cov --all-features --workspace --fail-under-lines 55
-
+  # ── Build ───────────────────────────────────────────────────────────────────
   build:
     name: Build — ${{ matrix.target }}
-    needs: preflight
-    if: needs.preflight.outputs.is_release == 'true'
+    needs: [lint, test, metadata]
+    if: needs.metadata.outputs.is_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -137,10 +163,11 @@ jobs:
           path: ${{ matrix.artifact }}
           retention-days: 1
 
+  # ── Release ─────────────────────────────────────────────────────────────────
   release:
     name: Create GitHub Release
-    needs: [preflight, build]
-    if: needs.preflight.outputs.is_release == 'true'
+    needs: [build, metadata]
+    if: needs.metadata.outputs.is_release == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -168,7 +195,7 @@ jobs:
       - name: Generate release notes from conventional commits
         id: release-notes
         env:
-          VERSION: v${{ needs.preflight.outputs.version }}
+          VERSION: v${{ needs.metadata.outputs.version }}
         run: |
           # Get the last tag to compare against
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
@@ -210,7 +237,7 @@ jobs:
           cat <<EOF > RELEASE_NOTES.md
             ## What's Changed
 
-            **${{ needs.preflight.outputs.version }}** is a bug fix and feature release.
+            **${{ needs.metadata.outputs.version }}** is a bug fix and feature release.
 
             ### New Features
             $(echo -e "${FEATURES:-_No new features in this release._}")
@@ -279,7 +306,7 @@ jobs:
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: v${{ needs.preflight.outputs.version }}
+          VERSION: v${{ needs.metadata.outputs.version }}
         run: |
           gh release create "$VERSION" \
             --title "$VERSION" \

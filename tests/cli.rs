@@ -86,8 +86,7 @@ fn test_agent_install_creates_skill_file_in_claude_directory() {
     let skill_file = claude_dir.join("scribe.md");
     assert!(
         skill_file.exists(),
-        "skill file should exist at {:?}",
-        skill_file
+        "skill file should exist at {skill_file:?}",
     );
     let content = std::fs::read_to_string(&skill_file).expect("read skill file");
     assert!(
@@ -215,14 +214,14 @@ fn test_inbox_process_json_non_interactive() {
         .expect("list inbox");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    if let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
-        if let Some(item) = items.first() {
-            let slug = item["slug"].as_str().unwrap_or("");
-            // Process with JSON output (non-interactive)
-            run(&dir, &["inbox", "process", slug, "--output", "json"])
-                .success()
-                .stdout(predicate::str::contains("\"slug\""));
-        }
+    if let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout)
+        && let Some(item) = items.first()
+    {
+        let slug = item["slug"].as_str().unwrap_or("");
+        // Process with JSON output (non-interactive)
+        run(&dir, &["inbox", "process", slug, "--output", "json"])
+            .success()
+            .stdout(predicate::str::contains("\"slug\""));
     }
 }
 
@@ -237,17 +236,17 @@ fn test_inbox_process_interactive_discard() {
         .expect("list inbox");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    if let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
-        if let Some(item) = items.first() {
-            let slug = item["slug"].as_str().unwrap_or("");
-            // Process interactively: choose '4' for discard
-            scribe_with_db(&dir)
-                .args(["inbox", "process", slug])
-                .write_stdin("4\n")
-                .assert()
-                .success()
-                .stdout(predicate::str::contains("Processed:"));
-        }
+    if let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout)
+        && let Some(item) = items.first()
+    {
+        let slug = item["slug"].as_str().unwrap_or("");
+        // Process interactively: choose '4' for discard
+        scribe_with_db(&dir)
+            .args(["inbox", "process", slug])
+            .write_stdin("4\n")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Processed:"));
     }
 }
 

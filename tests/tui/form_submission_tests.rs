@@ -6,9 +6,9 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
+use ratatui::Terminal;
 use scribe::db;
 use scribe::tui::app::{App, View};
 use scribe::tui::ui;
@@ -391,7 +391,6 @@ fn test_form_handles_empty_submission() {
 
     // Form should either submit with empty values or stay open for validation.
     // At minimum, the app should not panic.
-    assert!(true, "form should handle empty submission gracefully");
 }
 
 // ── Multi-field Form Navigation Stress Test ─────────────────────────────────
