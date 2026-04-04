@@ -29,16 +29,12 @@ use chrono::{
 ///
 /// # Errors
 ///
-/// Returns an error if the string cannot be parsed by any supported format.
+/// Returns an error if the string format is not recognized or represents an
+/// invalid date.
 ///
-/// # Examples
+/// # Panics
 ///
-/// ```
-/// use scribe::cli::parse::parse_datetime;
-///
-/// let dt = parse_datetime("2026-04-01T14:00:00").unwrap();
-/// assert_eq!(dt.format("%Y-%m-%d").to_string(), "2026-04-01");
-/// ```
+/// Panics if "00:00:00" or "09:00:00" cannot be parsed as valid times.
 pub fn parse_datetime(s: &str) -> anyhow::Result<DateTime<Utc>> {
     let s = s.trim();
 

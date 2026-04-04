@@ -203,10 +203,6 @@ pub fn prompt_project_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::
 /// # Errors
 ///
 /// Returns an error if the underlying I/O operation fails.
-#[expect(
-    dead_code,
-    reason = "Part of the public prompt API; will be used when task CLI commands gain interactive slug prompts"
-)]
 pub fn prompt_task_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<String> {
     prompt_with_completer(msg, Arc::clone(conn), queries::query_tasks)
 }
@@ -222,10 +218,6 @@ pub fn prompt_task_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::Res
 /// # Errors
 ///
 /// Returns an error if the underlying I/O operation fails.
-#[expect(
-    dead_code,
-    reason = "Part of the public prompt API; will be used when todo CLI commands gain interactive slug prompts"
-)]
 pub fn prompt_todo_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<String> {
     prompt_with_completer(msg, Arc::clone(conn), queries::query_todos)
 }
@@ -241,10 +233,6 @@ pub fn prompt_todo_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::Res
 /// # Errors
 ///
 /// Returns an error if the underlying I/O operation fails.
-#[expect(
-    dead_code,
-    reason = "Part of the public prompt API; will be used when reminder CLI commands gain interactive slug prompts"
-)]
 pub fn prompt_reminder_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<String> {
     prompt_with_completer(msg, Arc::clone(conn), queries::query_reminders)
 }
@@ -260,10 +248,6 @@ pub fn prompt_reminder_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow:
 /// # Errors
 ///
 /// Returns an error if the underlying I/O operation fails.
-#[expect(
-    dead_code,
-    reason = "Part of the public prompt API; will be used when inbox CLI commands accept slug arguments interactively"
-)]
 pub fn prompt_capture_slug(msg: &str, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<String> {
     prompt_with_completer(msg, Arc::clone(conn), queries::query_captures)
 }

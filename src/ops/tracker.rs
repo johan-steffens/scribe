@@ -214,10 +214,6 @@ impl TrackerOps {
     /// # Errors
     ///
     /// Returns an error on database failure.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "reserved for Phase 5 report views")
-    )]
     pub fn list_recent(&self, limit: usize) -> anyhow::Result<Vec<TimeEntry>> {
         let all = self.entries.list(None, false)?;
         Ok(all.into_iter().take(limit).collect())

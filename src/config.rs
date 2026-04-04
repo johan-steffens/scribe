@@ -328,6 +328,7 @@ struct DataConfig {
     /// Override for the `SQLite` database path; empty string means use default.
     db_path: Option<String>,
     /// Persisted per-machine UUID used for sync diagnostics.
+    #[cfg(feature = "sync")]
     machine_id: Option<String>,
 }
 

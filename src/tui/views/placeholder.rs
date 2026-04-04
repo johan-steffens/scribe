@@ -14,7 +14,6 @@ use ratatui::widgets::Paragraph;
 ///
 /// `view_name` is the display name shown in the heading. Retained for any
 /// future Phase 5+ views before they are fully implemented.
-#[expect(dead_code, reason = "kept for future Phase 5+ placeholder views")]
 pub fn render_placeholder(frame: &mut Frame, area: Rect, view_name: &str) {
     // Vertically centre the two-line message.
     let vertical = Layout::vertical([

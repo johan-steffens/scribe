@@ -50,10 +50,6 @@ pub use service::ServiceCommand;
 pub use setup::SetupArgs;
 #[cfg(feature = "sync")]
 #[doc(inline)]
-#[expect(
-    unused_imports,
-    reason = "public re-export for external consumers; Commands::Sync uses full path internally"
-)]
 pub use sync::SyncCommand;
 #[doc(inline)]
 pub use task::TaskCommand;

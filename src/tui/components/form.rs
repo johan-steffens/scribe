@@ -186,10 +186,6 @@ impl Form {
 
     /// Returns the form's title string.
     #[must_use]
-    #[expect(
-        dead_code,
-        reason = "public API; used in tests and future rendering code"
-    )]
     pub fn title(&self) -> &str {
         &self.title
     }
@@ -202,7 +198,6 @@ impl Form {
 
     /// Returns `true` if the form has been submitted.
     #[must_use]
-    #[expect(dead_code, reason = "public API; used in tests and future callers")]
     pub fn is_submitted(&self) -> bool {
         self.state == FormState::Submitted
     }
@@ -225,10 +220,6 @@ impl Form {
 
     /// Returns a shared slice of all fields.
     #[must_use]
-    #[expect(
-        dead_code,
-        reason = "public API; used in tests and future rendering callers"
-    )]
     pub fn fields(&self) -> &[FormField] {
         &self.fields
     }

@@ -26,6 +26,7 @@ use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
 
+#[cfg(feature = "sync")]
 use crate::sync::SyncSummary;
 
 /// Opens (or creates) the `SQLite` database at `path` and runs all pending migrations.
@@ -99,6 +100,7 @@ pub fn open_in_memory() -> anyhow::Result<Connection> {
 
 const SYNC_SUMMARY_KEY: &str = "sync_summary";
 
+#[cfg(feature = "sync")]
 pub fn load_sync_summary(conn: &Arc<Mutex<Connection>>) -> Option<SyncSummary> {
     let conn = conn.lock().ok()?;
     let result: rusqlite::Result<String> = conn.query_row(
@@ -116,6 +118,7 @@ pub fn load_sync_summary(conn: &Arc<Mutex<Connection>>) -> Option<SyncSummary> {
 /// # Errors
 ///
 /// Returns an error if the database connection fails or the JSON serialization fails.
+#[cfg(feature = "sync")]
 pub fn save_sync_summary(
     conn: &Arc<Mutex<Connection>>,
     summary: &SyncSummary,
