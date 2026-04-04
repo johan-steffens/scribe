@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Data-refresh methods for [`App`].
 //!
 //! These private methods reload each view's data from the database. They are

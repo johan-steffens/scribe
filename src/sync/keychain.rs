@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! OS keychain abstraction for sync secrets.
 //!
 //! This module provides [`KeychainStore`], a thin wrapper around the [`keyring`]
@@ -96,19 +95,31 @@ impl KeychainStore {
             return Ok(secret);
         }
 
-        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
-            SyncError::Keychain(format!(
-                "sync requires a keychain daemon to store secrets securely. \
-                 Install and start gnome-keyring or kwallet, then re-run \
-                 `scribe sync configure`. (detail: {e})"
-            ))
-        })?;
-        entry.get_password().map_err(|e| {
-            SyncError::Keychain(format!(
-                "secret '{service}' not found in keychain — run \
-                 `scribe sync configure` to set it up. (detail: {e})"
-            ))
-        })
+        #[cfg(any(test, feature = "test-util"))]
+        {
+            // In tests, we NEVER fall back to the real OS keychain to avoid prompts.
+            Err(SyncError::Keychain(format!(
+                "secret '{service}' not found in mock keychain (bootstrap file). \
+                 Ensure you called scribe::testing::keychain::set_secret() in your test setup."
+            )))
+        }
+
+        #[cfg(not(any(test, feature = "test-util")))]
+        {
+            let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+                SyncError::Keychain(format!(
+                    "sync requires a keychain daemon to store secrets securely. \
+                     Install and start gnome-keyring or kwallet, then re-run \
+                     `scribe sync configure`. (detail: {e})"
+                ))
+            })?;
+            entry.get_password().map_err(|e| {
+                SyncError::Keychain(format!(
+                    "secret '{service}' not found in keychain — run \
+                     `scribe sync configure` to set it up. (detail: {e})"
+                ))
+            })
+        }
     }
 
     /// Retrieves a secret from the OS keychain, optionally failing silently
@@ -130,6 +141,12 @@ impl KeychainStore {
         if let Some(secret) = Self::get_from_bootstrap(provider.as_ref(), field.as_ref()) {
             tracing::debug!(service, "keychain.get_optional: using bootstrap file");
             return Ok(Some(secret));
+        }
+
+        // If we are in test mode (via environment variable), NEVER fall back to
+        // the real OS keychain.
+        if std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP").is_ok() {
+            return Ok(None);
         }
 
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
@@ -192,6 +209,12 @@ impl KeychainStore {
         let field_ref = field.as_ref();
         let secret_ref = secret.as_ref();
 
+        // If we are in test mode (via environment variable), only update the bootstrap file.
+        if std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP").is_ok() {
+            Self::update_bootstrap(provider_ref, field_ref, secret_ref);
+            return Ok(());
+        }
+
         let service = Self::service_name(provider_ref, field_ref);
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
@@ -211,6 +234,9 @@ impl KeychainStore {
     /// Returns the path to the keychain bootstrap JSON file.
     #[must_use]
     pub fn bootstrap_path() -> Option<std::path::PathBuf> {
+        if let Ok(p) = std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP") {
+            return Some(std::path::PathBuf::from(p));
+        }
         directories::ProjectDirs::from("", "", "scribe")
             .map(|d| d.data_local_dir().join("keychain-bootstrap.json"))
     }
@@ -251,6 +277,12 @@ impl KeychainStore {
     /// (or multiple CLI invocations in different contexts) have different
     /// path identities, preventing access to secrets.
     pub fn apply_bootstrap() {
+        // If we are in test mode (via environment variable), NEVER apply bootstrap to
+        // the real OS keychain.
+        if std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP").is_ok() {
+            return;
+        }
+
         let Some(path) = Self::bootstrap_path() else {
             return;
         };
@@ -300,7 +332,27 @@ impl KeychainStore {
     /// keychain daemon) or when the deletion fails for a reason other than the
     /// entry being absent.
     pub fn remove(provider: impl AsRef<str>, field: impl AsRef<str>) -> Result<(), SyncError> {
-        let service = Self::service_name(provider, field);
+        let provider_ref = provider.as_ref();
+        let field_ref = field.as_ref();
+
+        // If we are in test mode (via environment variable), only clear from
+        // the bootstrap file.
+        if std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP").is_ok() {
+            if let Some(p) = Self::bootstrap_path()
+                && p.exists()
+                && let Ok(content) = std::fs::read_to_string(&p)
+                && let Ok(mut secrets) =
+                    serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
+            {
+                secrets.remove(&format!("{provider_ref}.{field_ref}"));
+                if let Ok(json) = serde_json::to_string(&secrets) {
+                    let _ = std::fs::write(&p, json);
+                }
+            }
+            return Ok(());
+        }
+
+        let service = Self::service_name(provider_ref, field_ref);
         let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
             SyncError::Keychain(format!(
                 "sync requires a keychain daemon to store secrets securely. \

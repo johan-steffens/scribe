@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Ops-layer mutations called after form submission or dialog confirmation.
 //!
 //! Each `exec_*` function corresponds to one [`FormContext`] variant and calls

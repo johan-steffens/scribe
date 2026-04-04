@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Rendering utilities for the form widget.
 //!
 //! These private helpers are split out of `form.rs` to keep file sizes

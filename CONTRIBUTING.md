@@ -70,12 +70,15 @@ cargo fmt --all
 
 # All tests must pass
 cargo test --all-features
+
+# Coverage must be 80% or higher
+cargo llvm-cov --all-features --fail-under-lines 80
 ```
 
 Run all checks locally before pushing:
 
 ```sh
-cargo fmt --all && cargo clippy --all-features -- -D warnings && cargo test --all-features
+cargo fmt --all && cargo clippy --all-features -- -D warnings && cargo test --all-features && cargo llvm-cov --all-features --fail-under-lines 80
 ```
 
 ## Project Structure
@@ -91,22 +94,53 @@ src/
 ├── store/        # Data access layer (SQLite queries)
 ├── sync/         # Sync engine and providers
 └── tui/          # Terminal UI
+
+tests/
+├── tests/*.rs    # Unit tests (migrated from src/)
+├── tui/          # TUI integration tests (TestBackend)
+└── sync/         # Sync integration tests
 ```
+
+**Note:** `src/` is primarily test-free (no `#[test]` blocks). All tests live
+in `tests/`. Internal exposition for testing is provided via a
+`#[cfg(feature = "test-util")] pub mod testing` pattern in each module and
+re-exported in `src/testing/mod.rs`.
 
 ## Writing Tests
 
-Unit tests live alongside their source files. Integration tests live in
-`tests/`.
+Tests are organized by subsystem in `tests/`:
+
+```sh
+# Unit tests
+tests/todo_store_tests.rs
+
+# TUI integration tests (ratatui TestBackend)
+tests/tui/dashboard_tests.rs
+
+# Sync integration tests
+tests/sync/provider_tests.rs
+```
+
+Use helpers from `scribe::testing` for temp databases and mock configs:
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+use scribe::testing::db::TestDb;
+use scribe::testing::config::TestConfig;
 
-    #[test]
-    fn test_my_function() {
-        assert_eq!(my_function(1), 2);
-    }
+#[test]
+fn test_my_function() {
+    let test_db = TestDb::new();
+    let conn = test_db.conn();
+    // test code
+}
+```
+
+Internal types are exposed for testing via the `testing` module in each module:
+
+```rust
+#[cfg(feature = "test-util")]
+pub mod testing {
+    pub use crate::ops::todos::TodoOps; // etc.
 }
 ```
 

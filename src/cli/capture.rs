@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! CLI subcommand for quick capture (`scribe capture <text>`).
 //!
 //! A single one-liner command that stores a raw thought in the inbox without

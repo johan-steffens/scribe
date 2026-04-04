@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`Tasks`] repository trait.
 //!
 //! [`SqliteTasks`] wraps a shared `Arc<Mutex<Connection>>` and provides
@@ -332,6 +331,47 @@ impl Tasks for SqliteTasks {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(feature = "test-util")]
+pub mod testing {
+    //! Test helpers for the task store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteTasks`] instances against an in-memory database.
+
+    use super::{Arc, Mutex, NewTask, ProjectId, SqliteTasks, TaskPriority, TaskStatus};
+    use crate::db::open_in_memory;
+
+    /// The seeded quick-capture project ID used in tests.
+    pub const QC_PROJECT_ID: ProjectId = ProjectId(1);
+
+    /// Constructs a [`SqliteTasks`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
+    #[must_use]
+    pub fn store() -> SqliteTasks {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteTasks::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewTask`] for testing purposes.
+    #[must_use]
+    pub fn new_task(slug: &str, title: &str) -> NewTask {
+        NewTask {
+            slug: slug.to_owned(),
+            project_id: QC_PROJECT_ID,
+            title: title.to_owned(),
+            description: None,
+            status: TaskStatus::Todo,
+            priority: TaskPriority::Medium,
+            due_date: None,
+        }
+    }
+}
+
 #[cfg(feature = "sync")]
 impl SqliteTasks {
     /// Returns every task row, including archived ones.
@@ -425,91 +465,5 @@ impl SqliteTasks {
         }
         tx.commit()?;
         Ok(())
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn store() -> SqliteTasks {
-        let conn = open_in_memory().expect("in-memory db");
-        SqliteTasks::new(Arc::new(Mutex::new(conn)))
-    }
-
-    // The seeded quick-capture project has id=1.
-    fn qc_project() -> ProjectId {
-        ProjectId(1)
-    }
-
-    fn new_task(slug: &str, title: &str) -> NewTask {
-        NewTask {
-            slug: slug.to_owned(),
-            project_id: qc_project(),
-            title: title.to_owned(),
-            description: None,
-            status: TaskStatus::Todo,
-            priority: TaskPriority::Medium,
-            due_date: None,
-        }
-    }
-
-    #[test]
-    fn test_create_and_find() {
-        let s = store();
-        let t = s.create(new_task("qc-task-fix", "Fix it")).expect("create");
-        assert_eq!(t.slug, "qc-task-fix");
-        let found = s.find_by_slug("qc-task-fix").expect("find").expect("some");
-        assert_eq!(found.id, t.id);
-    }
-
-    #[test]
-    fn test_archive_and_restore() {
-        let s = store();
-        s.create(new_task("t1", "T1")).expect("create");
-        s.archive("t1").expect("archive");
-        let tasks = s.list(None, None, None, false).expect("list");
-        assert!(!tasks.iter().any(|t| t.slug == "t1"));
-        s.restore("t1").expect("restore");
-        let tasks = s.list(None, None, None, false).expect("list");
-        assert!(tasks.iter().any(|t| t.slug == "t1"));
-    }
-
-    #[test]
-    fn test_delete() {
-        let s = store();
-        s.create(new_task("del", "Delete me")).expect("create");
-        s.delete("del").expect("delete");
-        assert!(s.find_by_slug("del").expect("find").is_none());
-    }
-
-    #[test]
-    fn test_update_status() {
-        let s = store();
-        s.create(new_task("upd", "Update me")).expect("create");
-        let t = s
-            .update(
-                "upd",
-                TaskPatch {
-                    status: Some(TaskStatus::Done),
-                    ..Default::default()
-                },
-            )
-            .expect("update");
-        assert_eq!(t.status, TaskStatus::Done);
-    }
-
-    #[test]
-    fn test_archive_all_for_project() {
-        let s = store();
-        s.create(new_task("p-t1", "T1")).expect("t1");
-        s.create(new_task("p-t2", "T2")).expect("t2");
-        s.archive_all_for_project(qc_project())
-            .expect("archive all");
-        let active = s.list(Some(qc_project()), None, None, false).expect("list");
-        assert!(active.is_empty());
     }
 }

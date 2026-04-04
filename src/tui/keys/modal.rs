@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Modal key handlers for the Scribe TUI.
 //!
 //! Handles key events when a [`Modal`] (confirm dialog or form) is active.

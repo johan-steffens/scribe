@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Private handler functions for `scribe reminder` subcommands.
 //!
 //! This file is included by `reminder.rs` via `#[path = "reminder_handlers.rs"]`.

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Integration tests for the sync engine (gated behind the `sync` feature).
 
 #[cfg(feature = "sync")]

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `TimeEntry` entity and the `TimeEntries` repository trait.
 //!
 //! Time entries record started/stopped timer sessions linked to a project and

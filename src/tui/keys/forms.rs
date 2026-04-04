@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Form-building helpers for the create/edit view handlers.
 //!
 //! Each `build_*_form` function returns an `Option<(Form, FormContext)>` so

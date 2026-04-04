@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Domain model: entities, repository traits, ID newtypes, and slug utilities.
 //!
 //! This module is the authoritative source for all business-domain types.

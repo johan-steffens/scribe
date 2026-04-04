@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! REST sync master server.
 //!
 //! Started by the daemon when `sync.provider = "rest"` and

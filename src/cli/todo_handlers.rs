@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Private handler functions for `scribe todo` subcommands.
 //!
 //! This file is included by `todo.rs` via `#[path = "todo_handlers.rs"]`.

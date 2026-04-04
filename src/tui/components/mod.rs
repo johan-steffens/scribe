@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Reusable TUI widget components.
 //!
 //! Components are pure rendering functions that accept `&App` or direct data

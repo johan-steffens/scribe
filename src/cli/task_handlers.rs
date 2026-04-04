@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Private handler functions for `scribe task` subcommands.
 //!
 //! This file is included by `task.rs` via `#[path = "task_handlers.rs"]`.

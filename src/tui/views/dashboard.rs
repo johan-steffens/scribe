@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Dashboard view — today's tasks and active timer panel.
 //!
 //! The dashboard is split into two side-by-side panels:

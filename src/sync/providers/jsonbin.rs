@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! JSONBin.io sync provider.
 //!
 //! [`JsonBinProvider`] stores the [`StateSnapshot`] as the content of a private

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! MCP (Model Context Protocol) stdio server for Scribe.
 //!
 //! This module is only compiled when the `mcp` Cargo feature is enabled.
@@ -29,6 +28,13 @@
 
 #[cfg(feature = "mcp")]
 pub mod server;
+
+#[cfg(feature = "mcp")]
+pub use server::{
+    CaptureParams, InboxProcessParams, ProjectCreateParams, ProjectSlugParam, ReminderCreateParams,
+    ReminderListParams, ReminderSlugParam, TaskCreateParams, TaskListParams, TaskSlugParam,
+    TimerStartParams, TodoCreateParams, TodoListParams, TodoSlugParam, TrackReportParams,
+};
 
 #[cfg(feature = "mcp")]
 use std::sync::{Arc, Mutex};

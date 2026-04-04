@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! File-based sync provider — reads and writes state to a local JSON file.
 //!
 //! [`FileProvider`] is a simple provider that stores the [`StateSnapshot`] as

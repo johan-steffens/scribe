@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Dropbox API v2 sync provider.
 //!
 //! [`DropboxProvider`] stores the [`StateSnapshot`] as a file at a configurable

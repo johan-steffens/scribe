@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Database connection management and migration runner.
 //!
 //! This module is the single entry point for obtaining a `rusqlite::Connection`.
@@ -21,11 +20,14 @@
 pub mod migrations;
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
 
+#[cfg(feature = "sync")]
+use std::sync::{Arc, Mutex};
+
+#[cfg(feature = "sync")]
 use crate::sync::SyncSummary;
 
 /// Opens (or creates) the `SQLite` database at `path` and runs all pending migrations.
@@ -87,7 +89,7 @@ pub fn open(path: &Path) -> anyhow::Result<Connection> {
 /// ```
 /// let conn = scribe::db::open_in_memory().expect("in-memory DB failed");
 /// ```
-// Used in unit tests and #[cfg(test)] blocks throughout the crate.
+// Used in unit tests and #[cfg(feature = "test-util")] blocks throughout the crate.
 #[allow(dead_code, reason = "used in test modules throughout the crate")]
 pub fn open_in_memory() -> anyhow::Result<Connection> {
     let mut conn = Connection::open_in_memory()?;
@@ -97,8 +99,10 @@ pub fn open_in_memory() -> anyhow::Result<Connection> {
     Ok(conn)
 }
 
+#[cfg(feature = "sync")]
 const SYNC_SUMMARY_KEY: &str = "sync_summary";
 
+#[cfg(feature = "sync")]
 pub fn load_sync_summary(conn: &Arc<Mutex<Connection>>) -> Option<SyncSummary> {
     let conn = conn.lock().ok()?;
     let result: rusqlite::Result<String> = conn.query_row(
@@ -116,6 +120,7 @@ pub fn load_sync_summary(conn: &Arc<Mutex<Connection>>) -> Option<SyncSummary> {
 /// # Errors
 ///
 /// Returns an error if the database connection fails or the JSON serialization fails.
+#[cfg(feature = "sync")]
 pub fn save_sync_summary(
     conn: &Arc<Mutex<Connection>>,
     summary: &SyncSummary,
@@ -131,32 +136,13 @@ pub fn save_sync_summary(
     Ok(())
 }
 
-// ── tests ──────────────────────────────────────────────────────────────────
+// ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[cfg(feature = "test-util")]
+pub mod testing {
+    //! Test helpers for the db module.
+    //!
+    //! Re-exports [`super::open_in_memory`] for convenience.
 
-    #[test]
-    fn test_open_in_memory_succeeds() {
-        let conn = open_in_memory().expect("should open");
-        // quick-capture project must be seeded
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM projects WHERE slug = 'quick-capture'",
-                [],
-                |row| row.get(0),
-            )
-            .expect("query failed");
-        assert_eq!(count, 1);
-    }
-
-    #[test]
-    fn test_open_creates_file_and_directory() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let db_path = dir.path().join("nested").join("scribe.db");
-        let conn = open(&db_path).expect("should open");
-        assert!(db_path.exists());
-        drop(conn);
-    }
+    pub use super::open_in_memory;
 }

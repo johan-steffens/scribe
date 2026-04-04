@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `scribe sync` — manual sync, configuration, and status subcommands.
 //!
 //! Provides three subcommands:

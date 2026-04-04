@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `SyncEngine` — pull → merge → push cycle with last-write-wins semantics.
 //!
 //! The engine drives a single sync round-trip:

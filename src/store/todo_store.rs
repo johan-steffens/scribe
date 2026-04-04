@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`Todos`] repository trait.
 //!
 //! Wired into the CLI via [`crate::ops::TodoOps`].
@@ -257,6 +256,40 @@ impl Todos for SqliteTodos {
     }
 }
 
+// ── test helpers ─────────────────────────────────────────────────────────
+
+#[cfg(feature = "test-util")]
+pub mod testing {
+    //! Test helpers for the todo store module.
+    //!
+    //! Re-exports internals so external integration tests can construct
+    //! [`super::SqliteTodos`] instances against an in-memory database.
+
+    use super::{Arc, Mutex, NewTodo, ProjectId, SqliteTodos};
+    use crate::db::open_in_memory;
+
+    /// Constructs a [`SqliteTodos`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
+    #[must_use]
+    pub fn store() -> SqliteTodos {
+        let conn = open_in_memory().expect("in-memory db");
+        SqliteTodos::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Creates a [`NewTodo`] for testing purposes.
+    #[must_use]
+    pub fn new_todo(slug: &str, title: &str) -> NewTodo {
+        NewTodo {
+            slug: slug.to_owned(),
+            project_id: ProjectId(1),
+            title: title.to_owned(),
+        }
+    }
+}
+
 #[cfg(feature = "sync")]
 impl SqliteTodos {
     /// Returns every todo row, including archived and done ones.
@@ -333,59 +366,5 @@ impl SqliteTodos {
         }
         tx.commit()?;
         Ok(())
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn store() -> SqliteTodos {
-        let conn = open_in_memory().expect("in-memory db");
-        SqliteTodos::new(Arc::new(Mutex::new(conn)))
-    }
-
-    fn new_todo(slug: &str, title: &str) -> NewTodo {
-        NewTodo {
-            slug: slug.to_owned(),
-            project_id: ProjectId(1),
-            title: title.to_owned(),
-        }
-    }
-
-    #[test]
-    fn test_create_and_find() {
-        let s = store();
-        let t = s.create(new_todo("t1", "Do thing")).expect("create");
-        assert_eq!(t.slug, "t1");
-        assert!(!t.done);
-    }
-
-    #[test]
-    fn test_mark_done() {
-        let s = store();
-        s.create(new_todo("td", "Do it")).expect("create");
-        let updated = s
-            .update(
-                "td",
-                TodoPatch {
-                    done: Some(true),
-                    ..Default::default()
-                },
-            )
-            .expect("update");
-        assert!(updated.done);
-    }
-
-    #[test]
-    fn test_archive_hide_from_list() {
-        let s = store();
-        s.create(new_todo("ta", "Archive me")).expect("create");
-        s.archive("ta").expect("archive");
-        let items = s.list(None, true, false).expect("list");
-        assert!(!items.iter().any(|t| t.slug == "ta"));
     }
 }

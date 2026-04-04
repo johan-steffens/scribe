@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! CLI subcommands for managing reminders (`scribe reminder …`).
 //!
 //! Each subcommand maps to an operation in [`crate::ops::ReminderOps`].

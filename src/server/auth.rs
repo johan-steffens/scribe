@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Bearer token authentication middleware for the REST sync server.
 //!
 //! Provides [`require_bearer`], an axum middleware layer that validates every

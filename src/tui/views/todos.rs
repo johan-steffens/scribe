@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Todos view — full-screen list of active todos.
 //!
 //! Each row shows:

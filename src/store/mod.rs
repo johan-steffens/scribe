@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `SQLite` repository implementations for all domain entities.
 //!
 //! Each sub-module provides a concrete `Sqlite*` struct that implements the

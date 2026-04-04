@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Business logic operations for all entities.
 //!
 //! The `ops` layer sits between the CLI and the store layer. It enforces

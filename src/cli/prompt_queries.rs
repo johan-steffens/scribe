@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! SQL query helpers used by `SlugCompleter` in [`super::prompt`].
 //!
 //! Each function receives a locked [`rusqlite::Connection`] and a slug prefix,

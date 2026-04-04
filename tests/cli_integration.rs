@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! CLI integration tests using `assert_cmd` and isolated temporary databases.
 //!
 //! Each test creates a `tempfile::TempDir` and sets `SCRIBE_TEST_DB` so that

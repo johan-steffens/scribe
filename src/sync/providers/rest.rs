@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Self-hosted REST sync provider (client side).
 //!
 //! [`RestProvider`] connects to a self-hosted Scribe sync server and exchanges

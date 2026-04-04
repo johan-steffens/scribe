@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Configuration loading and saving from XDG-compliant paths.
 //!
 //! This module reads and writes `config.toml` from
@@ -328,6 +327,7 @@ struct DataConfig {
     /// Override for the `SQLite` database path; empty string means use default.
     db_path: Option<String>,
     /// Persisted per-machine UUID used for sync diagnostics.
+    #[cfg(feature = "sync")]
     machine_id: Option<String>,
 }
 
@@ -378,7 +378,7 @@ pub struct SetupConfig {
 
 /// Raw top-level structure parsed from `config.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct RawConfig {
+pub(crate) struct RawConfig {
     #[serde(default)]
     data: DataConfig,
     #[serde(default)]
@@ -630,88 +630,5 @@ pub(crate) fn default_db_path() -> PathBuf {
         dirs.data_dir().join("scribe.db")
     } else {
         PathBuf::from(".local/share/scribe/scribe.db")
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_config_has_sensible_values() {
-        let cfg = Config::default();
-        assert!(cfg.db_path.is_none());
-        assert!(cfg.notifications_enabled);
-        assert_eq!(cfg.date_format, "%Y-%m-%d");
-        assert_eq!(cfg.time_format, "%H:%M");
-        assert!(!cfg.setup.daemon_service_installed);
-        assert!(!cfg.setup.agent_installed);
-    }
-
-    #[test]
-    fn test_db_path_returns_override_when_set() {
-        let cfg = Config {
-            db_path: Some(PathBuf::from("/tmp/test.db")),
-            notifications_enabled: true,
-            date_format: "%Y-%m-%d".to_owned(),
-            time_format: "%H:%M".to_owned(),
-            setup: SetupConfig::default(),
-            #[cfg(feature = "sync")]
-            sync: SyncConfig::default(),
-            #[cfg(feature = "sync")]
-            machine_id: None,
-        };
-        assert_eq!(cfg.db_path(), PathBuf::from("/tmp/test.db"));
-    }
-
-    #[test]
-    fn test_db_path_returns_xdg_default_when_unset() {
-        let cfg = Config::default();
-        let db = cfg.db_path();
-        assert_eq!(db.file_name().and_then(|n| n.to_str()), Some("scribe.db"));
-    }
-
-    #[test]
-    fn test_from_raw_empty_db_path_string_uses_default() {
-        let mut raw = RawConfig::default();
-        raw.data.db_path = Some(String::new());
-        let cfg = Config::from_raw(raw);
-        assert!(cfg.db_path.is_none());
-    }
-
-    #[test]
-    fn test_round_trip_preserves_setup_state() {
-        let mut cfg = Config::default();
-        cfg.setup.daemon_service_installed = true;
-        cfg.setup.agent_installed = true;
-        let raw = cfg.to_raw();
-        let restored = Config::from_raw(raw);
-        assert!(restored.setup.daemon_service_installed);
-        assert!(restored.setup.agent_installed);
-    }
-
-    #[cfg(feature = "sync")]
-    #[test]
-    fn test_sync_config_defaults_to_disabled() {
-        let cfg = Config::default();
-        assert!(!cfg.sync.enabled);
-        assert_eq!(cfg.sync.provider, SyncProvider::Gist);
-        assert_eq!(cfg.sync.interval_secs, 60);
-    }
-
-    #[cfg(feature = "sync")]
-    #[test]
-    fn test_sync_config_round_trip() {
-        let mut cfg = Config::default();
-        cfg.sync.enabled = true;
-        cfg.sync.provider = SyncProvider::S3;
-        cfg.sync.s3.bucket = "my-bucket".to_owned();
-        let raw = cfg.to_raw();
-        let restored = Config::from_raw(raw);
-        assert!(restored.sync.enabled);
-        assert_eq!(restored.sync.provider, SyncProvider::S3);
-        assert_eq!(restored.sync.s3.bucket, "my-bucket");
     }
 }

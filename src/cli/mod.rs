@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! CLI argument definitions and top-level command dispatch.
 //!
 //! This module defines the [`Cli`] struct (the root `clap` parser) and the
@@ -50,10 +49,6 @@ pub use service::ServiceCommand;
 pub use setup::SetupArgs;
 #[cfg(feature = "sync")]
 #[doc(inline)]
-#[expect(
-    unused_imports,
-    reason = "public re-export for external consumers; Commands::Sync uses full path internally"
-)]
 pub use sync::SyncCommand;
 #[doc(inline)]
 pub use task::TaskCommand;

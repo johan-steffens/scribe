@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Status bar component rendered at the bottom of every TUI frame.
 //!
 //! The status bar occupies two lines:

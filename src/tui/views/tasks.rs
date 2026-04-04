@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Tasks view — full-screen list of active tasks.
 //!
 //! Each row shows:

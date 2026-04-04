@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Handlers for `scribe completions` (static) and `scribe __complete` (dynamic).
 //!
 //! ## Two-layer completion architecture

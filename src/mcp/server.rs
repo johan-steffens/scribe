@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! MCP server implementation — tools and resources for Scribe data.
 //!
 //! [`ScribeMcpServer`] implements [`rmcp::ServerHandler`] and exposes all
@@ -815,6 +814,51 @@ fn read_resource_contents(server: &ScribeMcpServer, uri: &str) -> ResourceConten
     };
 
     ResourceContents::text(text, uri)
+}
+
+// ── Testing utilities ────────────────────────────────────────────────────────
+
+#[cfg(feature = "test-util")]
+pub mod testing {
+    //! Test helpers for the MCP server.
+    //!
+    //! This module exposes internals for integration testing of the MCP tool
+    //! handlers without requiring the full stdio transport.
+
+    use std::sync::{Arc, Mutex};
+
+    use rusqlite::Connection;
+
+    /// A test harness that wraps an in-memory database and MCP server.
+    #[derive(Debug)]
+    pub struct TestMcpServer {
+        /// Shared database connection (in-memory).
+        pub conn: Arc<Mutex<Connection>>,
+        /// The MCP server instance.
+        pub server: super::ScribeMcpServer,
+    }
+
+    impl TestMcpServer {
+        /// Creates a new test MCP server with an in-memory database.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the in-memory database cannot be opened (should not happen).
+        #[must_use]
+        pub fn new() -> Self {
+            let conn = Arc::new(Mutex::new(
+                rusqlite::Connection::open_in_memory().expect("in-memory database should open"),
+            ));
+            let server = super::ScribeMcpServer::new(&conn);
+            Self { conn, server }
+        }
+    }
+
+    impl Default for TestMcpServer {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 }
 
 // ── Entry point ─────────────────────────────────────────────────────────────
