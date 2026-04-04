@@ -95,31 +95,27 @@ impl KeychainStore {
             return Ok(secret);
         }
 
-        #[cfg(test)]
-        {
-            // In tests, we NEVER fall back to the real OS keychain to avoid prompts.
-            Err(SyncError::Keychain(format!(
+        // If SCRIBE_TEST_KEYCHAIN_BOOTSTRAP is set, we never fall back to real keychain.
+        if std::env::var("SCRIBE_TEST_KEYCHAIN_BOOTSTRAP").is_ok() {
+            return Err(SyncError::Keychain(format!(
                 "secret '{service}' not found in mock keychain (bootstrap file). \
                  Ensure you called scribe::testing::keychain::set_secret() in your test setup."
-            )))
+            )));
         }
 
-        #[cfg(not(test))]
-        {
-            let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
-                SyncError::Keychain(format!(
-                    "sync requires a keychain daemon to store secrets securely. \
-                     Install and start gnome-keyring or kwallet, then re-run \
-                     `scribe sync configure`. (detail: {e})"
-                ))
-            })?;
-            entry.get_password().map_err(|e| {
-                SyncError::Keychain(format!(
-                    "secret '{service}' not found in keychain — run \
-                     `scribe sync configure` to set it up. (detail: {e})"
-                ))
-            })
-        }
+        let entry = Entry::new(&service, KEYCHAIN_USERNAME).map_err(|e| {
+            SyncError::Keychain(format!(
+                "sync requires a keychain daemon to store secrets securely. \
+                 Install and start gnome-keyring or kwallet, then re-run \
+                 `scribe sync configure`. (detail: {e})"
+            ))
+        })?;
+        entry.get_password().map_err(|e| {
+            SyncError::Keychain(format!(
+                "secret '{service}' not found in keychain — run \
+                 `scribe sync configure` to set it up. (detail: {e})"
+            ))
+        })
     }
 
     /// Retrieves a secret from the OS keychain, optionally failing silently
