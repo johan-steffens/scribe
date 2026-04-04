@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`Projects`] repository trait.
 //!
 //! [`SqliteProjects`] wraps a shared `Arc<Mutex<Connection>>` and provides

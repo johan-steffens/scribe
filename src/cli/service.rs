@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `scribe service` — background daemon service management.
 //!
 //! Installs and uninstalls the `scribe daemon` as a system-managed background

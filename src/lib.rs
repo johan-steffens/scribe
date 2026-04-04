@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Scribe library — exposes domain types and feature-gated modules for testing.
 //!
 //! The primary entry point is `src/main.rs`. This library target exists to

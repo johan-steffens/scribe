@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Unit tests for [`crate::domain::slug`].
 
 use scribe::testing::slug::{MAX_TITLE_LEN, ensure_unique, generate};

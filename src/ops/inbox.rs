@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Business logic for the quick-capture inbox feature.
 //!
 //! [`InboxOps`] wraps [`SqliteCaptureItems`] and coordinates with the task

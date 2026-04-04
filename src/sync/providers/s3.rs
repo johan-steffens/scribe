@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! S3-compatible object storage sync provider.
 //!
 //! [`S3Provider`] supports AWS S3, Cloudflare R2, `MinIO`, and any S3-compatible

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Reminders view — list of active (non-archived, non-fired) reminders.
 //!
 //! Each row shows:

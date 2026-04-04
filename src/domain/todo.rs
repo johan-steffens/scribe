@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `Todo` entity and the `Todos` repository trait.
 //!
 //! Todos are lightweight checklist items. They belong to a project and have a

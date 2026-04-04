@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Top-level layout composition and frame drawing.
 //!
 //! [`draw`] is the sole entry point called by the event loop on every tick.

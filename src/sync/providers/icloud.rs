@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! iCloud Drive sync provider — delegates to [`FileProvider`] with tilde expansion.
 //!
 //! [`ICloudProvider`] wraps a [`FileProvider`] and expands a leading `~/` in

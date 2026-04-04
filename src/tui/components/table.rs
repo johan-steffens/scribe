@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Reusable stateful table widget wrapping [`ratatui::widgets::Table`].
 //!
 //! [`render_table`] is a pure function that accepts headers, rows, a selected

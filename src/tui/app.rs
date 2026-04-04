@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Application state machine for the Scribe TUI.
 //!
 //! [`App`] is the single source of truth for all TUI state. Views are pure

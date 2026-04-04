@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Embedded SQL migration definitions for Scribe's `SQLite` database.
 //!
 //! Each migration is a `&str` constant containing valid `SQLite` DDL/DML.

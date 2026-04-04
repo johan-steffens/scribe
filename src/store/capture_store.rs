@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `SQLite` implementation of the [`CaptureItems`] repository trait.
 //!
 //! Wired into the CLI via [`crate::ops::InboxOps`].

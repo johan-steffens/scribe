@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Hand-authored fish completion script for `scribe`.
 //!
 //! Exported as [`FISH_COMPLETION`], a `&str` that is printed verbatim by

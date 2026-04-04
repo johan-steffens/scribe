@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! GitHub Gist sync provider.
 //!
 //! [`GistProvider`] stores the [`StateSnapshot`] as the content of a single

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Placeholder view renderer for unimplemented views.
 //!
 //! This module is retained for potential Phase 5+ views that are not yet

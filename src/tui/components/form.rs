@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Generic inline form component for the Scribe TUI.
 //!
 //! [`Form`] is a floating popup containing an ordered list of [`FormField`]

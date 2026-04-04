@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Business logic operations for the task entity.
 //!
 //! [`TaskOps`] wraps `SqliteTasks` and adds slug generation on task creation.

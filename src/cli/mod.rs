@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! CLI argument definitions and top-level command dispatch.
 //!
 //! This module defines the [`Cli`] struct (the root `clap` parser) and the

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Unit tests for [`crate::store::todo_store::SqliteTodos`].
 
 use scribe::domain::{NewTodo, ProjectId, TodoPatch, Todos};

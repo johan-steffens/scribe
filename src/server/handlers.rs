@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `GET /state` and `PUT /state` handlers for the REST sync master server.
 //!
 //! Both handlers operate on [`ServerState`], a cheaply-cloneable wrapper

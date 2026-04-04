@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Scribe application entry point.
 //!
 //! Sets the `mimalloc` global allocator, initialises structured tracing,

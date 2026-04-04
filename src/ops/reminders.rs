@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Business logic for the reminders feature.
 //!
 //! [`ReminderOps`] wraps `SqliteReminders` and adds project/task validation

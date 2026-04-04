@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Readline-powered interactive prompts with tab completion for slug values.
 //!
 //! This module replaces the plain `stdin().read_line` helper used throughout

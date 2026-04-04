@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! OS keychain abstraction for sync secrets.
 //!
 //! This module provides [`KeychainStore`], a thin wrapper around the [`keyring`]

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! OS desktop-notification helpers for Scribe reminders.
 //!
 //! [`fire`] sends a single native desktop notification. The implementation is

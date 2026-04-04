@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Slug generation and uniqueness enforcement.
 //!
 //! A slug is a lowercase, kebab-case, URL-safe string used as the

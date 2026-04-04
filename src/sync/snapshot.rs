@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `StateSnapshot` — a flat, serialisable point-in-time view of all entities.
 //!
 //! A snapshot captures every entity table in the database into a single

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! MCP (Model Context Protocol) stdio server for Scribe.
 //!
 //! This module is only compiled when the `mcp` Cargo feature is enabled.

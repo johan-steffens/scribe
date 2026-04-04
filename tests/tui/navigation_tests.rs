@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Integration tests for TUI navigation between views.
 //!
 //! Verifies that pressing navigation keys switches the active view correctly

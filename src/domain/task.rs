@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `Task` entity, status/priority enums, and the `Tasks` repository trait.
 //!
 //! Tasks are the primary unit of work. They belong to a project and carry a

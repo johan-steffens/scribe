@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! TUI entry point and event loop.
 //!
 //! The [`run`] function is the sole public API of this module. It:

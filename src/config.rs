@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Configuration loading and saving from XDG-compliant paths.
 //!
 //! This module reads and writes `config.toml` from

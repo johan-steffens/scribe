@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Tracker view — active timer display and time-entry history.
 //!
 //! The view is split into two sections:

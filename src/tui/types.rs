@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Application state types for the Scribe TUI.
 //!
 //! This module contains the foundational enums and generic structs used by

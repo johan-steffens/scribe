@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Agent skill-file installer — `scribe agent install`.
 //!
 //! Detects which AI coding agent tool directories are present on the machine

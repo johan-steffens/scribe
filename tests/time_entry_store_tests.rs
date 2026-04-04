@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Unit tests for [`crate::store::time_entry_store::SqliteTimeEntries`].
 
 use chrono::Utc;

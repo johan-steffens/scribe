@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Selection, navigation, and utility helpers for the key handler.
 //!
 //! These are pure helper functions that read or compute values from `App`

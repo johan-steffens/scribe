@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `CaptureItem` entity and the `CaptureItems` repository trait.
 //!
 //! Capture items are raw inbox entries — they have no project binding by

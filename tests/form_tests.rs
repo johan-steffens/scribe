@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Unit tests for the form component.
 
 use crossterm::event::{KeyCode, KeyModifiers};

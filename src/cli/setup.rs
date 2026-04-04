@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `scribe setup` — first-run wizard and setup status.
 //!
 //! On first run this command presents an interactive wizard that guides the

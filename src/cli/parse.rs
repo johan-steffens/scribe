@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Flexible datetime string parsing for CLI `--at` arguments.
 //!
 //! [`parse_datetime`] accepts a variety of human-friendly datetime formats

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Per-view action handlers triggered by `n`/`e`/`D`/`Space`/`Enter`/`v`.
 //!
 //! Each handler opens a form or confirm dialog by writing into `app.modal`.

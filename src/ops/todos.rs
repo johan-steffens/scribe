@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Business logic operations for the todo entity.
 //!
 //! [`TodoOps`] wraps `SqliteTodos` and adds rules such as:

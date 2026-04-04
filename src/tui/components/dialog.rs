@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Confirmation dialog component.
 //!
 //! [`ConfirmDialog`] is a small modal that asks the user a yes/no question

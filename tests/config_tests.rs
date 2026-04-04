@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Unit tests for [`crate::config::Config`].
 
 use std::path::PathBuf;

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Key-event dispatching for the Scribe TUI.
 //!
 //! [`handle_key`] is the single entry point called by [`App::handle_key`].

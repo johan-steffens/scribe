@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! TUI view modules — one per navigable screen.
 //!
 //! Each view is a pure rendering function that accepts `&App` and writes to a

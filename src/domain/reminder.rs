@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `Reminder` entity and the `Reminders` repository trait.
 //!
 //! Reminders are scheduled notifications linked to a project and optionally a

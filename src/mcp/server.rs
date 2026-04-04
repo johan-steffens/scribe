@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! MCP server implementation — tools and resources for Scribe data.
 //!
 //! [`ScribeMcpServer`] implements [`rmcp::ServerHandler`] and exposes all

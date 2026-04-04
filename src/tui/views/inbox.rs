@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Inbox view — list of unprocessed capture items.
 //!
 //! Items are sorted oldest-first. Each row shows:

@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! `Project` entity, status enum, and the `Projects` repository trait.
 //!
 //! Projects are the top-level organisational unit. Every task, todo, time

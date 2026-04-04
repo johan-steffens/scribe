@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Integration tests for the dashboard view using `ratatui`'s `TestBackend`.
 //!
 //! These tests render the dashboard into a virtual terminal buffer and assert

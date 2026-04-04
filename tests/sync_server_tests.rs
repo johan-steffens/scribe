@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Integration tests for the REST sync master server (gated behind `sync`).
 
 #[cfg(feature = "sync")]

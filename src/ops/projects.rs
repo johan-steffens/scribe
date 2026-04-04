@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Business logic operations for the project entity.
 //!
 //! [`ProjectOps`] wraps the `SqliteProjects` store and adds rules such as:

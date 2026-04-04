@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Database connection management and migration runner.
 //!
 //! This module is the single entry point for obtaining a `rusqlite::Connection`.

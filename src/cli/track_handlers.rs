@@ -1,4 +1,3 @@
-// Rust guideline compliant 2026-02-21
 //! Private handler functions for `scribe track` subcommands.
 //!
 //! This file is included by `track.rs` via `#[path = "track_handlers.rs"]`.
