@@ -49,13 +49,18 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install clippy and rustfmt
-        run: rustup component add clippy rustfmt
+      - name: Install clippy, rustfmt and llvm-cov
+        run: |
+          rustup component add clippy rustfmt
+          cargo install cargo-llvm-cov --locked
 
       - name: Run checks
         run: |
           cargo fmt --all -- --check
           cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --all-features
+          # Enforce our new coverage baseline (currently ~55%) to prevent regressions
+          cargo llvm-cov --all-features --workspace --fail-under-lines 55
 
   build:
     name: Build — ${{ matrix.target }}
