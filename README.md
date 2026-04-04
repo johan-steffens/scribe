@@ -36,6 +36,8 @@ tracker, process your inbox, or schedule reminders using plain English.
   interactive work, shell completions for fast input.
 - **AI agent-ready** — MCP server exposes your data as tools to coding agents
   (Claude Code, Cursor, OpenCode, etc.).
+- **Well-tested** — 80%+ code coverage via `cargo-llvm-cov`. Integration tests for
+  TUI (using `ratatui` `TestBackend`) and sync (using `wiremock`).
 
 ---
 

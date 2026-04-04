@@ -1181,6 +1181,62 @@ process.`) to keep stdout clean.
 
 ---
 
+## Testing and Coverage
+
+Scribe maintains 80%+ code coverage using `cargo-llvm-cov`.
+
+### Running Tests
+
+```sh
+# Run all tests
+cargo test --all-features
+
+# Run only unit tests
+cargo test --lib
+
+# Run only integration tests
+cargo test --tests
+
+# Run a specific integration test file
+cargo test --test todo_store_tests
+```
+
+### Running with Coverage
+
+```sh
+# Install cargo-llvm-cov if not present
+cargo install cargo-llvm-cov
+
+# Generate coverage report (terminal)
+cargo llvm-cov --all-features
+
+# Generate HTML coverage report
+cargo llvm-cov --all-features --html
+open target/llvm-cov/html/index.html  # macOS
+
+# Generate HTML for the whole workspace
+cargo llvm-cov --all-features --workspace --html
+```
+
+### Coverage Requirements
+
+- Minimum coverage threshold: **80%**
+- Coverage is checked in CI on every PR
+- Run `cargo llvm-cov --all-features --fail-under-lines 80` locally to verify before pushing
+
+### Test Organization
+
+Tests live in `tests/` (not in `src/`):
+
+| Directory / Module | Purpose |
+|-----------|---------|
+| `scribe::testing` | Shared test helpers (temp DB, mock config) |
+| `tests/*.rs` | Unit tests migrated from `src/` modules |
+| `tests/tui/` | TUI integration tests (using `TestBackend`) |
+| `tests/sync/` | Sync integration tests |
+
+---
+
 ## Tips and workflows
 
 ### 1. Morning planning session in the TUI
