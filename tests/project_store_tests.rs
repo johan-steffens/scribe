@@ -1,15 +1,10 @@
 // Rust guideline compliant 2026-02-21
-//! Unit tests for [`SqliteProjects`].
-//!
-//! This file is included by `project_store.rs` via `#[path = "project_store_tests.rs"]`.
+//! Unit tests for [`crate::store::project_store::SqliteProjects`].
 
-use super::*;
-use crate::db::open_in_memory;
+use scribe::domain::{NewProject, ProjectPatch, ProjectStatus, Projects};
+use scribe::testing::project_store;
 
-fn store() -> SqliteProjects {
-    let conn = open_in_memory().expect("in-memory db");
-    SqliteProjects::new(Arc::new(Mutex::new(conn)))
-}
+use project_store::store as make_store;
 
 fn new_project(slug: &str, name: &str) -> NewProject {
     NewProject {
@@ -22,7 +17,7 @@ fn new_project(slug: &str, name: &str) -> NewProject {
 
 #[test]
 fn test_create_and_find_by_slug() {
-    let s = store();
+    let s = make_store();
     let p = s.create(new_project("alpha", "Alpha")).expect("create");
     assert_eq!(p.slug, "alpha");
     let found = s.find_by_slug("alpha").expect("find").expect("some");
@@ -31,7 +26,7 @@ fn test_create_and_find_by_slug() {
 
 #[test]
 fn test_list_active_excludes_archived() {
-    let s = store();
+    let s = make_store();
     s.create(new_project("p1", "P1")).expect("p1");
     s.create(new_project("p2", "P2")).expect("p2");
     s.archive("p1").expect("archive");
@@ -42,21 +37,21 @@ fn test_list_active_excludes_archived() {
 
 #[test]
 fn test_archive_blocked_on_reserved() {
-    let s = store();
+    let s = make_store();
     let err = s.archive("quick-capture").unwrap_err();
     assert!(err.to_string().contains("reserved"));
 }
 
 #[test]
 fn test_delete_blocked_on_reserved() {
-    let s = store();
+    let s = make_store();
     let err = s.delete("quick-capture").unwrap_err();
     assert!(err.to_string().contains("reserved"));
 }
 
 #[test]
 fn test_restore_clears_archived_at() {
-    let s = store();
+    let s = make_store();
     s.create(new_project("r1", "R1")).expect("create");
     s.archive("r1").expect("archive");
     let restored = s.restore("r1").expect("restore");
@@ -65,7 +60,7 @@ fn test_restore_clears_archived_at() {
 
 #[test]
 fn test_update_name() {
-    let s = store();
+    let s = make_store();
     s.create(new_project("upd", "Old Name")).expect("create");
     let updated = s
         .update(
@@ -81,7 +76,7 @@ fn test_update_name() {
 
 #[test]
 fn test_list_filtered_by_status() {
-    let s = store();
+    let s = make_store();
     s.create(NewProject {
         status: ProjectStatus::Paused,
         ..new_project("paused-one", "Paused One")

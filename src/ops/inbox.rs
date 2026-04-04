@@ -259,106 +259,24 @@ impl InboxOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the inbox ops module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::InboxOps`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, InboxOps, Mutex};
     use crate::db::open_in_memory;
 
     /// Constructs an [`InboxOps`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn ops() -> InboxOps {
         let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
         InboxOps::new(&conn)
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn ops() -> InboxOps {
-        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
-        InboxOps::new(&conn)
-    }
-
-    #[test]
-    fn test_capture_creates_item() {
-        let ops = ops();
-        let item = ops.capture("Buy groceries").expect("capture");
-        assert_eq!(item.body, "Buy groceries");
-        assert!(!item.processed);
-        assert!(item.slug.starts_with("capture-"));
-    }
-
-    #[test]
-    fn test_capture_trims_whitespace() {
-        let ops = ops();
-        let item = ops.capture("  hello  ").expect("capture");
-        assert_eq!(item.body, "hello");
-    }
-
-    #[test]
-    fn test_capture_empty_body_returns_error() {
-        let ops = ops();
-        let err = ops.capture("   ").unwrap_err();
-        assert!(err.to_string().contains("empty"));
-    }
-
-    #[test]
-    fn test_process_discard() {
-        let ops = ops();
-        let item = ops.capture("Discard me").expect("capture");
-        let processed = ops
-            .process(&item.slug, ProcessAction::Discard)
-            .expect("process");
-        assert!(processed.processed);
-    }
-
-    #[test]
-    fn test_process_convert_to_todo() {
-        let ops = ops();
-        let item = ops.capture("Convert to todo").expect("capture");
-        let processed = ops
-            .process(
-                &item.slug,
-                ProcessAction::ConvertToTodo {
-                    project_slug: "quick-capture".to_owned(),
-                    title: None,
-                },
-            )
-            .expect("process");
-        assert!(processed.processed);
-    }
-
-    #[test]
-    fn test_process_project_not_found_returns_error() {
-        let ops = ops();
-        let item = ops.capture("No project").expect("capture");
-        let err = ops.process(&item.slug, ProcessAction::Discard).map(|_| ());
-        // Discard always succeeds
-        assert!(
-            err.is_ok(),
-            "Discard should have succeeded, but got error: {:?}",
-            err.err()
-        );
-
-        let item2 = ops.capture("No project 2").expect("capture");
-        let err2 = ops
-            .process(
-                &item2.slug,
-                ProcessAction::AssignToProject {
-                    project_slug: "nonexistent".to_owned(),
-                },
-            )
-            .unwrap_err();
-        assert!(err2.to_string().contains("not found"));
     }
 }

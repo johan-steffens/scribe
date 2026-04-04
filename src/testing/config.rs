@@ -14,7 +14,7 @@ use std::path::PathBuf;
 /// # Example
 ///
 /// ```
-/// use crate::testing::config::TestConfig;
+/// use scribe::testing::config::TestConfig;
 ///
 /// // Fully default config
 /// let config = TestConfig::new();
@@ -56,12 +56,17 @@ impl TestConfig {
     /// `TestConfig::with_db_path()` so the config points to the same temporary
     /// file that the database is using.
     ///
+    /// # Panics
+    ///
+    /// Panics if the temporary directory or database cannot be created.
+    ///
     /// # Example
     ///
     /// ```
-    /// let (config, test_db) = crate::testing::config::TestConfig::with_temp_db();
+    /// let (config, test_db) = scribe::testing::config::TestConfig::with_temp_db();
     /// // Use config with the test...
     /// ```
+    #[must_use]
     pub fn with_temp_db() -> (Self, super::db::TestDb) {
         let dir = tempfile::tempdir().expect("tempdir should succeed");
         let db_path = dir.path().join("test.db");
@@ -83,6 +88,7 @@ impl TestConfig {
     }
 
     /// Sets the `setup` fields to simulate a fully-configured installation.
+    #[must_use]
     pub fn with_setup_completed(mut self) -> Self {
         self.config.setup.daemon_service_installed = true;
         self.config.setup.agent_installed = true;
@@ -90,18 +96,21 @@ impl TestConfig {
     }
 
     /// Sets `notifications_enabled` for the test.
+    #[must_use]
     pub fn with_notifications(mut self, enabled: bool) -> Self {
         self.config.notifications_enabled = enabled;
         self
     }
 
     /// Sets the date format string.
+    #[must_use]
     pub fn with_date_format(mut self, format: impl Into<String>) -> Self {
         self.config.date_format = format.into();
         self
     }
 
     /// Sets the time format string.
+    #[must_use]
     pub fn with_time_format(mut self, format: impl Into<String>) -> Self {
         self.config.time_format = format.into();
         self

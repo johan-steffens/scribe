@@ -30,6 +30,9 @@ sync = [
     "dep:tokio",
     "dep:uuid",
 ]
+# The `test-util` feature exposes internal testing helpers for integration tests.
+# Automatically enabled when running `cargo test`.
+test-util = ["dep:tempfile"]
 
 [dependencies]
 anyhow             = "1"
@@ -64,6 +67,8 @@ reqwest     = { version = "0.12", default-features = false, features = ["json", 
 rpassword   = { version = "7",    optional = true }
 sha2        = { version = "0.10", optional = true }
 uuid        = { version = "1",    features = ["v4", "serde"], optional = true }
+# Optional dep — only compiled when the `test-util` feature is enabled.
+tempfile    = { version = "3", optional = true }
 
 # Platform-specific keyring credential store backends.
 # These features select the appropriate native keystore for each OS.
@@ -92,7 +97,6 @@ assert_cmd = "2"
 predicates = "3"
 reqwest     = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rstest     = "0.23"
-tempfile   = "3"
 tokio      = { version = "1", features = ["rt", "macros"] }
 
 [lints.rust]

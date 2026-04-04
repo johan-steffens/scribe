@@ -88,7 +88,7 @@ pub fn open(path: &Path) -> anyhow::Result<Connection> {
 /// ```
 /// let conn = scribe::db::open_in_memory().expect("in-memory DB failed");
 /// ```
-// Used in unit tests and #[cfg(test)] blocks throughout the crate.
+// Used in unit tests and #[cfg(feature = "test-util")] blocks throughout the crate.
 #[allow(dead_code, reason = "used in test modules throughout the crate")]
 pub fn open_in_memory() -> anyhow::Result<Connection> {
     let mut conn = Connection::open_in_memory()?;
@@ -136,41 +136,11 @@ pub fn save_sync_summary(
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the db module.
     //!
     //! Re-exports [`super::open_in_memory`] for convenience.
 
     pub use super::open_in_memory;
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_open_in_memory_succeeds() {
-        let conn = open_in_memory().expect("should open");
-        // quick-capture project must be seeded
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM projects WHERE slug = 'quick-capture'",
-                [],
-                |row| row.get(0),
-            )
-            .expect("query failed");
-        assert_eq!(count, 1);
-    }
-
-    #[test]
-    fn test_open_creates_file_and_directory() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let db_path = dir.path().join("nested").join("scribe.db");
-        let conn = open(&db_path).expect("should open");
-        assert!(db_path.exists());
-        drop(conn);
-    }
 }

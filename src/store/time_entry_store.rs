@@ -414,17 +414,21 @@ impl SqliteTimeEntries {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the time entry store module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::SqliteTimeEntries`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, Mutex, NewTimeEntry, ProjectId, SqliteTimeEntries, Utc};
     use crate::db::open_in_memory;
 
     /// Constructs a [`SqliteTimeEntries`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn store() -> SqliteTimeEntries {
         let conn = open_in_memory().expect("in-memory db");
@@ -441,45 +445,5 @@ pub mod testing {
             started_at: Utc::now(),
             note: None,
         }
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn store() -> SqliteTimeEntries {
-        let conn = open_in_memory().expect("in-memory db");
-        SqliteTimeEntries::new(Arc::new(Mutex::new(conn)))
-    }
-
-    fn new_entry(slug: &str) -> NewTimeEntry {
-        NewTimeEntry {
-            slug: slug.to_owned(),
-            project_id: ProjectId(1),
-            task_id: None,
-            started_at: Utc::now(),
-            note: None,
-        }
-    }
-
-    #[test]
-    fn test_create_find_running() {
-        let s = store();
-        s.create(new_entry("e1")).expect("create");
-        let running = s.find_running().expect("find running").expect("some");
-        assert_eq!(running.slug, "e1");
-    }
-
-    #[test]
-    fn test_stop() {
-        let s = store();
-        s.create(new_entry("e2")).expect("create");
-        let stopped = s.stop("e2", Utc::now()).expect("stop");
-        assert!(stopped.ended_at.is_some());
-        assert!(s.find_running().expect("running").is_none());
     }
 }

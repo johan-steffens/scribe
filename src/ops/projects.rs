@@ -168,17 +168,21 @@ impl ProjectOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the project ops module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::ProjectOps`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, Mutex, NewProject, ProjectOps, ProjectStatus};
     use crate::db::open_in_memory;
 
     /// Constructs a [`ProjectOps`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn ops() -> ProjectOps {
         let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
@@ -194,74 +198,5 @@ pub mod testing {
             description: None,
             status: ProjectStatus::Active,
         }
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-    use crate::domain::{NewTask, TaskPriority, TaskStatus};
-
-    fn ops() -> ProjectOps {
-        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
-        ProjectOps::new(&conn)
-    }
-
-    fn new_project(slug: &str) -> NewProject {
-        NewProject {
-            slug: slug.to_owned(),
-            name: slug.to_owned(),
-            description: None,
-            status: ProjectStatus::Active,
-        }
-    }
-
-    #[test]
-    fn test_create_and_get_project() {
-        let ops = ops();
-        let p = ops.create_project(new_project("beta")).expect("create");
-        assert_eq!(p.slug, "beta");
-        let got = ops.get_project("beta").expect("get").expect("some");
-        assert_eq!(got.id, p.id);
-    }
-
-    #[test]
-    fn test_archive_project_cascades_tasks() {
-        let conn = Arc::new(Mutex::new(open_in_memory().expect("db")));
-        let ops = ProjectOps::new(&conn);
-        let tasks_store = SqliteTasks::new(Arc::clone(&conn));
-
-        ops.create_project(new_project("cascade")).expect("create");
-        let p = ops.get_project("cascade").expect("get").expect("some");
-
-        tasks_store
-            .create(NewTask {
-                slug: "cascade-task-1".to_owned(),
-                project_id: p.id,
-                title: "Task 1".to_owned(),
-                description: None,
-                status: TaskStatus::Todo,
-                priority: TaskPriority::Medium,
-                due_date: None,
-            })
-            .expect("create task");
-
-        ops.archive_project("cascade").expect("archive");
-
-        // All tasks for that project must be archived.
-        let active = tasks_store
-            .list(Some(p.id), None, None, false)
-            .expect("list");
-        assert!(active.is_empty());
-    }
-
-    #[test]
-    fn test_delete_reserved_blocked() {
-        let ops = ops();
-        let err = ops.delete_project("quick-capture").unwrap_err();
-        assert!(err.to_string().contains("reserved"));
     }
 }

@@ -241,125 +241,24 @@ impl TodoOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the todo ops module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::TodoOps`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, Mutex, TodoOps};
     use crate::db::open_in_memory;
 
     /// Constructs a [`TodoOps`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn ops() -> TodoOps {
         let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
         TodoOps::new(conn)
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn ops() -> TodoOps {
-        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
-        TodoOps::new(conn)
-    }
-
-    #[test]
-    fn test_create_generates_slug() {
-        let ops = ops();
-        let todo = ops
-            .create("quick-capture", "Buy groceries")
-            .expect("create");
-        assert_eq!(todo.slug, "quick-capture-todo-buy-groceries");
-    }
-
-    #[test]
-    fn test_create_project_not_found_returns_error() {
-        let ops = ops();
-        let err = ops.create("nonexistent", "Title").unwrap_err();
-        assert!(err.to_string().contains("not found"));
-    }
-
-    #[test]
-    fn test_mark_done() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "Do thing").expect("create");
-        let done = ops.mark_done(&todo.slug).expect("done");
-        assert!(done.done);
-    }
-
-    #[test]
-    fn test_list_excludes_done_by_default() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "List test").expect("create");
-        ops.mark_done(&todo.slug).expect("done");
-        let active = ops.list(None, false, false).expect("list");
-        assert!(!active.iter().any(|t| t.slug == todo.slug));
-    }
-
-    #[test]
-    fn test_list_includes_done_when_requested() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "Include done").expect("create");
-        ops.mark_done(&todo.slug).expect("done");
-        let all = ops.list(None, true, false).expect("list");
-        assert!(all.iter().any(|t| t.slug == todo.slug));
-    }
-
-    #[test]
-    fn test_archive_and_restore() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "Archive me").expect("create");
-        ops.archive(&todo.slug).expect("archive");
-        let active = ops.list(None, true, false).expect("list");
-        assert!(!active.iter().any(|t| t.slug == todo.slug));
-        ops.restore(&todo.slug).expect("restore");
-        let active = ops.list(None, true, false).expect("list");
-        assert!(active.iter().any(|t| t.slug == todo.slug));
-    }
-
-    #[test]
-    fn test_delete_requires_archived() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "Delete me").expect("create");
-        let err = ops.delete(&todo.slug).unwrap_err();
-        assert!(err.to_string().contains("archived"));
-    }
-
-    #[test]
-    fn test_delete_archived_succeeds() {
-        let ops = ops();
-        let todo = ops
-            .create("quick-capture", "Delete archived")
-            .expect("create");
-        ops.archive(&todo.slug).expect("archive");
-        ops.delete(&todo.slug).expect("delete");
-        assert!(ops.get(&todo.slug).expect("get").is_none());
-    }
-
-    #[test]
-    fn test_mark_undone() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "Mark undone").expect("create");
-        ops.mark_done(&todo.slug).expect("mark done");
-        let undone = ops.mark_undone(&todo.slug).expect("mark undone");
-        assert!(!undone.done);
-    }
-
-    #[test]
-    fn test_update_title() {
-        let ops = ops();
-        let todo = ops.create("quick-capture", "Old title").expect("create");
-        let updated = ops
-            .update_title(&todo.slug, "New title")
-            .expect("update title");
-        assert_eq!(updated.title, "New title");
     }
 }

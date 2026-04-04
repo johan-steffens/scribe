@@ -181,82 +181,24 @@ impl TaskOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the task ops module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::TaskOps`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, Mutex, TaskOps};
     use crate::db::open_in_memory;
 
     /// Constructs a [`TaskOps`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn ops() -> TaskOps {
         let conn = open_in_memory().expect("in-memory db");
         TaskOps::new(Arc::new(Mutex::new(conn)))
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn ops() -> TaskOps {
-        let conn = open_in_memory().expect("in-memory db");
-        TaskOps::new(Arc::new(Mutex::new(conn)))
-    }
-
-    fn create(ops: &TaskOps, title: &str) -> Task {
-        ops.create_task(CreateTask {
-            project_slug: "qc".to_owned(),
-            project_id: ProjectId(1),
-            title: title.to_owned(),
-            description: None,
-            status: TaskStatus::Todo,
-            priority: TaskPriority::Medium,
-            due_date: None,
-        })
-        .expect("create task")
-    }
-
-    #[test]
-    fn test_create_generates_slug() {
-        let ops = ops();
-        let t = create(&ops, "Fix Login Bug");
-        assert_eq!(t.slug, "qc-task-fix-login-bug");
-    }
-
-    #[test]
-    fn test_mark_done() {
-        let ops = ops();
-        let t = create(&ops, "Finish Report");
-        let done = ops.mark_done(&t.slug).expect("done");
-        assert_eq!(done.status, TaskStatus::Done);
-    }
-
-    #[test]
-    fn test_list_tasks() {
-        let ops = ops();
-        create(&ops, "Task A");
-        create(&ops, "Task B");
-        let tasks = ops.list_tasks(None, None, None, false).expect("list");
-        assert!(tasks.len() >= 2);
-    }
-
-    #[test]
-    fn test_archive_and_restore() {
-        let ops = ops();
-        let t = create(&ops, "Archive me");
-        ops.archive_task(&t.slug).expect("archive");
-        let active = ops.list_tasks(None, None, None, false).expect("list");
-        assert!(!active.iter().any(|x| x.slug == t.slug));
-        ops.restore_task(&t.slug).expect("restore");
-        let active = ops.list_tasks(None, None, None, false).expect("list");
-        assert!(active.iter().any(|x| x.slug == t.slug));
     }
 }

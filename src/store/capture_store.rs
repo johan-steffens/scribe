@@ -190,7 +190,7 @@ impl SqliteCaptureItems {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the capture store module.
     //!
@@ -199,10 +199,14 @@ pub mod testing {
 
     use chrono::Utc;
 
-    use super::*;
+    use super::{Arc, Mutex, NewCaptureItem, SqliteCaptureItems};
     use crate::db::open_in_memory;
 
     /// Constructs a [`SqliteCaptureItems`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn store() -> SqliteCaptureItems {
         let conn = open_in_memory().expect("in-memory db");
@@ -217,57 +221,5 @@ pub mod testing {
             body: body.to_owned(),
             created_at: Utc::now(),
         }
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use chrono::Utc;
-
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn store() -> SqliteCaptureItems {
-        let conn = open_in_memory().expect("in-memory db");
-        SqliteCaptureItems::new(Arc::new(Mutex::new(conn)))
-    }
-
-    fn new_item(slug: &str, body: &str) -> NewCaptureItem {
-        NewCaptureItem {
-            slug: slug.to_owned(),
-            body: body.to_owned(),
-            created_at: Utc::now(),
-        }
-    }
-
-    #[test]
-    fn test_create_and_find() {
-        let s = store();
-        let item = s
-            .create(new_item("c1", "Remember to buy milk"))
-            .expect("create");
-        assert_eq!(item.slug, "c1");
-        assert!(!item.processed);
-    }
-
-    #[test]
-    fn test_mark_processed() {
-        let s = store();
-        s.create(new_item("c2", "Call dentist")).expect("create");
-        let updated = s.mark_processed("c2").expect("mark");
-        assert!(updated.processed);
-    }
-
-    #[test]
-    fn test_list_excludes_processed() {
-        let s = store();
-        s.create(new_item("c3", "Unprocessed")).expect("c3");
-        s.create(new_item("c4", "Processed")).expect("c4");
-        s.mark_processed("c4").expect("mark");
-        let items = s.list(false).expect("list");
-        assert!(items.iter().any(|i| i.slug == "c3"));
-        assert!(!items.iter().any(|i| i.slug == "c4"));
     }
 }

@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 /// A temporary test database that is automatically cleaned up on drop.
 ///
-/// Wraps an in-memory SQLite database with all migrations applied. The `quick-capture`
+/// Wraps an in-memory `SQLite` database with all migrations applied. The `quick-capture`
 /// seed project is guaranteed to exist after creation.
 ///
 /// # Differences from `TestDb::tempfile()`
@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 /// # Example
 ///
 /// ```
-/// let test_db = crate::testing::db::TestDb::new();
+/// let test_db = scribe::testing::db::TestDb::new();
 /// let conn = test_db.conn();
 ///
 /// // Use conn with the store/ops layers...
@@ -31,7 +31,6 @@ pub struct TestDb {
     /// Guards the connection behind a mutex for store/ops compatibility.
     conn: Arc<Mutex<rusqlite::Connection>>,
     /// Keeps the temp directory alive for the lifetime of the database.
-    #[allow(dead_code)]
     dir: tempfile::TempDir,
 }
 
@@ -40,6 +39,11 @@ impl TestDb {
     ///
     /// This is the fastest option and is suitable for most unit tests.
     /// The database is freed when this instance is dropped.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
+    #[must_use]
     pub fn new() -> Self {
         let conn = Arc::new(Mutex::new(
             crate::db::open_in_memory().expect("in-memory DB should succeed"),
@@ -55,6 +59,12 @@ impl TestDb {
     /// The file is placed in the OS temp directory and deleted when the
     /// instance is dropped. Use this variant when you need to inspect
     /// the database file directly (e.g., during debugging).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the temporary directory cannot be created or the database
+    /// cannot be opened.
+    #[must_use]
     pub fn tempfile() -> Self {
         let dir = tempfile::tempdir().expect("tempdir should succeed");
         let db_path = dir.path().join("test.db");
@@ -71,6 +81,11 @@ impl TestDb {
     /// The caller is responsible for ensuring `dir` outlives `self`.
     /// This is useful when you need to know the database path (e.g., for pairing
     /// with [`TestConfig::with_db_path`][crate::testing::config::TestConfig::with_db_path]).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the database cannot be opened.
+    #[must_use]
     pub fn new_in_dir(dir: tempfile::TempDir) -> Self {
         let db_path = dir.path().join("test.db");
         let conn = Arc::new(Mutex::new(
@@ -80,6 +95,7 @@ impl TestDb {
     }
 
     /// Returns the path to the database file.
+    #[must_use]
     pub fn db_path(&self) -> std::path::PathBuf {
         self.dir.path().join("test.db")
     }

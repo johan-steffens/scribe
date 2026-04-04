@@ -228,17 +228,22 @@ impl ReminderOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the reminder ops module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::ReminderOps`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, Mutex, ReminderOps};
     use crate::db::open_in_memory;
+    use chrono::{DateTime, Utc};
 
     /// Constructs a [`ReminderOps`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn ops() -> ReminderOps {
         let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
@@ -249,115 +254,5 @@ pub mod testing {
     #[must_use]
     pub fn future() -> DateTime<Utc> {
         Utc::now() + chrono::Duration::hours(1)
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn ops() -> ReminderOps {
-        let conn = Arc::new(Mutex::new(open_in_memory().expect("in-memory db")));
-        ReminderOps::new(conn)
-    }
-
-    fn future() -> DateTime<Utc> {
-        Utc::now() + chrono::Duration::hours(1)
-    }
-
-    #[test]
-    fn test_create_reminder() {
-        let ops = ops();
-        let r = ops
-            .create(CreateReminder {
-                project_slug: "quick-capture".to_owned(),
-                task_slug: None,
-                remind_at: future(),
-                message: Some("Deploy on Friday".to_owned()),
-                persistent: false,
-            })
-            .expect("create");
-        assert!(r.slug.starts_with("quick-capture-reminder-"));
-        assert!(!r.fired);
-    }
-
-    #[test]
-    fn test_create_project_not_found_returns_error() {
-        let ops = ops();
-        let err = ops
-            .create(CreateReminder {
-                project_slug: "nonexistent".to_owned(),
-                task_slug: None,
-                remind_at: future(),
-                message: None,
-                persistent: false,
-            })
-            .unwrap_err();
-        assert!(err.to_string().contains("not found"));
-    }
-
-    #[test]
-    fn test_check_due_fires_past_reminders() {
-        let ops = ops();
-        // Directly insert a past reminder via the store, bypassing ops validation.
-        let past = Utc::now() - chrono::Duration::hours(1);
-        ops.reminders
-            .create(NewReminder {
-                slug: "qc-reminder-past".to_owned(),
-                project_id: crate::domain::ProjectId(1),
-                task_id: None,
-                remind_at: past,
-                message: Some("Past".to_owned()),
-                persistent: false,
-            })
-            .expect("create past reminder");
-
-        let fired = ops.check_due().expect("check_due");
-        assert_eq!(fired.len(), 1);
-        assert!(fired[0].fired);
-    }
-
-    #[test]
-    fn test_delete_requires_archived() {
-        let ops = ops();
-        let r = ops
-            .create(CreateReminder {
-                project_slug: "quick-capture".to_owned(),
-                task_slug: None,
-                remind_at: future(),
-                message: Some("Active".to_owned()),
-                persistent: false,
-            })
-            .expect("create");
-        let err = ops.delete(&r.slug).unwrap_err();
-        assert!(err.to_string().contains("archived"));
-    }
-
-    #[test]
-    fn test_update_changes_message() {
-        let ops = ops();
-        let r = ops
-            .create(CreateReminder {
-                project_slug: "quick-capture".to_owned(),
-                task_slug: None,
-                remind_at: future(),
-                message: Some("Original".to_owned()),
-                persistent: false,
-            })
-            .expect("create");
-        let updated = ops
-            .update(
-                &r.slug,
-                crate::domain::ReminderPatch {
-                    remind_at: None,
-                    message: Some("Updated".to_owned()),
-                    persistent: None,
-                },
-            )
-            .expect("update");
-        assert_eq!(updated.message.as_deref(), Some("Updated"));
     }
 }

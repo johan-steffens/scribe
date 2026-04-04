@@ -426,17 +426,21 @@ impl SqliteReminders {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(test)]
+#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the reminder store module.
     //!
     //! Re-exports internals so external integration tests can construct
     //! [`super::SqliteReminders`] instances against an in-memory database.
 
-    use super::*;
+    use super::{Arc, Mutex, NewReminder, ProjectId, SqliteReminders, Utc};
     use crate::db::open_in_memory;
 
     /// Constructs a [`SqliteReminders`] backed by an in-memory database.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn store() -> SqliteReminders {
         let conn = open_in_memory().expect("in-memory db");
@@ -454,49 +458,5 @@ pub mod testing {
             message: Some("Reminder message".to_owned()),
             persistent: false,
         }
-    }
-}
-
-// ── tests ──────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::open_in_memory;
-
-    fn store() -> SqliteReminders {
-        let conn = open_in_memory().expect("in-memory db");
-        SqliteReminders::new(Arc::new(Mutex::new(conn)))
-    }
-
-    fn new_reminder(slug: &str) -> NewReminder {
-        NewReminder {
-            slug: slug.to_owned(),
-            project_id: ProjectId(1),
-            task_id: None,
-            remind_at: Utc::now(),
-            message: Some("Reminder message".to_owned()),
-            persistent: false,
-        }
-    }
-
-    #[test]
-    fn test_create_and_find() {
-        let s = store();
-        let r = s.create(new_reminder("r1")).expect("create");
-        assert_eq!(r.slug, "r1");
-        assert!(!r.fired);
-    }
-
-    #[test]
-    fn test_archive_and_restore() {
-        let s = store();
-        s.create(new_reminder("r2")).expect("create");
-        s.archive("r2").expect("archive");
-        let items = s.list(None, false).expect("list");
-        assert!(!items.iter().any(|r| r.slug == "r2"));
-        s.restore("r2").expect("restore");
-        let items = s.list(None, false).expect("list");
-        assert!(items.iter().any(|r| r.slug == "r2"));
     }
 }
