@@ -848,7 +848,11 @@ fn reinstall_service(config: &mut Config) -> anyhow::Result<()> {
 fn run_loop(conn: &Arc<Mutex<Connection>>, interval_secs: Option<u64>, config: &Config) -> ! {
     let reminder_interval = Duration::from_secs(interval_secs.unwrap_or(DEFAULT_INTERVAL_SECS));
 
-    tracing::info!(interval_secs = reminder_interval.as_secs(), version = env!("CARGO_PKG_VERSION"), "daemon.start",);
+    tracing::info!(
+        interval_secs = reminder_interval.as_secs(),
+        version = env!("CARGO_PKG_VERSION"),
+        "daemon.start",
+    );
     eprintln!(
         "Scribe v{} daemon running — polling every {}s. Press Ctrl-C to stop.",
         env!("CARGO_PKG_VERSION"),
@@ -1014,8 +1018,15 @@ fn spawn_rest_server_thread(conn: &Arc<Mutex<Connection>>, config: &Config) -> a
             .expect("invariant: REST server task must not fail");
     });
 
-    tracing::info!(port, version = env!("CARGO_PKG_VERSION"), "sync.rest.master.started");
-    eprintln!("Scribe v{} REST sync master listening on port {port}.", env!("CARGO_PKG_VERSION"));
+    tracing::info!(
+        port,
+        version = env!("CARGO_PKG_VERSION"),
+        "sync.rest.master.started"
+    );
+    eprintln!(
+        "Scribe v{} REST sync master listening on port {port}.",
+        env!("CARGO_PKG_VERSION")
+    );
 
     Ok(())
 }
