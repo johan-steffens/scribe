@@ -239,7 +239,6 @@ impl TrackerOps {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the tracker ops module.
     //!

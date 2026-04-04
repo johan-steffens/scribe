@@ -4,6 +4,6 @@
 // The `sync` Cargo feature must be enabled to compile these tests.
 //
 // To run these tests:
-//   cargo test --features sync,test-util --test sync_integration
+//   cargo test --features sync --test sync_integration
 
 mod sync;

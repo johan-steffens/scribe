@@ -425,7 +425,6 @@ impl SqliteReminders {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the reminder store module.
     //!

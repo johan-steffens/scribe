@@ -258,7 +258,6 @@ impl Todos for SqliteTodos {
 
 // ── test helpers ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "test-util")]
 pub mod testing {
     //! Test helpers for the todo store module.
     //!

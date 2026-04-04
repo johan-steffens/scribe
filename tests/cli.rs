@@ -13,6 +13,11 @@ use tempfile::TempDir;
 
 // ── scribe command helper ─────────────────────────────────────────────────────
 
+/// Adds common test environment variables to block real OS integrations.
+fn add_test_env(cmd: &mut Command) {
+    cmd.env("SCRIBE_MOCK_NOTIFY", "1");
+}
+
 /// Returns a `Command` for the `scribe` binary with an isolated DB.
 fn scribe_with_db(dir: &TempDir) -> Command {
     let mut cmd = Command::cargo_bin("scribe").expect("binary not found");
@@ -22,6 +27,7 @@ fn scribe_with_db(dir: &TempDir) -> Command {
         "SCRIBE_TEST_KEYCHAIN_BOOTSTRAP",
         dir.path().join("mock-keychain.json"),
     );
+    add_test_env(&mut cmd);
     cmd.timeout(std::time::Duration::from_secs(5));
     cmd
 }
@@ -35,6 +41,7 @@ fn scribe_with_home(home: &TempDir) -> Command {
         "SCRIBE_TEST_KEYCHAIN_BOOTSTRAP",
         home.path().join("mock-keychain.json"),
     );
+    add_test_env(&mut cmd);
     cmd.timeout(std::time::Duration::from_secs(5));
     cmd
 }
@@ -49,6 +56,7 @@ fn scribe_with_config(home: &TempDir, db_path: &TempDir) -> Command {
         "SCRIBE_TEST_KEYCHAIN_BOOTSTRAP",
         db_path.path().join("mock-keychain.json"),
     );
+    add_test_env(&mut cmd);
     cmd.timeout(std::time::Duration::from_secs(5));
     cmd
 }
