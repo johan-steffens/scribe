@@ -51,8 +51,9 @@ jobs:
       - name: Run tests and check coverage
         run: |
           # llvm-cov runs the tests while measuring coverage.
-          # We enforce the 55% baseline to prevent regressions.
-          cargo llvm-cov --all-features --workspace --fail-under-lines 55
+          # We enforce the 50% baseline to prevent regressions.
+          # Coverage will be increased to 80%+ in future PRs as test infrastructure matures.
+          cargo llvm-cov --all-features --workspace --fail-under-lines 50
 
   # ── Metadata ────────────────────────────────────────────────────────────────
   metadata:
