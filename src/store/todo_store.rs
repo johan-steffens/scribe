@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
 use rusqlite::types::ToSql;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 
 use crate::domain::{NewTodo, ProjectId, Todo, TodoId, TodoPatch, Todos};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
@@ -37,6 +37,7 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
     })
 }
 
+#[cfg(feature = "sync")]
 fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRow, String)> {
     Ok((
         RawRow {
