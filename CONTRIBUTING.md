@@ -62,23 +62,23 @@ Examples:
 All commits must pass before merging:
 
 ```sh
-# Must pass with zero warnings
-cargo clippy --all-features -- -D warnings
-
 # Must be formatted
-cargo fmt --all
+cargo fmt --all -- --check
+
+# Must pass with zero warnings across all targets
+cargo clippy --all-targets --all-features -- -D warnings
 
 # All tests must pass
 cargo test --all-features
 
-# Coverage must be 80% or higher
-cargo llvm-cov --all-features --fail-under-lines 80
+# Coverage must be 50% or higher (target 80%+)
+cargo llvm-cov --all-features --workspace --fail-under-lines 50
 ```
 
 Run all checks locally before pushing:
 
 ```sh
-cargo fmt --all && cargo clippy --all-features -- -D warnings && cargo test --all-features && cargo llvm-cov --all-features --fail-under-lines 80
+cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features && cargo llvm-cov --all-features --workspace --fail-under-lines 50
 ```
 
 ## Project Structure

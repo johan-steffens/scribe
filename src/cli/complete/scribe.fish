@@ -6,31 +6,33 @@
 complete -c scribe -f
 
 # ── top-level subcommands ─────────────────────────────────────────────────────
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a project    -d 'Manage projects'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a task       -d 'Manage tasks'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a todo       -d 'Manage todos'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a track      -d 'Time tracking'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a capture    -d 'Quickly capture a thought into the inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a inbox      -d 'Manage the quick-capture inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a reminder   -d 'Manage reminders'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+  -a report     -d 'Generate reports (summary or domain-specific)'
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a setup      -d 'First-run wizard and setup status'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a service    -d 'Manage the background daemon service'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a sync       -d 'Sync state to or from a remote provider'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a agent      -d 'Install skill files for AI coding agents'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a completions -d 'Print a shell completion script for the given shell'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
   -a help       -d 'Print this message or the help of the given subcommand(s)'
 
 # ── global flags ──────────────────────────────────────────────────────────────
@@ -388,6 +390,78 @@ complete -c scribe -n '__fish_seen_subcommand_from reminder; and __fish_seen_sub
   -l output -d 'Output format' -r -a 'text json'
 complete -c scribe -n '__fish_seen_subcommand_from reminder; and __fish_seen_subcommand_from delete' \
   -a '(scribe __complete reminders 2>/dev/null)' -d 'Reminder slug'
+
+# ── report subcommands ────────────────────────────────────────────────────────
+complete -c scribe -n '__fish_seen_subcommand_from report; and not __fish_seen_subcommand_from project task todo inbox reminders track help' \
+  -a project   -d 'Report on a specific project'
+complete -c scribe -n '__fish_seen_subcommand_from report; and not __fish_seen_subcommand_from project task todo inbox reminders track help' \
+  -a task     -d 'Report on a specific task'
+complete -c scribe -n '__fish_seen_subcommand_from report; and not __fish_seen_subcommand_from project task todo inbox reminders track help' \
+  -a todo     -d 'Report on a specific todo'
+complete -c scribe -n '__fish_seen_subcommand_from report; and not __fish_seen_subcommand_from project task todo inbox reminders track help' \
+  -a inbox    -d 'Report on inbox status'
+complete -c scribe -n '__fish_seen_subcommand_from report; and not __fish_seen_subcommand_from project task todo inbox reminders track help' \
+  -a reminders -d 'Report on reminders'
+complete -c scribe -n '__fish_seen_subcommand_from report; and not __fish_seen_subcommand_from project task todo inbox reminders track help' \
+  -a track    -d 'Time tracking report'
+
+# report project
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from project' \
+  -l today    -d 'Restrict to today'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from project' \
+  -l week     -d 'Restrict to this week'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from project' \
+  -l output   -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from project' \
+  -l detailed -d 'Include detailed information'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from project' \
+  -a '(scribe __complete projects 2>/dev/null)' -d 'Project slug'
+
+# report task
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from task' \
+  -l output   -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from task' \
+  -l detailed -d 'Include detailed information'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from task' \
+  -a '(scribe __complete tasks 2>/dev/null)' -d 'Task slug'
+
+# report todo
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from todo' \
+  -l output   -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from todo' \
+  -l detailed -d 'Include detailed information'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from todo' \
+  -a '(scribe __complete todos 2>/dev/null)' -d 'Todo slug'
+
+# report inbox
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from inbox' \
+  -l today    -d 'Restrict to today'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from inbox' \
+  -l week     -d 'Restrict to this week'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from inbox' \
+  -l output   -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from inbox' \
+  -l detailed -d 'Include detailed information'
+
+# report reminders
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from reminders' \
+  -l today    -d 'Restrict to today'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from reminders' \
+  -l week     -d 'Restrict to this week'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from reminders' \
+  -l output   -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from reminders' \
+  -l detailed -d 'Include detailed information'
+
+# report track
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from track' \
+  -l today    -d 'Restrict to today'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from track' \
+  -l week     -d 'Restrict to this week'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from track' \
+  -l project  -d 'Filter by project slug' -r -a '(scribe __complete projects 2>/dev/null)'
+complete -c scribe -n '__fish_seen_subcommand_from report; and __fish_seen_subcommand_from track' \
+  -l output   -d 'Output format' -r -a 'text json'
 
 # ── agent subcommands ─────────────────────────────────────────────────────────
 complete -c scribe -n '__fish_seen_subcommand_from agent; and not __fish_seen_subcommand_from install help' \

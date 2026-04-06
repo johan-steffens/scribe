@@ -21,6 +21,8 @@ pub mod parse;
 pub mod project;
 pub mod prompt;
 pub mod reminder;
+pub mod report;
+pub mod report_handlers;
 pub mod service;
 pub mod setup;
 #[cfg(feature = "sync")]
@@ -43,6 +45,8 @@ pub use inbox::InboxCommand;
 pub use project::ProjectCommand;
 #[doc(inline)]
 pub use reminder::ReminderCommand;
+#[doc(inline)]
+pub use report::ReportCommand;
 #[doc(inline)]
 pub use service::ServiceCommand;
 #[doc(inline)]
@@ -90,6 +94,8 @@ pub enum Commands {
     Inbox(InboxCommand),
     /// Manage reminders.
     Reminder(ReminderCommand),
+    /// Generate reports (summary or domain-specific).
+    Report(ReportCommand),
     /// Configure Scribe features interactively (first-run wizard).
     ///
     /// On first run, presents a wizard to set up optional features such as

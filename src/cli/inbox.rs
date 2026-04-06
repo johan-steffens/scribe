@@ -1,9 +1,10 @@
 //! CLI subcommands for the quick-capture inbox (`scribe inbox …`).
 //!
-//! Each subcommand maps to an operation in [`crate::ops::InboxOps`].
-//! The `process` subcommand is interactive (reads from stdin) unless
-//! `--output json` is passed.  When stdin is a TTY, tab completion for
-//! project slugs is provided via [`crate::cli::prompt`].
+//! Each subcommand maps to an operation in [`crate::ops::InboxOps`].  The
+//! `process` subcommand is interactive (reads from stdin) unless `--output json`
+//! is passed.  When stdin is a TTY, tab completion for project slugs is provided
+//! via [`crate::cli::prompt`].  The `report` subcommand is an alias for
+//! `scribe report inbox`.
 
 use std::sync::{Arc, Mutex};
 
@@ -12,8 +13,10 @@ use rusqlite::Connection;
 
 use crate::cli::project::OutputFormat;
 use crate::cli::prompt;
-use crate::ops::InboxOps;
+use crate::cli::report::{ReportCommand, ReportSubcommand, ReportSubcommandCommon};
+use crate::cli::report_handlers::handle_report as report_handle_report;
 use crate::ops::inbox::ProcessAction;
+use crate::ops::{InboxOps, ProjectOps};
 
 use std::io::{BufRead, Write};
 
@@ -34,6 +37,8 @@ pub enum InboxSubcommand {
     List(InboxList),
     /// Process an inbox item interactively.
     Process(InboxProcess),
+    /// Generate a report for the inbox (alias for `scribe report inbox`).
+    Report(InboxReport),
 }
 
 // ── subcommand structs ─────────────────────────────────────────────────────
@@ -61,12 +66,30 @@ pub struct InboxProcess {
     pub output: OutputFormat,
 }
 
+/// Arguments for `scribe inbox report`.
+#[derive(Debug, Args)]
+pub struct InboxReport {
+    /// Restrict the report to items created today.
+    #[arg(long)]
+    pub today: bool,
+    /// Restrict the report to items created this week.
+    #[arg(long)]
+    pub week: bool,
+    /// Output format.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+    /// Include detailed information in the report.
+    #[arg(long)]
+    pub detailed: bool,
+}
+
 // ── dispatch ───────────────────────────────────────────────────────────────
 
 /// Executes an `inbox` subcommand against the given ops layer.
 ///
 /// `conn` is forwarded to interactive prompts so that tab completion can
-/// query the database for project slugs.
+/// query the database for project slugs. It is also required for the `report`
+/// subcommand which delegates to [`crate::cli::report_handlers::handle_report`].
 ///
 /// # Errors
 ///
@@ -74,11 +97,13 @@ pub struct InboxProcess {
 pub fn run(
     cmd: &InboxCommand,
     ops: &InboxOps,
+    project_ops: &ProjectOps,
     conn: &Arc<Mutex<Connection>>,
 ) -> anyhow::Result<()> {
     match &cmd.subcommand {
         InboxSubcommand::List(args) => handle_list(args, ops),
         InboxSubcommand::Process(args) => handle_process(args, ops, conn),
+        InboxSubcommand::Report(args) => handle_report(args, project_ops, conn),
     }
 }
 
@@ -179,4 +204,26 @@ fn handle_process(
     let processed = ops.process(&args.slug, action)?;
     println!("Processed: {}", processed.slug);
     Ok(())
+}
+
+/// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
+/// from the `InboxReport` arguments.
+fn handle_report(
+    args: &InboxReport,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
+    let cmd = ReportCommand {
+        subcommand: Some(ReportSubcommand::Inbox {
+            common: ReportSubcommandCommon {
+                output: args.output.clone(),
+                detailed: args.detailed,
+            },
+        }),
+        today: args.today,
+        week: args.week,
+        output: args.output.clone(),
+        detailed: args.detailed,
+    };
+    report_handle_report(&cmd, Arc::clone(conn), project_ops)
 }

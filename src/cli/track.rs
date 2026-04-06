@@ -3,7 +3,10 @@
 //! Each subcommand maps to an operation in [`crate::ops::TrackerOps`].
 //! All subcommands support `--output json` for machine-readable output.
 
+use std::sync::{Arc, Mutex};
+
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 
 use crate::cli::project::OutputFormat;
 use crate::ops::{ProjectOps, TaskOps, TrackerOps};
@@ -88,7 +91,9 @@ pub struct TrackReport {
 /// Executes a `track` subcommand against the given ops layers.
 ///
 /// `project_ops` is used to resolve project slugs, `task_ops` to resolve task
-/// slugs. Prints results to stdout; errors are propagated to the caller.
+/// slugs. `conn` is required for the `report` subcommand which delegates to the
+/// centralized reporting system. Prints results to stdout; errors are propagated
+/// to the caller.
 ///
 /// # Errors
 ///
@@ -98,12 +103,13 @@ pub fn run(
     ops: &TrackerOps,
     project_ops: &ProjectOps,
     task_ops: &TaskOps,
+    conn: &Arc<Mutex<Connection>>,
 ) -> anyhow::Result<()> {
     match &cmd.subcommand {
         TrackSubcommand::Start(args) => handlers::handle_start(args, ops, task_ops),
         TrackSubcommand::Stop(args) => handlers::handle_stop(args, ops),
         TrackSubcommand::Status(args) => handlers::handle_status(args, ops),
-        TrackSubcommand::Report(args) => handlers::handle_report(args, ops, project_ops),
+        TrackSubcommand::Report(args) => handlers::handle_report(args, project_ops, conn),
     }
 }
 

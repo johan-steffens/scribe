@@ -480,6 +480,10 @@ impl Config {
             config.path = %path.display(),
             "config loaded",
         );
+        #[allow(
+            unused_mut,
+            reason = "mutation occurs inside #[cfg(feature = \"sync\")] block"
+        )]
         let mut cfg = Self::from_raw(raw);
 
         #[cfg(feature = "sync")]

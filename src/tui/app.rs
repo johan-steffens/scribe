@@ -34,6 +34,7 @@ use rusqlite::Connection;
 
 use crate::domain::TimeEntry;
 use crate::ops::TrackerOps;
+use crate::ops::reporting::SummaryReport;
 use crate::tui::types::{
     CaptureViewState, EntryViewState, Modal, ProjectViewState, ReminderViewState, TaskViewState,
     TodoViewState, ViewState,
@@ -89,6 +90,8 @@ pub struct App {
     pub captures: CaptureViewState,
     /// Per-view list state for reminders.
     pub reminders: ReminderViewState,
+    /// Summary report for the dashboard system overview.
+    pub summary: Option<SummaryReport>,
     /// Shared database connection used to refresh data.
     pub(super) db: Arc<Mutex<Connection>>,
 }
@@ -127,6 +130,7 @@ impl App {
             entries: ViewState::new(),
             captures: ViewState::new(),
             reminders: ViewState::new(),
+            summary: None,
             db,
         };
         app.refresh();
@@ -144,6 +148,7 @@ impl App {
         refresh::refresh_entries(self);
         refresh::refresh_captures(self);
         refresh::refresh_reminders(self);
+        refresh::refresh_summary(self);
     }
 
     /// Refreshes the active timer status from the database.

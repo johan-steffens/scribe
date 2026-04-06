@@ -37,6 +37,7 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
     })
 }
 
+#[cfg(feature = "sync")]
 fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRow, String)> {
     Ok((
         RawRow {

@@ -14,10 +14,12 @@
 //! | [`tracker`] | Timer start/stop, duration computation, reports |
 //! | [`inbox`] | Quick-capture and inbox processing |
 //! | [`reminders`] | Reminder scheduling and due-check |
+//! | [`reporting`] | Cross-domain summary and project reports |
 
 pub mod inbox;
 pub mod projects;
 pub mod reminders;
+pub mod reporting;
 pub mod tasks;
 pub mod todos;
 pub mod tracker;
@@ -28,6 +30,8 @@ pub use inbox::InboxOps;
 pub use projects::ProjectOps;
 #[doc(inline)]
 pub use reminders::ReminderOps;
+#[doc(inline)]
+pub use reporting::ReportingOps;
 #[doc(inline)]
 pub use tasks::TaskOps;
 #[doc(inline)]

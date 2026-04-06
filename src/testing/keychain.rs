@@ -88,7 +88,11 @@ pub fn set_secret(provider: &str, field: &str, secret: &str) -> anyhow::Result<(
 
     map.insert(format!("{provider}.{field}"), secret.to_owned());
     let json = serde_json::to_string(&map)?;
-    std::fs::write(&path, json)?;
+
+    // Atomic write via temp file + rename to avoid race conditions with readers.
+    let temp_path = path.with_extension("tmp");
+    std::fs::write(&temp_path, json)?;
+    std::fs::rename(temp_path, path)?;
 
     Ok(())
 }

@@ -1,11 +1,17 @@
 //! CLI subcommands for managing projects (`scribe project …`).
 //!
-//! Each subcommand maps to an operation in [`crate::ops::ProjectOps`].
-//! All subcommands support `--output json` for machine-readable output.
+//! Each subcommand maps to an operation in [`crate::ops::ProjectOps`].  All
+//! subcommands support `--output json` for machine-readable output.  The `report`
+//! subcommand is an alias for `scribe report project …`.
+
+use std::sync::{Arc, Mutex};
 
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 use serde_json::json;
 
+use crate::cli::report::{ReportCommand, ReportSubcommand, ReportSubcommandCommon};
+use crate::cli::report_handlers::handle_report as report_handle_report;
 use crate::domain::{NewProject, ProjectPatch, ProjectStatus};
 use crate::ops::ProjectOps;
 
@@ -46,6 +52,8 @@ pub enum ProjectSubcommand {
     Restore(ProjectRestore),
     /// Delete a project (must be empty or archived first).
     Delete(ProjectDelete),
+    /// Generate a report for a specific project (alias for `scribe report project`).
+    Report(ProjectReport),
 }
 
 // ── subcommand structs ─────────────────────────────────────────────────────
@@ -142,6 +150,25 @@ pub struct ProjectDelete {
     pub output: OutputFormat,
 }
 
+/// Arguments for `scribe project report`.
+#[derive(Debug, Args)]
+pub struct ProjectReport {
+    /// Project slug to report on.
+    pub slug: String,
+    /// Restrict the report to items due or created today.
+    #[arg(long)]
+    pub today: bool,
+    /// Restrict the report to items due or created this week.
+    #[arg(long)]
+    pub week: bool,
+    /// Output format.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+    /// Include detailed information in the report.
+    #[arg(long)]
+    pub detailed: bool,
+}
+
 // ── clap impl for ProjectStatus ────────────────────────────────────────────
 
 impl clap::ValueEnum for ProjectStatus {
@@ -162,13 +189,18 @@ impl clap::ValueEnum for ProjectStatus {
 
 /// Executes a `project` subcommand against the given ops layer.
 ///
-/// Prints results to stdout and errors to stderr. Returns `Ok(())` on
-/// success or an error that the caller converts to an exit code.
+/// `conn` is required when the `report` subcommand is used (it delegates to
+/// [`crate::cli::report_handlers::handle_report`]). Prints results to stdout
+/// and errors to stderr. Returns `Ok(())` on success.
 ///
 /// # Errors
 ///
 /// Returns an error if the operation fails (e.g. project not found, DB error).
-pub fn run(cmd: &ProjectCommand, ops: &ProjectOps) -> anyhow::Result<()> {
+pub fn run(
+    cmd: &ProjectCommand,
+    ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     match &cmd.subcommand {
         ProjectSubcommand::Add(args) => handle_add(args, ops),
         ProjectSubcommand::List(args) => handle_list(args, ops),
@@ -177,6 +209,7 @@ pub fn run(cmd: &ProjectCommand, ops: &ProjectOps) -> anyhow::Result<()> {
         ProjectSubcommand::Archive(args) => handle_archive(args, ops),
         ProjectSubcommand::Restore(args) => handle_restore(args, ops),
         ProjectSubcommand::Delete(args) => handle_delete(args, ops),
+        ProjectSubcommand::Report(args) => handle_report(args, conn),
     }
 }
 
@@ -289,4 +322,24 @@ fn handle_delete(args: &ProjectDelete, ops: &ProjectOps) -> anyhow::Result<()> {
         OutputFormat::Text => println!("Deleted project: {}", args.slug),
     }
     Ok(())
+}
+
+/// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
+/// from the `ProjectReport` arguments.
+fn handle_report(args: &ProjectReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+    let cmd = ReportCommand {
+        subcommand: Some(ReportSubcommand::Project {
+            slug: args.slug.clone(),
+            common: ReportSubcommandCommon {
+                output: args.output.clone(),
+                detailed: args.detailed,
+            },
+        }),
+        today: args.today,
+        week: args.week,
+        output: args.output.clone(),
+        detailed: args.detailed,
+    };
+    let project_ops = ProjectOps::new(conn);
+    report_handle_report(&cmd, Arc::clone(conn), &project_ops)
 }

@@ -159,6 +159,46 @@ _scribe() {
     esac
   }
 
+  _scribe_args_report() {
+    case $words[1] in
+    (project)
+      _arguments \
+        '--today[Restrict to today]' \
+        '--week[Restrict to this week]' \
+        '--output=[Output format]:format:(text json)' \
+        '--detailed[Include detailed information]' \
+        ':slug:_scribe_complete_projects' ;;
+    (task)
+      _arguments \
+        '--output=[Output format]:format:(text json)' \
+        '--detailed[Include detailed information]' \
+        ':slug:_scribe_complete_tasks' ;;
+    (todo)
+      _arguments \
+        '--output=[Output format]:format:(text json)' \
+        '--detailed[Include detailed information]' \
+        ':slug:_scribe_complete_todos' ;;
+    (inbox)
+      _arguments \
+        '--today[Restrict to today]' \
+        '--week[Restrict to this week]' \
+        '--output=[Output format]:format:(text json)' \
+        '--detailed[Include detailed information]' ;;
+    (reminders)
+      _arguments \
+        '--today[Restrict to today]' \
+        '--week[Restrict to this week]' \
+        '--output=[Output format]:format:(text json)' \
+        '--detailed[Include detailed information]' ;;
+    (track)
+      _arguments \
+        '--today[Restrict to today]' \
+        '--week[Restrict to this week]' \
+        '--project=[Project slug]:project:_scribe_complete_projects' \
+        '--output=[Output format]:format:(text json)' ;;
+    esac
+  }
+
   # ── subcommand listers ───────────────────────────────────────────────────
   _scribe_list_project_subs() {
     local -a s; s=(
@@ -210,6 +250,17 @@ _scribe() {
     )
     _describe -t commands 'reminder subcommands' s
   }
+  _scribe_list_report_subs() {
+    local -a s; s=(
+      'project:Report on a specific project'
+      'task:Report on a specific task'
+      'todo:Report on a specific todo'
+      'inbox:Report on inbox status'
+      'reminders:Report on reminders'
+      'track:Time tracking report'
+    )
+    _describe -t commands 'report subcommands' s
+  }
 
   # ── top-level dispatch ───────────────────────────────────────────────────
   local context state state_descr line
@@ -223,6 +274,7 @@ _scribe() {
     'capture:Quickly capture a thought into the inbox'
     'inbox:Manage the quick-capture inbox'
     'reminder:Manage reminders'
+    'report:Generate reports (summary or domain-specific)'
     'setup:First-run wizard and setup status'
     'service:Manage the background daemon service'
     'sync:Sync state to or from a remote provider'
@@ -290,6 +342,12 @@ _scribe() {
         _scribe_list_reminder_subs
       else
         _scribe_args_reminder
+      fi ;;
+    (report)
+      if (( CURRENT == 1 )); then
+        _scribe_list_report_subs
+      else
+        _scribe_args_report
       fi ;;
     (agent)
       if (( CURRENT == 1 )); then

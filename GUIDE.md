@@ -405,6 +405,163 @@ for archiving individual time entries.
 
 ---
 
+## Reporting
+
+The `scribe report` command provides cross-domain reports for productivity
+insights. Use it without arguments for a summary, or with a domain subcommand
+for focused reports.
+
+### Summary Report
+
+```sh
+# Overall summary (default — all time)
+scribe report
+
+# Summary filtered to today
+scribe report --today
+
+# Summary filtered to this week
+scribe report --week
+
+# Detailed summary with more information
+scribe report --detailed
+
+# JSON output for scripting
+scribe report --output json
+```
+
+Example text output:
+
+```
+Scribe Summary Report (2026-04-06)
+────────────────────────────────────────────────────────────
+Projects:     11 active
+Tasks:        45 pending, 3 overdue
+Todos:        8 open
+Inbox:        4 unprocessed items
+Reminders:    2 active
+Time Tracked: 6h 42m
+────────────────────────────────────────────────────────────
+```
+
+### Project Report
+
+```sh
+# Report on a specific project
+scribe report project payments
+
+# With time filter
+scribe report project payments --week
+
+# Detailed output
+scribe report project payments --detailed
+
+# JSON output
+scribe report project payments --output json
+```
+
+Example text output:
+
+```
+Project Report: Payments (payments)
+Status: active | Created: 2026-04-01
+────────────────────────────────────────────────────────────
+Pending Tasks:
+- fix: stripe-webhook-retry-logic (high)
+- feat: add-paypal-support (medium)
+
+Open Todos:
+- Verify API keys
+- Update documentation
+
+Tracked Time:
+- payments-entry-20260401-140000    2h 30m
+- payments-entry-20260402-091522    1h 45m
+────────────────────────────────────────────────────────────
+Total Project Time: 4h 15m
+Completion: 65%
+```
+
+### Task Report
+
+```sh
+# Report on a specific task
+scribe report task payments-task-fix-login
+
+# Detailed output
+scribe report task payments-task-fix-login --detailed
+
+# JSON output
+scribe report task payments-task-fix-login --output json
+```
+
+Example text output:
+
+```
+Task Report: fix-login (payments-task-fix-login)
+Project: payments | Priority: high | Status: in_progress
+────────────────────────────────────────────────────────────
+Lifecycle:
+- 2026-04-05 09:00: Created
+
+Related Time Tracking:
+- payments-entry-20260405-101522    1h 20m
+- payments-entry-20260406-083000    0h 45m
+────────────────────────────────────────────────────────────
+Total Task Time: 2h 05m
+```
+
+### Inbox Report
+
+```sh
+# Inbox status summary
+scribe report inbox
+
+# With time filter
+scribe report inbox --today
+
+# JSON output
+scribe report inbox --output json
+```
+
+### Reminders Report
+
+```sh
+# Reminders status summary
+scribe report reminders
+
+# With time filter
+scribe report reminders --today
+
+# JSON output
+scribe report reminders --output json
+```
+
+### Time Tracking Report (alias)
+
+```sh
+# Equivalent to `scribe track report`
+scribe report track --week
+
+# Filter by project
+scribe report track --project payments
+
+# Combine filters
+scribe report track --week --project payments --output json
+```
+
+### Flag Reference
+
+| Flag | Description | Applies To |
+|------|-------------|------------|
+| `--today` | Filter to current calendar day | All |
+| `--week` | Filter to current week (Mon–Sun) | All |
+| `--output json` | Machine-readable JSON output | All |
+| `--detailed` | Include full details and notes | All |
+| `--project <slug>` | Filter to specific project | `track` |
+
+---
+
 ## Quick Capture and Inbox
 
 ### Capturing a thought

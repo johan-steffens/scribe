@@ -431,6 +431,10 @@ fn test_tracker_ops_start_and_stop_timer() {
 }
 
 #[test]
+#[allow(
+    deprecated,
+    reason = "testing legacy report method for MCP compatibility"
+)]
 fn test_tracker_ops_report_empty() {
     let ctx = TestContext::new();
 

@@ -1,10 +1,11 @@
-//! Dashboard view — today's tasks and active timer panel.
+//! Dashboard view — today's tasks, active timer, and system overview.
 //!
-//! The dashboard is split into two side-by-side panels:
+//! The dashboard is split into three side-by-side panels:
 //! - **Left** — "Today's Tasks": active tasks with a due date of today or
 //!   earlier, sorted urgent-first.
-//! - **Right** — "Active Timer": running timer details, or a placeholder hint
+//! - **Middle** — "Active Timer": running timer details, or a placeholder hint
 //!   if no timer is active.
+//! - **Right** — "System Overview": summary statistics across all domains.
 //!
 //! This is a pure rendering function; no state is mutated here.
 
@@ -23,14 +24,21 @@ use crate::tui::components::table;
 
 /// Renders the dashboard into `area`.
 ///
-/// The area is split horizontally into a left task panel and a right timer
-/// panel. Data is read from `app` with no DB calls.
+/// The area is split into three columns:
+/// - Left: "Today's Tasks" (active tasks due today or overdue)
+/// - Middle: "Active Timer" (running timer details)
+/// - Right: "System Overview" (summary statistics)
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
-    let panels =
-        Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)]).split(area);
+    let panels = Layout::horizontal([
+        Constraint::Percentage(50),
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+    ])
+    .split(area);
 
     render_today_tasks(frame, panels[0], app);
     render_active_timer(frame, panels[1], app);
+    render_system_overview(frame, panels[2], app);
 }
 
 // ── private helpers ────────────────────────────────────────────────────────
@@ -165,13 +173,85 @@ fn render_no_timer(frame: &mut Frame, area: Rect) {
             " Press [Space] to start a timer",
             Style::default().fg(Color::DarkGray),
         )),
-        Line::from(Span::styled(
-            " (Phase 4)",
-            Style::default().fg(Color::DarkGray),
-        )),
     ];
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, area);
+}
+
+/// Renders the "System Overview" right panel with summary statistics.
+fn render_system_overview(frame: &mut Frame, area: Rect, app: &App) {
+    let block = Block::default()
+        .title(" System Overview ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let Some(summary) = &app.summary else {
+        let msg = Paragraph::new("  Loading...").style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(msg, inner);
+        return;
+    };
+
+    let total_time = summary.total_time_tracked;
+    let hours = total_time.num_hours();
+    let mins = total_time.num_minutes() % 60;
+
+    let lines: Vec<Line<'_>> = vec![
+        Line::from(vec![
+            Span::styled(" Projects:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", summary.active_projects),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(" Pending:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", summary.pending_tasks),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(" Open Todos:  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", summary.open_todos),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(" Inbox Items: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", summary.items_in_inbox),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(" Time Today:  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{hours}h {mins}m"),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
 }
 
 // ── utilities ──────────────────────────────────────────────────────────────
