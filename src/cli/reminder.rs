@@ -165,7 +165,7 @@ pub fn run(
         ReminderSubcommand::Archive(args) => handlers::handle_archive(args, ops),
         ReminderSubcommand::Restore(args) => handlers::handle_restore(args, ops),
         ReminderSubcommand::Delete(args) => handlers::handle_delete(args, ops),
-        ReminderSubcommand::Report(args) => handle_report(args, conn),
+        ReminderSubcommand::Report(args) => handle_report(args, project_ops, conn),
     }
 }
 
@@ -176,7 +176,11 @@ mod handlers;
 
 /// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
 /// from the `ReminderReport` arguments.
-fn handle_report(args: &ReminderReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+fn handle_report(
+    args: &ReminderReport,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     let cmd = ReportCommand {
         subcommand: Some(ReportSubcommand::Reminders {
             common: ReportSubcommandCommon {
@@ -189,5 +193,5 @@ fn handle_report(args: &ReminderReport, conn: &Arc<Mutex<Connection>>) -> anyhow
         output: args.output.clone(),
         detailed: args.detailed,
     };
-    report_handle_report(&cmd, Arc::clone(conn))
+    report_handle_report(&cmd, Arc::clone(conn), project_ops)
 }

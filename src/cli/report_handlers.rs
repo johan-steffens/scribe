@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use crate::cli::project::OutputFormat;
 use crate::cli::report::{ReportCommand, ReportSubcommand};
+use crate::ops::ProjectOps;
 use crate::ops::reporting::{ProjectReport, ReportingOps, SummaryReport, TaskReport};
 
 /// The separator line used in text-mode reports.
@@ -72,7 +73,11 @@ fn compute_time_window(today: bool, week: bool) -> (chrono::DateTime<Utc>, chron
 /// # Errors
 ///
 /// Returns an error if the database query fails or the requested entity is not found.
-pub fn handle_report(cmd: &ReportCommand, conn: Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+pub fn handle_report(
+    cmd: &ReportCommand,
+    conn: Arc<Mutex<Connection>>,
+    project_ops: &ProjectOps,
+) -> anyhow::Result<()> {
     let ops = ReportingOps::new(conn);
 
     match &cmd.subcommand {
@@ -91,6 +96,14 @@ pub fn handle_report(cmd: &ReportCommand, conn: Arc<Mutex<Connection>>) -> anyho
         }
         Some(ReportSubcommand::Todo { slug, common }) => {
             handle_todo_report_impl(cmd, &ops, slug, &common.output, common.detailed)
+        }
+        Some(ReportSubcommand::Track {
+            today,
+            week,
+            project,
+            output,
+        }) => {
+            handle_track_report_impl(&ops, project_ops, *today, *week, project.as_deref(), output)
         }
     }
 }
@@ -483,6 +496,69 @@ fn handle_todo_report_impl(
         OutputFormat::Text => {
             println!("Todo-specific reports are not yet implemented.");
             println!("Use `scribe todo list` to see all todos.");
+        }
+    }
+    Ok(())
+}
+
+/// Handler for time tracking reports via `scribe report track`.
+///
+/// This provides the same functionality as `scribe track report`, delegating
+/// to `ReportingOps::time_report` for data retrieval.
+fn handle_track_report_impl(
+    ops: &ReportingOps,
+    project_ops: &ProjectOps,
+    today: bool,
+    week: bool,
+    project_slug: Option<&str>,
+    output: &OutputFormat,
+) -> anyhow::Result<()> {
+    let (since, until) = compute_time_window(today, week);
+
+    let project_id = match project_slug {
+        Some(slug) => {
+            let project = project_ops
+                .get_project(slug)?
+                .ok_or_else(|| anyhow::anyhow!("project '{slug}' not found"))?;
+            Some(project.id)
+        }
+        None => None,
+    };
+
+    let entries = ops.time_report(project_id, since, until)?;
+
+    match output {
+        OutputFormat::Json => {
+            let items: Vec<_> = entries
+                .iter()
+                .map(|(e, d)| {
+                    serde_json::json!({
+                        "slug": e.slug,
+                        "started_at": e.started_at,
+                        "ended_at": e.ended_at,
+                        "duration_seconds": d.num_seconds(),
+                        "note": e.note,
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&items)?);
+        }
+        OutputFormat::Text => {
+            if entries.is_empty() {
+                println!("No time entries found.");
+            } else {
+                let total: Duration = entries.iter().map(|(_, d)| *d).sum();
+                for (e, d) in &entries {
+                    let mins = d.num_minutes();
+                    let secs = d.num_seconds() % 60;
+                    let note = e.note.as_deref().unwrap_or("");
+                    println!("{:<45} {mins:>4}m {secs:02}s  {}", e.slug, note,);
+                }
+                let total_mins = total.num_minutes();
+                let total_secs = total.num_seconds() % 60;
+                println!("─────────────────────────────────────────────");
+                println!("Total: {total_mins}m {total_secs}s");
+            }
         }
     }
     Ok(())

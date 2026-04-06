@@ -2,10 +2,14 @@
 //!
 //! This file is included by `track.rs` via `#[path = "track_handlers.rs"]`.
 
-use chrono::{Duration, Local, Utc};
+use std::sync::{Arc, Mutex};
+
+use rusqlite::Connection;
 use serde_json::json;
 
 use super::{OutputFormat, TrackReport, TrackStart, TrackStatus, TrackStop};
+use crate::cli::report::{ReportCommand, ReportSubcommand};
+use crate::cli::report_handlers::handle_report as report_handle_report;
 use crate::ops::tracker::StartTimer;
 use crate::ops::{ProjectOps, TaskOps, TrackerOps};
 
@@ -94,91 +98,26 @@ pub(super) fn handle_status(args: &TrackStatus, ops: &TrackerOps) -> anyhow::Res
     Ok(())
 }
 
+/// Delegates to the centralized [`report_handle_report`] handler.
+///
+/// This redirects `scribe track report` to the new centralized reporting system
+/// via `ReportSubcommand::Track`.
 pub(super) fn handle_report(
     args: &TrackReport,
-    ops: &TrackerOps,
     project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
 ) -> anyhow::Result<()> {
-    let now = Utc::now();
-
-    // Determine the time window.
-    let (since, until) = if args.today {
-        // Midnight local time today → now.
-        let midnight = Local::now()
-            .date_naive()
-            .and_hms_opt(0, 0, 0)
-            .expect("valid midnight")
-            .and_local_timezone(Local)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("failed to compute local midnight"))?
-            .with_timezone(&Utc);
-        (midnight, now + Duration::seconds(1))
-    } else if args.week {
-        // Monday midnight local → now.
-        use chrono::Datelike;
-        let today = Local::now().date_naive();
-        let days_since_monday = today.weekday().num_days_from_monday();
-        let monday = today - Duration::days(i64::from(days_since_monday));
-        let monday_dt = monday
-            .and_hms_opt(0, 0, 0)
-            .expect("valid midnight")
-            .and_local_timezone(Local)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("failed to compute Monday midnight"))?
-            .with_timezone(&Utc);
-        (monday_dt, now + Duration::seconds(1))
-    } else {
-        // Default: all time (epoch to far future).
-        let epoch = chrono::DateTime::UNIX_EPOCH;
-        (epoch, now + Duration::days(365 * 100))
+    let cmd = ReportCommand {
+        subcommand: Some(ReportSubcommand::Track {
+            today: args.today,
+            week: args.week,
+            project: args.project.clone(),
+            output: args.output.clone(),
+        }),
+        today: args.today,
+        week: args.week,
+        output: args.output.clone(),
+        detailed: false,
     };
-
-    let project_id = args
-        .project
-        .as_deref()
-        .map(|slug| {
-            project_ops
-                .get_project(slug)?
-                .ok_or_else(|| anyhow::anyhow!("project '{slug}' not found"))
-                .map(|p| p.id)
-        })
-        .transpose()?;
-
-    let entries = ops.report(project_id, since, until)?;
-
-    match args.output {
-        OutputFormat::Json => {
-            let items: Vec<_> = entries
-                .iter()
-                .map(|(e, d)| {
-                    json!({
-                        "slug": e.slug,
-                        "started_at": e.started_at,
-                        "ended_at": e.ended_at,
-                        "duration_seconds": d.num_seconds(),
-                        "note": e.note,
-                    })
-                })
-                .collect();
-            println!("{}", serde_json::to_string_pretty(&items)?);
-        }
-        OutputFormat::Text => {
-            if entries.is_empty() {
-                println!("No time entries found.");
-            } else {
-                let total: Duration = entries.iter().map(|(_, d)| *d).sum();
-                for (e, d) in &entries {
-                    let mins = d.num_minutes();
-                    let secs = d.num_seconds() % 60;
-                    let note = e.note.as_deref().unwrap_or("");
-                    println!("{:<45} {mins:>4}m {secs:02}s  {}", e.slug, note,);
-                }
-                let total_mins = total.num_minutes();
-                let total_secs = total.num_seconds() % 60;
-                println!("─────────────────────────────────────────────");
-                println!("Total: {total_mins}m {total_secs}s");
-            }
-        }
-    }
-    Ok(())
+    report_handle_report(&cmd, Arc::clone(conn), project_ops)
 }

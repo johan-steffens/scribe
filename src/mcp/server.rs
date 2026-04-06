@@ -526,6 +526,10 @@ impl ScribeMcpServer {
     #[tool(
         description = "Generate a Scribe time report. period: 'today', 'week', or omit for all-time."
     )]
+    #[allow(
+        deprecated,
+        reason = "MCP server uses TrackerOps::report which is deprecated but retained for compatibility"
+    )]
     async fn track_report(&self, Parameters(p): Parameters<TrackReportParams>) -> String {
         use chrono::{DateTime, Duration, TimeZone as _, Utc};
 

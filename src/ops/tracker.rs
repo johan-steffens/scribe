@@ -159,6 +159,10 @@ impl TrackerOps {
     /// # Errors
     ///
     /// Returns an error on database failure.
+    #[deprecated(
+        since = "0.12.0",
+        note = "use `ReportingOps::time_report` instead for CLI; this method is retained for MCP compatibility"
+    )]
     pub fn report(
         &self,
         project_id: Option<ProjectId>,

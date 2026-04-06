@@ -187,7 +187,7 @@ pub fn run(
         TodoSubcommand::Archive(args) => handlers::handle_archive(args, ops),
         TodoSubcommand::Restore(args) => handlers::handle_restore(args, ops),
         TodoSubcommand::Delete(args) => handlers::handle_delete(args, ops),
-        TodoSubcommand::Report(args) => handle_report(args, conn),
+        TodoSubcommand::Report(args) => handle_report(args, project_ops, conn),
     }
 }
 
@@ -198,7 +198,11 @@ mod handlers;
 
 /// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
 /// from the `TodoReport` arguments.
-fn handle_report(args: &TodoReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+fn handle_report(
+    args: &TodoReport,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     let cmd = ReportCommand {
         subcommand: Some(ReportSubcommand::Todo {
             slug: args.slug.clone(),
@@ -212,5 +216,5 @@ fn handle_report(args: &TodoReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Re
         output: args.output.clone(),
         detailed: args.detailed,
     };
-    report_handle_report(&cmd, Arc::clone(conn))
+    report_handle_report(&cmd, Arc::clone(conn), project_ops)
 }

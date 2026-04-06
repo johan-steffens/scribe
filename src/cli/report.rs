@@ -77,4 +77,19 @@ pub enum ReportSubcommand {
         #[command(flatten)]
         common: ReportSubcommandCommon,
     },
+    /// Generate a time tracking report (alias for `scribe track report`).
+    Track {
+        /// Restrict to today's entries.
+        #[arg(long)]
+        today: bool,
+        /// Restrict to this week's entries.
+        #[arg(long)]
+        week: bool,
+        /// Filter by project slug.
+        #[arg(long)]
+        project: Option<String>,
+        /// Output format.
+        #[arg(long, default_value = "text")]
+        output: OutputFormat,
+    },
 }

@@ -15,8 +15,8 @@ use crate::cli::project::OutputFormat;
 use crate::cli::prompt;
 use crate::cli::report::{ReportCommand, ReportSubcommand, ReportSubcommandCommon};
 use crate::cli::report_handlers::handle_report as report_handle_report;
-use crate::ops::InboxOps;
 use crate::ops::inbox::ProcessAction;
+use crate::ops::{InboxOps, ProjectOps};
 
 use std::io::{BufRead, Write};
 
@@ -97,12 +97,13 @@ pub struct InboxReport {
 pub fn run(
     cmd: &InboxCommand,
     ops: &InboxOps,
+    project_ops: &ProjectOps,
     conn: &Arc<Mutex<Connection>>,
 ) -> anyhow::Result<()> {
     match &cmd.subcommand {
         InboxSubcommand::List(args) => handle_list(args, ops),
         InboxSubcommand::Process(args) => handle_process(args, ops, conn),
-        InboxSubcommand::Report(args) => handle_report(args, conn),
+        InboxSubcommand::Report(args) => handle_report(args, project_ops, conn),
     }
 }
 
@@ -207,7 +208,11 @@ fn handle_process(
 
 /// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
 /// from the `InboxReport` arguments.
-fn handle_report(args: &InboxReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+fn handle_report(
+    args: &InboxReport,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     let cmd = ReportCommand {
         subcommand: Some(ReportSubcommand::Inbox {
             common: ReportSubcommandCommon {
@@ -220,5 +225,5 @@ fn handle_report(args: &InboxReport, conn: &Arc<Mutex<Connection>>) -> anyhow::R
         output: args.output.clone(),
         detailed: args.detailed,
     };
-    report_handle_report(&cmd, Arc::clone(conn))
+    report_handle_report(&cmd, Arc::clone(conn), project_ops)
 }

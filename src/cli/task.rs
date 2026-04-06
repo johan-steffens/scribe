@@ -254,7 +254,7 @@ pub fn run(
         TaskSubcommand::Archive(args) => handle_archive(args, task_ops),
         TaskSubcommand::Restore(args) => handle_restore(args, task_ops),
         TaskSubcommand::Delete(args) => handle_delete(args, task_ops),
-        TaskSubcommand::Report(args) => handle_report(args, conn),
+        TaskSubcommand::Report(args) => handle_report(args, project_ops, conn),
     }
 }
 
@@ -270,7 +270,11 @@ use handlers::{
 
 /// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
 /// from the `TaskReport` arguments.
-fn handle_report(args: &TaskReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+fn handle_report(
+    args: &TaskReport,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     let cmd = ReportCommand {
         subcommand: Some(ReportSubcommand::Task {
             slug: args.slug.clone(),
@@ -284,5 +288,5 @@ fn handle_report(args: &TaskReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Re
         output: args.output.clone(),
         detailed: args.detailed,
     };
-    report_handle_report(&cmd, Arc::clone(conn))
+    report_handle_report(&cmd, Arc::clone(conn), project_ops)
 }

@@ -14,7 +14,7 @@ use crate::domain::reminder::Reminders;
 use crate::domain::task::Tasks;
 use crate::domain::time_entry::TimeEntries;
 use crate::domain::todo::Todos;
-use crate::domain::{Project, Task, TaskStatus, TimeEntry, Todo};
+use crate::domain::{Project, ProjectId, Task, TaskStatus, TimeEntry, Todo};
 use crate::store::{
     SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
     SqliteTodos,
@@ -236,6 +236,36 @@ impl ReportingOps {
             total_time,
             completion_percentage,
         })
+    }
+
+    /// Returns completed time entries within `[since, until)` for optional project filter.
+    ///
+    /// Entries are returned with their computed durations. Only completed
+    /// (non-running), non-archived entries are included.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on database failure.
+    pub fn time_report(
+        &self,
+        project_id: Option<ProjectId>,
+        since: DateTime<Utc>,
+        until: DateTime<Utc>,
+    ) -> anyhow::Result<Vec<(TimeEntry, Duration)>> {
+        let entries = self
+            .entries
+            .list_completed_in_range(project_id, since, until)?;
+
+        let result = entries
+            .into_iter()
+            .filter_map(|e| {
+                let ended = e.ended_at?;
+                let dur = ended - e.started_at;
+                Some((e, dur))
+            })
+            .collect();
+
+        Ok(result)
     }
 
     /// Generates a detailed report for a specific task.

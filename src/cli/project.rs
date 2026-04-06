@@ -340,5 +340,6 @@ fn handle_report(args: &ProjectReport, conn: &Arc<Mutex<Connection>>) -> anyhow:
         output: args.output.clone(),
         detailed: args.detailed,
     };
-    report_handle_report(&cmd, Arc::clone(conn))
+    let project_ops = ProjectOps::new(conn);
+    report_handle_report(&cmd, Arc::clone(conn), &project_ops)
 }

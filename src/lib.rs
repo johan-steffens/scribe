@@ -147,19 +147,19 @@ pub fn run() -> anyhow::Result<()> {
             cli::todo::run(&cmd, &todo_ops, &project_ops, &conn)?;
         }
         Some(Commands::Track(cmd)) => {
-            cli::track::run(&cmd, &tracker_ops, &project_ops, &task_ops)?;
+            cli::track::run(&cmd, &tracker_ops, &project_ops, &task_ops, &conn)?;
         }
         Some(Commands::Capture(cmd)) => {
             cli::capture::run(&cmd, &inbox_ops)?;
         }
         Some(Commands::Inbox(cmd)) => {
-            cli::inbox::run(&cmd, &inbox_ops, &conn)?;
+            cli::inbox::run(&cmd, &inbox_ops, &project_ops, &conn)?;
         }
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops, &conn)?;
         }
         Some(Commands::Report(cmd)) => {
-            cli::report_handlers::handle_report(&cmd, Arc::clone(&conn))?;
+            cli::report_handlers::handle_report(&cmd, Arc::clone(&conn), &project_ops)?;
         }
         Some(Commands::Service { command }) => {
             cli::service::run(&command, &mut config, Some(&conn))?;
