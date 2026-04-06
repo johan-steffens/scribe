@@ -5,9 +5,9 @@
 
 use chrono::{Duration, Utc};
 use scribe::domain::{TaskPriority, TaskStatus};
+use scribe::ops::ReportingOps;
 use scribe::ops::tasks::CreateTask;
 use scribe::ops::tracker::StartTimer;
-use scribe::ops::ReportingOps;
 use scribe::ops::{ProjectOps, TaskOps, TrackerOps};
 use scribe::testing::db::TestDb;
 
