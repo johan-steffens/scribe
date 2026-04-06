@@ -153,10 +153,37 @@ scribe track report --week
 scribe capture "Fix that bug later"
 scribe reminder add --project myproject --at "tomorrow 9am"
 scribe inbox process <slug>
+scribe report project myproject
 scribe sync configure --provider gist
 ```
 
 Every subcommand supports `--output json` for scripting.
+
+---
+
+## Reporting
+
+Generate reports across all Scribe domains:
+
+```sh
+# Summary report (all domains)
+scribe report
+
+# Project-specific report
+scribe report project myproject
+
+# Task-specific report
+scribe report task myproject-task-fix-login
+
+# Time tracking report
+scribe report track --week
+
+# Filter by time window
+scribe report --today
+scribe report --week
+```
+
+All reports support `--output json` for machine-readable output and `--detailed` for expanded information.
 
 ---
 
