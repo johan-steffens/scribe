@@ -258,11 +258,15 @@ impl KeychainStore {
         map.insert(format!("{provider}.{field}"), secret.to_owned());
 
         if let Ok(json) = serde_json::to_string(&map) {
-            let _ = std::fs::write(&path, json);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+            let temp_path = path.with_extension("tmp");
+            if std::fs::write(&temp_path, json).is_ok() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ =
+                        std::fs::set_permissions(&temp_path, std::fs::Permissions::from_mode(0o600));
+                }
+                let _ = std::fs::rename(temp_path, path);
             }
         }
     }
