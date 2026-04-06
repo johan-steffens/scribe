@@ -322,13 +322,18 @@ jobs:
     needs: [release, metadata]
     if: needs.metadata.outputs.is_release == 'true'
     runs-on: ubuntu-24.04
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Bump Formula
         uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: scribe
           homebrew-tap: johan-steffens/homebrew-scribe
-          base-branch: master
+          base-branch: main
           download-url: https://github.com/johan-steffens/scribe/archive/refs/tags/v${{ needs.metadata.outputs.version }}.tar.gz
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -1,6 +1,6 @@
 [package]
 name = "scribe"
-version = "1.0.10"
+version = "1.0.11"
 edition = "2024"
 description = "A personal productivity CLI/TUI tool for offline project and task management"
 license = "MIT"
