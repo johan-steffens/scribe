@@ -22,6 +22,7 @@ pub mod project;
 pub mod prompt;
 pub mod reminder;
 pub mod report;
+pub mod report_handlers;
 pub mod service;
 pub mod setup;
 #[cfg(feature = "sync")]

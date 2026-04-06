@@ -31,6 +31,18 @@ pub struct ReportCommand {
     pub detailed: bool,
 }
 
+/// Common flags for report subcommands.
+#[derive(Debug, Args)]
+pub struct ReportSubcommandCommon {
+    /// Output format for the report.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+
+    /// Include detailed information in the report.
+    #[arg(long)]
+    pub detailed: bool,
+}
+
 /// All `scribe report` subcommands.
 #[derive(Debug, Subcommand)]
 pub enum ReportSubcommand {
@@ -38,19 +50,31 @@ pub enum ReportSubcommand {
     Project {
         /// Project slug to report on.
         slug: String,
+        #[command(flatten)]
+        common: ReportSubcommandCommon,
     },
     /// Generate a report for a specific task.
     Task {
         /// Task slug to report on.
         slug: String,
+        #[command(flatten)]
+        common: ReportSubcommandCommon,
     },
     /// Generate a report for a specific todo.
     Todo {
         /// Todo slug to report on.
         slug: String,
+        #[command(flatten)]
+        common: ReportSubcommandCommon,
     },
     /// Generate a report for the inbox.
-    Inbox,
+    Inbox {
+        #[command(flatten)]
+        common: ReportSubcommandCommon,
+    },
     /// Generate a report for reminders.
-    Reminders,
+    Reminders {
+        #[command(flatten)]
+        common: ReportSubcommandCommon,
+    },
 }
