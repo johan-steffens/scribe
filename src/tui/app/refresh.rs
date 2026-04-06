@@ -5,7 +5,10 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
+
 use crate::domain::{CaptureItems, Projects, Reminders, Tasks, TimeEntries, Todos};
+use crate::ops::ReportingOps;
 use crate::store::{
     SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
     SqliteTodos,
@@ -99,6 +102,21 @@ pub(super) fn refresh_reminders(app: &mut App) {
         }
         Err(e) => {
             app.last_error = Some(format!("failed to load reminders: {e}"));
+        }
+    }
+}
+
+/// Reloads the summary report for the dashboard system overview.
+pub(super) fn refresh_summary(app: &mut App) {
+    let ops = ReportingOps::new(Arc::clone(&app.db));
+    let now = Utc::now();
+    let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+    match ops.summary_report(today_start, now) {
+        Ok(summary) => {
+            app.summary = Some(summary);
+        }
+        Err(e) => {
+            app.last_error = Some(format!("failed to load summary: {e}"));
         }
     }
 }
