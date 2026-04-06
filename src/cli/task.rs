@@ -1,11 +1,17 @@
 //! CLI subcommands for managing tasks (`scribe task …`).
 //!
 //! Each subcommand maps to an operation in [`crate::ops::TaskOps`] or
-//! [`crate::ops::ProjectOps`]. All subcommands support `--output json`.
+//! [`crate::ops::ProjectOps`]. All subcommands support `--output json`.  The
+//! `report` subcommand is an alias for `scribe report task …`.
+
+use std::sync::{Arc, Mutex};
 
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 
 use crate::cli::project::OutputFormat;
+use crate::cli::report::{ReportCommand, ReportSubcommand, ReportSubcommandCommon};
+use crate::cli::report_handlers::handle_report as report_handle_report;
 use crate::domain::{TaskPriority, TaskStatus};
 use crate::ops::{ProjectOps, TaskOps};
 
@@ -72,6 +78,8 @@ pub enum TaskSubcommand {
     Restore(TaskRestore),
     /// Delete a task.
     Delete(TaskDelete),
+    /// Generate a report for a specific task (alias for `scribe report task`).
+    Report(TaskReport),
 }
 
 // ── subcommand structs ─────────────────────────────────────────────────────
@@ -200,17 +208,42 @@ pub struct TaskDelete {
     pub output: OutputFormat,
 }
 
+/// Arguments for `scribe task report`.
+#[derive(Debug, Args)]
+pub struct TaskReport {
+    /// Task slug to report on.
+    pub slug: String,
+    /// Restrict the report to items due or created today.
+    #[arg(long)]
+    pub today: bool,
+    /// Restrict the report to items due or created this week.
+    #[arg(long)]
+    pub week: bool,
+    /// Output format.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+    /// Include detailed information in the report.
+    #[arg(long)]
+    pub detailed: bool,
+}
+
 // ── dispatch ───────────────────────────────────────────────────────────────
 
 /// Executes a `task` subcommand against the given ops layers.
 ///
-/// `project_ops` is needed to resolve project slugs to IDs. Prints results to
-/// stdout and errors to stderr. Returns `Ok(())` on success.
+/// `project_ops` is needed to resolve project slugs to IDs. `conn` is required
+/// when the `report` subcommand is used. Prints results to stdout; errors are
+/// propagated to the caller.
 ///
 /// # Errors
 ///
 /// Returns an error if the operation fails (e.g. task not found, DB error).
-pub fn run(cmd: &TaskCommand, task_ops: &TaskOps, project_ops: &ProjectOps) -> anyhow::Result<()> {
+pub fn run(
+    cmd: &TaskCommand,
+    task_ops: &TaskOps,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     match &cmd.subcommand {
         TaskSubcommand::Add(args) => handle_add(args, task_ops, project_ops),
         TaskSubcommand::List(args) => handle_list(args, task_ops, project_ops),
@@ -221,6 +254,7 @@ pub fn run(cmd: &TaskCommand, task_ops: &TaskOps, project_ops: &ProjectOps) -> a
         TaskSubcommand::Archive(args) => handle_archive(args, task_ops),
         TaskSubcommand::Restore(args) => handle_restore(args, task_ops),
         TaskSubcommand::Delete(args) => handle_delete(args, task_ops),
+        TaskSubcommand::Report(args) => handle_report(args, conn),
     }
 }
 
@@ -233,3 +267,22 @@ use handlers::{
     handle_add, handle_archive, handle_delete, handle_done, handle_edit, handle_list, handle_move,
     handle_restore, handle_show,
 };
+
+/// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
+/// from the `TaskReport` arguments.
+fn handle_report(args: &TaskReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+    let cmd = ReportCommand {
+        subcommand: Some(ReportSubcommand::Task {
+            slug: args.slug.clone(),
+            common: ReportSubcommandCommon {
+                output: args.output.clone(),
+                detailed: args.detailed,
+            },
+        }),
+        today: args.today,
+        week: args.week,
+        output: args.output.clone(),
+        detailed: args.detailed,
+    };
+    report_handle_report(&cmd, Arc::clone(conn))
+}

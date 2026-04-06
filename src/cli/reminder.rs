@@ -1,13 +1,18 @@
 //! CLI subcommands for managing reminders (`scribe reminder …`).
 //!
-//! Each subcommand maps to an operation in [`crate::ops::ReminderOps`].
-//! All subcommands support `--output json` for machine-readable output.
-//! The `--at` flag uses [`crate::cli::parse::parse_datetime`] for flexible
-//! datetime input.
+//! Each subcommand maps to an operation in [`crate::ops::ReminderOps`].  All
+//! subcommands support `--output json` for machine-readable output.  The
+//! `--at` flag uses [`crate::cli::parse::parse_datetime`] for flexible datetime
+//! input.  The `report` subcommand is an alias for `scribe report reminders`.
+
+use std::sync::{Arc, Mutex};
 
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 
 use crate::cli::project::OutputFormat;
+use crate::cli::report::{ReportCommand, ReportSubcommand, ReportSubcommandCommon};
+use crate::cli::report_handlers::handle_report as report_handle_report;
 use crate::ops::{ProjectOps, ReminderOps};
 
 // ── top-level reminder command ─────────────────────────────────────────────
@@ -35,6 +40,8 @@ pub enum ReminderSubcommand {
     Restore(ReminderRestore),
     /// Delete a reminder (must be archived first).
     Delete(ReminderDelete),
+    /// Generate a report for reminders (alias for `scribe report reminders`).
+    Report(ReminderReport),
 }
 
 // ── subcommand structs ─────────────────────────────────────────────────────
@@ -118,11 +125,29 @@ pub struct ReminderDelete {
     pub output: OutputFormat,
 }
 
+/// Arguments for `scribe reminder report`.
+#[derive(Debug, Args)]
+pub struct ReminderReport {
+    /// Restrict the report to reminders today.
+    #[arg(long)]
+    pub today: bool,
+    /// Restrict the report to reminders this week.
+    #[arg(long)]
+    pub week: bool,
+    /// Output format.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+    /// Include detailed information in the report.
+    #[arg(long)]
+    pub detailed: bool,
+}
+
 // ── dispatch ───────────────────────────────────────────────────────────────
 
 /// Executes a `reminder` subcommand against the given ops layers.
 ///
-/// `project_ops` is used to resolve project slugs for filtering.
+/// `project_ops` is used to resolve project slugs for filtering. `conn` is
+/// required when the `report` subcommand is used.
 ///
 /// # Errors
 ///
@@ -131,6 +156,7 @@ pub fn run(
     cmd: &ReminderCommand,
     ops: &ReminderOps,
     project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
 ) -> anyhow::Result<()> {
     match &cmd.subcommand {
         ReminderSubcommand::Add(args) => handlers::handle_add(args, ops),
@@ -139,6 +165,7 @@ pub fn run(
         ReminderSubcommand::Archive(args) => handlers::handle_archive(args, ops),
         ReminderSubcommand::Restore(args) => handlers::handle_restore(args, ops),
         ReminderSubcommand::Delete(args) => handlers::handle_delete(args, ops),
+        ReminderSubcommand::Report(args) => handle_report(args, conn),
     }
 }
 
@@ -146,3 +173,21 @@ pub fn run(
 
 #[path = "reminder_handlers.rs"]
 mod handlers;
+
+/// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
+/// from the `ReminderReport` arguments.
+fn handle_report(args: &ReminderReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+    let cmd = ReportCommand {
+        subcommand: Some(ReportSubcommand::Reminders {
+            common: ReportSubcommandCommon {
+                output: args.output.clone(),
+                detailed: args.detailed,
+            },
+        }),
+        today: args.today,
+        week: args.week,
+        output: args.output.clone(),
+        detailed: args.detailed,
+    };
+    report_handle_report(&cmd, Arc::clone(conn))
+}

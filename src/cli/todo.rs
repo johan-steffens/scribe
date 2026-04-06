@@ -1,11 +1,17 @@
 //! CLI subcommands for managing todos (`scribe todo …`).
 //!
-//! Each subcommand maps to an operation in [`crate::ops::TodoOps`].
-//! All subcommands support `--output json` for machine-readable output.
+//! Each subcommand maps to an operation in [`crate::ops::TodoOps`].  All
+//! subcommands support `--output json` for machine-readable output.  The
+//! `report` subcommand is an alias for `scribe report todo …`.
+
+use std::sync::{Arc, Mutex};
 
 use clap::{Args, Subcommand};
+use rusqlite::Connection;
 
 use crate::cli::project::OutputFormat;
+use crate::cli::report::{ReportCommand, ReportSubcommand, ReportSubcommandCommon};
+use crate::cli::report_handlers::handle_report as report_handle_report;
 use crate::ops::{ProjectOps, TodoOps};
 
 // ── top-level todo command ─────────────────────────────────────────────────
@@ -37,6 +43,8 @@ pub enum TodoSubcommand {
     Restore(TodoRestore),
     /// Delete a todo (must be archived first).
     Delete(TodoDelete),
+    /// Generate a report for a specific todo (alias for `scribe report todo`).
+    Report(TodoReport),
 }
 
 // ── subcommand structs ─────────────────────────────────────────────────────
@@ -134,17 +142,42 @@ pub struct TodoDelete {
     pub output: OutputFormat,
 }
 
+/// Arguments for `scribe todo report`.
+#[derive(Debug, Args)]
+pub struct TodoReport {
+    /// Todo slug to report on.
+    pub slug: String,
+    /// Restrict the report to items due or created today.
+    #[arg(long)]
+    pub today: bool,
+    /// Restrict the report to items due or created this week.
+    #[arg(long)]
+    pub week: bool,
+    /// Output format.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+    /// Include detailed information in the report.
+    #[arg(long)]
+    pub detailed: bool,
+}
+
 // ── dispatch ───────────────────────────────────────────────────────────────
 
 /// Executes a `todo` subcommand against the given ops layers.
 ///
 /// `project_ops` is used to resolve project slugs to IDs for list filtering.
-/// Prints results to stdout; errors are propagated to the caller.
+/// `conn` is required when the `report` subcommand is used. Prints results to
+/// stdout; errors are propagated to the caller.
 ///
 /// # Errors
 ///
 /// Returns an error if the operation fails (e.g. todo not found, DB error).
-pub fn run(cmd: &TodoCommand, ops: &TodoOps, project_ops: &ProjectOps) -> anyhow::Result<()> {
+pub fn run(
+    cmd: &TodoCommand,
+    ops: &TodoOps,
+    project_ops: &ProjectOps,
+    conn: &Arc<Mutex<Connection>>,
+) -> anyhow::Result<()> {
     match &cmd.subcommand {
         TodoSubcommand::Add(args) => handlers::handle_add(args, ops),
         TodoSubcommand::List(args) => handlers::handle_list(args, ops, project_ops),
@@ -154,6 +187,7 @@ pub fn run(cmd: &TodoCommand, ops: &TodoOps, project_ops: &ProjectOps) -> anyhow
         TodoSubcommand::Archive(args) => handlers::handle_archive(args, ops),
         TodoSubcommand::Restore(args) => handlers::handle_restore(args, ops),
         TodoSubcommand::Delete(args) => handlers::handle_delete(args, ops),
+        TodoSubcommand::Report(args) => handle_report(args, conn),
     }
 }
 
@@ -161,3 +195,22 @@ pub fn run(cmd: &TodoCommand, ops: &TodoOps, project_ops: &ProjectOps) -> anyhow
 
 #[path = "todo_handlers.rs"]
 mod handlers;
+
+/// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
+/// from the `TodoReport` arguments.
+fn handle_report(args: &TodoReport, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+    let cmd = ReportCommand {
+        subcommand: Some(ReportSubcommand::Todo {
+            slug: args.slug.clone(),
+            common: ReportSubcommandCommon {
+                output: args.output.clone(),
+                detailed: args.detailed,
+            },
+        }),
+        today: args.today,
+        week: args.week,
+        output: args.output.clone(),
+        detailed: args.detailed,
+    };
+    report_handle_report(&cmd, Arc::clone(conn))
+}

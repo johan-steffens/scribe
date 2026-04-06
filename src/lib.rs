@@ -138,13 +138,13 @@ pub fn run() -> anyhow::Result<()> {
             tui::run(Arc::clone(&conn), &config)?;
         }
         Some(Commands::Project(cmd)) => {
-            cli::project::run(&cmd, &project_ops)?;
+            cli::project::run(&cmd, &project_ops, &conn)?;
         }
         Some(Commands::Task(cmd)) => {
-            cli::task::run(&cmd, &task_ops, &project_ops)?;
+            cli::task::run(&cmd, &task_ops, &project_ops, &conn)?;
         }
         Some(Commands::Todo(cmd)) => {
-            cli::todo::run(&cmd, &todo_ops, &project_ops)?;
+            cli::todo::run(&cmd, &todo_ops, &project_ops, &conn)?;
         }
         Some(Commands::Track(cmd)) => {
             cli::track::run(&cmd, &tracker_ops, &project_ops, &task_ops)?;
@@ -156,7 +156,7 @@ pub fn run() -> anyhow::Result<()> {
             cli::inbox::run(&cmd, &inbox_ops, &conn)?;
         }
         Some(Commands::Reminder(cmd)) => {
-            cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
+            cli::reminder::run(&cmd, &reminder_ops, &project_ops, &conn)?;
         }
         Some(Commands::Report(cmd)) => {
             cli::report_handlers::handle_report(&cmd, Arc::clone(&conn))?;
