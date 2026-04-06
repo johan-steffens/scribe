@@ -5,9 +5,9 @@
 
 use chrono::{Duration, Utc};
 use scribe::domain::{TaskPriority, TaskStatus};
-use scribe::ops::ReportingOps;
 use scribe::ops::tasks::CreateTask;
 use scribe::ops::tracker::StartTimer;
+use scribe::ops::ReportingOps;
 use scribe::ops::{ProjectOps, TaskOps, TrackerOps};
 use scribe::testing::db::TestDb;
 
@@ -128,7 +128,11 @@ fn project_report_returns_project_details() {
     assert_eq!(report.project.slug, "report-test-project");
     assert_eq!(report.pending_tasks.len(), 0, "no tasks yet");
     assert_eq!(report.open_todos.len(), 0, "no todos yet");
-    assert_eq!(report.completion_percentage, 0.0, "no tasks to complete");
+    assert!(
+        report.completion_percentage < f32::EPSILON,
+        "no tasks to complete, got {}",
+        report.completion_percentage
+    );
 }
 
 #[test]
