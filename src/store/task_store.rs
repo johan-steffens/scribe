@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{NaiveDate, Utc};
 use rusqlite::types::ToSql;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 use crate::domain::{NewTask, ProjectId, Task, TaskId, TaskPatch, TaskPriority, TaskStatus, Tasks};
 use crate::store::project_store::{parse_dt, parse_dt_opt};

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
 use rusqlite::types::ToSql;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 use crate::domain::{NewTodo, ProjectId, Todo, TodoId, TodoPatch, Todos};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
