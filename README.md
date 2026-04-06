@@ -44,22 +44,15 @@ tracker, process your inbox, or schedule reminders using plain English.
 ## Quick Start
 
 ```sh
-# Install (pre-built binary or from source)
+# Install (Homebrew recommended)
+brew tap johan-steffens/scribe
+brew install scribe
+
+# Or pre-built binary
 curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-macos-aarch64
 chmod +x scribe && sudo mv scribe /usr/local/bin/
 
-# Or from source: cargo install --path . --features mcp,sync
-
 # Run the setup wizard
-scribe setup --wizard
-
-# Open the TUI
-scribe
-
-# Or use the CLI directly
-scribe task add "Review PR" --priority high --project myproject
-scribe track start --task mytask
-scribe capture "Remember to call mom"
 ```
 
 ---
@@ -189,19 +182,18 @@ All reports support `--output json` for machine-readable output and `--detailed`
 
 ## Installation
 
-### Pre-built binary (recommended)
+### Homebrew (macOS & Linux)
+
+```sh
+brew tap johan-steffens/scribe
+brew install scribe
+```
+
+### Pre-built binary
 
 ```sh
 # macOS ARM64
 curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-macos-aarch64
-
-# macOS Intel
-curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-macos-x86_64
-
-# Linux
-curl -Lo scribe https://github.com/johan-steffens/scribe/releases/latest/download/scribe-linux-x86_64
-
-chmod +x scribe && sudo mv scribe /usr/local/bin/
 ```
 
 Binaries include MCP server and sync features. Verify against checksums in

@@ -315,3 +315,20 @@ jobs:
             dist/scribe-linux-x86_64 \
             dist/scribe-macos-aarch64 \
             dist/scribe-windows-x86_64.exe
+
+  # ── Homebrew ────────────────────────────────────────────────────────────────
+  homebrew:
+    name: Bump Homebrew Formula
+    needs: [release, metadata]
+    if: needs.metadata.outputs.is_release == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Bump Formula
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: scribe
+          homebrew-tap: johan-steffens/homebrew-scribe
+          base-branch: master
+          download-url: https://github.com/johan-steffens/scribe/archive/refs/tags/v${{ needs.metadata.outputs.version }}.tar.gz
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
