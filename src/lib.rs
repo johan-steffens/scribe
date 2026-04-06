@@ -158,6 +158,11 @@ pub fn run() -> anyhow::Result<()> {
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops)?;
         }
+        Some(Commands::Report(_cmd)) => {
+            anyhow::bail!(
+                "report command not yet implemented; use `scribe track report` for time reports"
+            );
+        }
         Some(Commands::Service { command }) => {
             cli::service::run(&command, &mut config, Some(&conn))?;
         }
