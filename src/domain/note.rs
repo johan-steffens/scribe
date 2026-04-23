@@ -4,9 +4,67 @@
 //! They are the core building block of the Personal Knowledge Management layer.
 
 use chrono::{DateTime, Utc};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::NoteId;
+
+// ── link parsing ─────────────────────────────────────────────────────────────
+
+/// Regex pattern matching Obsidian-style `[[slug]]` links.
+///
+/// The pattern matches double-bracket links containing a kebab-case slug:
+/// - Opening `[[`
+/// - One or more alphanumeric characters or hyphens (slug)
+/// - Closing `]]`
+///
+/// # Examples
+///
+/// ```
+/// use scribe::domain::parse_links;
+/// assert_eq!(parse_links("See [[my-task]] for details").len(), 1);
+/// assert_eq!(parse_links("[[link-a]] and [[link-b]]").len(), 2);
+/// assert!(parse_links("no links here").is_empty());
+/// ```
+const LINK_PATTERN: &str = r"\[\[([a-zA-Z0-9][a-zA-Z0-9-]*)\]\]";
+
+/// Parses `[[slug]]` Obsidian-style links from markdown content.
+///
+/// Returns a vector of unique target slugs found in the content, in the
+/// order they first appear. Self-referential links (where source equals target)
+/// are included since the caller may want to filter them out.
+///
+/// # Examples
+///
+/// ```
+/// use scribe::domain::parse_links;
+/// let slugs = parse_links("References [[task-one]] and [[task-two]]");
+/// assert_eq!(slugs, &["task-one", "task-two"]);
+/// ```
+///
+/// # Performance
+///
+/// The regex is compiled on first use and cached in a thread-local `Regex`
+/// to avoid repeated recompilation.
+#[must_use]
+pub fn parse_links(content: &str) -> Vec<String> {
+    thread_local! {
+        static RE: Regex = Regex::new(LINK_PATTERN).expect("link pattern is valid regex");
+    }
+    RE.with(|re| {
+        let mut slugs = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for cap in re.captures_iter(content) {
+            if let Some(slug) = cap.get(1) {
+                let s = slug.as_str().to_owned();
+                if seen.insert(s.clone()) {
+                    slugs.push(s);
+                }
+            }
+        }
+        slugs
+    })
+}
 
 // ── entity struct ──────────────────────────────────────────────────────────
 

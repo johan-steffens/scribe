@@ -59,7 +59,7 @@ pub struct NoteId(pub i64);
 #[doc(inline)]
 pub use capture::{CaptureItem, CaptureItems, NewCaptureItem};
 #[doc(inline)]
-pub use note::{Link, Links, NewNote, Note, NotePatch, Notes};
+pub use note::{Link, Links, NewNote, Note, NotePatch, Notes, parse_links};
 #[doc(inline)]
 pub use project::{NewProject, Project, ProjectPatch, ProjectStatus, Projects};
 #[doc(inline)]

@@ -39,6 +39,7 @@ clap_complete      = "4"
 crossterm          = { version = "0.28", features = ["event-stream"] }
 directories        = "6"
 mimalloc           = "0.1"
+regex              = "1"
 ratatui            = "0.29"
 rusqlite           = { version = "0.32", features = ["bundled"] }
 rusqlite_migration = "1"

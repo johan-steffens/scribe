@@ -2506,6 +2506,7 @@ dependencies = [
  "notify-rust",
  "predicates",
  "ratatui",
+ "regex",
  "reqwest",
  "rmcp",
  "rpassword",
