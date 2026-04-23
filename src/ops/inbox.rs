@@ -201,6 +201,7 @@ impl InboxOps {
                     status: TaskStatus::Todo,
                     priority: priority.unwrap_or(TaskPriority::Medium),
                     due_date: None,
+                    parent_id: None,
                 })?;
             }
             ProcessAction::ConvertToTodo {

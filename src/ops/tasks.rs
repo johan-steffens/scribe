@@ -9,7 +9,9 @@ use std::sync::{Arc, Mutex};
 use chrono::NaiveDate;
 use rusqlite::Connection;
 
-use crate::domain::{NewTask, ProjectId, Task, TaskPatch, TaskPriority, TaskStatus, Tasks, slug};
+use crate::domain::{
+    NewTask, ProjectId, Task, TaskId, TaskPatch, TaskPriority, TaskStatus, Tasks, slug,
+};
 use crate::store::SqliteTasks;
 
 /// Parameters for creating a new task via [`TaskOps`].
@@ -31,6 +33,8 @@ pub struct CreateTask {
     pub priority: TaskPriority,
     /// Optional due date.
     pub due_date: Option<NaiveDate>,
+    /// Optional parent task ID for hierarchical nesting.
+    pub parent_id: Option<TaskId>,
 }
 
 /// High-level task operations with slug generation on create.
@@ -98,7 +102,7 @@ impl TaskOps {
             status: params.status,
             priority: params.priority,
             due_date: params.due_date,
-            parent_id: None,
+            parent_id: params.parent_id,
             kind: crate::domain::TaskKind::Task,
         })
     }

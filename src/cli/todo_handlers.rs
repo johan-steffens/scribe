@@ -3,6 +3,7 @@
 //! This file is included by `todo.rs` via `#[path = "todo_handlers.rs"]`.
 
 use serde_json::json;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::{
     OutputFormat, TodoAdd, TodoArchive, TodoDelete, TodoDone, TodoList, TodoMove, TodoRestore,
@@ -10,7 +11,23 @@ use super::{
 };
 use crate::ops::{ProjectOps, TodoOps};
 
+/// Flag to track whether the deprecation warning has been shown.
+/// Uses atomic to allow checking from multiple handlers without mutex.
+static DEPRECATION_WARNED: AtomicBool = AtomicBool::new(false);
+
+/// Prints a deprecation warning to stderr if it hasn't been shown yet.
+fn warn_deprecation() {
+    if !DEPRECATION_WARNED.swap(true, Ordering::Relaxed) {
+        eprintln!(
+            "WARNING: The `scribe todo` command is deprecated and will be removed in a future release.\n\
+             Todos are now managed as checklist items under `scribe task` commands.\n\
+             Please use `scribe task add`, `scribe task list`, etc. instead."
+        );
+    }
+}
+
 pub(super) fn handle_add(args: &TodoAdd, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     let project_slug = args
         .project
         .clone()
@@ -28,6 +45,7 @@ pub(super) fn handle_list(
     ops: &TodoOps,
     project_ops: &ProjectOps,
 ) -> anyhow::Result<()> {
+    warn_deprecation();
     let project_id = args
         .project
         .as_deref()
@@ -62,6 +80,7 @@ pub(super) fn handle_list(
 }
 
 pub(super) fn handle_show(args: &TodoShow, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     let todo = ops
         .get(&args.slug)?
         .ok_or_else(|| anyhow::anyhow!("todo '{}' not found", args.slug))?;
@@ -81,6 +100,7 @@ pub(super) fn handle_show(args: &TodoShow, ops: &TodoOps) -> anyhow::Result<()> 
 }
 
 pub(super) fn handle_move(args: &TodoMove, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     let todo = ops.move_project(&args.slug, &args.project)?;
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&todo)?),
@@ -92,6 +112,7 @@ pub(super) fn handle_move(args: &TodoMove, ops: &TodoOps) -> anyhow::Result<()> 
 }
 
 pub(super) fn handle_done(args: &TodoDone, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     let todo = ops.mark_done(&args.slug)?;
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&todo)?),
@@ -101,6 +122,7 @@ pub(super) fn handle_done(args: &TodoDone, ops: &TodoOps) -> anyhow::Result<()> 
 }
 
 pub(super) fn handle_archive(args: &TodoArchive, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     let todo = ops.archive(&args.slug)?;
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&todo)?),
@@ -110,6 +132,7 @@ pub(super) fn handle_archive(args: &TodoArchive, ops: &TodoOps) -> anyhow::Resul
 }
 
 pub(super) fn handle_restore(args: &TodoRestore, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     let todo = ops.restore(&args.slug)?;
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&todo)?),
@@ -119,6 +142,7 @@ pub(super) fn handle_restore(args: &TodoRestore, ops: &TodoOps) -> anyhow::Resul
 }
 
 pub(super) fn handle_delete(args: &TodoDelete, ops: &TodoOps) -> anyhow::Result<()> {
+    warn_deprecation();
     ops.delete(&args.slug)?;
     match args.output {
         OutputFormat::Json => println!("{}", json!({ "deleted": args.slug })),

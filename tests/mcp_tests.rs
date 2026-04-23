@@ -202,6 +202,7 @@ fn test_task_ops_create_with_project() {
             status: TaskStatus::Todo,
             priority: TaskPriority::High,
             due_date: None,
+            parent_id: None,
         })
         .expect("task should be created");
 
@@ -230,6 +231,7 @@ fn test_task_ops_create_without_project_uses_quick_capture() {
             status: TaskStatus::Todo,
             priority: TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
         })
         .expect("task should be created");
 

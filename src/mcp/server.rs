@@ -407,6 +407,7 @@ impl ScribeMcpServer {
             status: TaskStatus::Todo,
             priority,
             due_date,
+            parent_id: None,
         };
 
         match self.tasks.create_task(params) {

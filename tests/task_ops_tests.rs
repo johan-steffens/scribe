@@ -15,6 +15,7 @@ fn create(ops: &TaskOps, title: &str) -> scribe::domain::Task {
         status: TaskStatus::Todo,
         priority: TaskPriority::Medium,
         due_date: None,
+        parent_id: None,
     })
     .expect("create task")
 }

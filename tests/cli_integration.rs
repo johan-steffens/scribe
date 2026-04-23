@@ -178,7 +178,149 @@ fn test_task_add_to_custom_project() {
         .stdout(predicates::str::contains("custom-task-my-task"));
 }
 
+#[test]
+fn test_task_add_with_parent() {
+    let dir = TempDir::new().expect("tempdir");
+    // Create a parent task
+    run(
+        &dir,
+        &["task", "add", "Parent Task", "--project", "quick-capture"],
+    )
+    .success()
+    .stdout(predicates::str::contains("Created task"));
+
+    // Get the parent task slug
+    let list_out = scribe(&dir)
+        .args(["task", "list"])
+        .output()
+        .expect("list tasks");
+    let stdout = String::from_utf8_lossy(&list_out.stdout);
+    let parent_slug = stdout
+        .lines()
+        .find(|l| l.contains("parent-task"))
+        .and_then(|l| l.split_whitespace().next())
+        .expect("parent_slug not found")
+        .to_owned();
+
+    // Create a child task with --parent flag
+    run(
+        &dir,
+        &[
+            "task",
+            "add",
+            "Child Task",
+            "--project",
+            "quick-capture",
+            "--parent",
+            &parent_slug,
+        ],
+    )
+    .success()
+    .stdout(predicates::str::contains("Created task"))
+    .stdout(predicates::str::contains("child-task"));
+}
+
+#[test]
+fn test_task_add_with_parent_not_found() {
+    let dir = TempDir::new().expect("tempdir");
+    run(
+        &dir,
+        &[
+            "task",
+            "add",
+            "Orphan Task",
+            "--project",
+            "quick-capture",
+            "--parent",
+            "nonexistent-parent",
+        ],
+    )
+    .failure()
+    .stderr(predicates::str::contains(
+        "parent task 'nonexistent-parent' not found",
+    ));
+}
+
+#[test]
+fn test_task_toggle_todo_to_done() {
+    let dir = TempDir::new().expect("tempdir");
+    run(
+        &dir,
+        &["task", "add", "Toggle me", "--project", "quick-capture"],
+    )
+    .success();
+
+    // Get the task slug
+    let list_out = scribe(&dir)
+        .args(["task", "list"])
+        .output()
+        .expect("list tasks");
+    let stdout = String::from_utf8_lossy(&list_out.stdout);
+    let slug = stdout
+        .lines()
+        .find(|l| l.contains("toggle-me"))
+        .and_then(|l| l.split_whitespace().next())
+        .expect("slug not found")
+        .to_owned();
+
+    // Toggle from todo to done
+    run(&dir, &["task", "toggle", &slug])
+        .success()
+        .stdout(predicates::str::contains("Toggled"))
+        .stdout(predicates::str::contains("done"));
+}
+
+#[test]
+fn test_task_toggle_done_to_todo() {
+    let dir = TempDir::new().expect("tempdir");
+    run(
+        &dir,
+        &["task", "add", "Toggle me too", "--project", "quick-capture"],
+    )
+    .success();
+
+    // Get the task slug
+    let list_out = scribe(&dir)
+        .args(["task", "list"])
+        .output()
+        .expect("list tasks");
+    let stdout = String::from_utf8_lossy(&list_out.stdout);
+    let slug = stdout
+        .lines()
+        .find(|l| l.contains("toggle-me-too"))
+        .and_then(|l| l.split_whitespace().next())
+        .expect("slug not found")
+        .to_owned();
+
+    // Toggle twice: todo -> done -> todo
+    run(&dir, &["task", "toggle", &slug])
+        .success()
+        .stdout(predicates::str::contains("done"));
+
+    run(&dir, &["task", "toggle", &slug])
+        .success()
+        .stdout(predicates::str::contains("Toggled"))
+        .stdout(predicates::str::contains("todo"));
+}
+
+#[test]
+fn test_task_toggle_not_found() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["task", "toggle", "nonexistent-task"])
+        .failure()
+        .stderr(predicates::str::contains("not found"));
+}
+
 // ── todo tests ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_todo_deprecation_warning_shown() {
+    let dir = TempDir::new().expect("tempdir");
+    // First use should show deprecation warning
+    run(&dir, &["todo", "add", "Test deprecation"])
+        .success()
+        .stderr(predicates::str::contains("deprecated"));
+}
 
 #[test]
 fn test_todo_add_and_list() {

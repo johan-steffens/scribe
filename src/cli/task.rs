@@ -72,6 +72,8 @@ pub enum TaskSubcommand {
     Move(TaskMove),
     /// Mark a task as done.
     Done(TaskDone),
+    /// Toggle a task between todo and done status.
+    Toggle(TaskToggle),
     /// Archive a task.
     Archive(TaskArchive),
     /// Restore an archived task.
@@ -98,6 +100,9 @@ pub struct TaskAdd {
     /// Due date in `YYYY-MM-DD` format.
     #[arg(long)]
     pub due: Option<String>,
+    /// Parent task slug for hierarchical nesting.
+    #[arg(long)]
+    pub parent: Option<String>,
     /// Output format.
     #[arg(long, default_value = "text")]
     pub output: OutputFormat,
@@ -178,6 +183,16 @@ pub struct TaskDone {
     pub output: OutputFormat,
 }
 
+/// Arguments for `scribe task toggle`.
+#[derive(Debug, Args)]
+pub struct TaskToggle {
+    /// Task slug to toggle.
+    pub slug: String,
+    /// Output format.
+    #[arg(long, default_value = "text")]
+    pub output: OutputFormat,
+}
+
 /// Arguments for `scribe task archive`.
 #[derive(Debug, Args)]
 pub struct TaskArchive {
@@ -251,6 +266,7 @@ pub fn run(
         TaskSubcommand::Edit(args) => handle_edit(args, task_ops),
         TaskSubcommand::Move(args) => handle_move(args, task_ops, project_ops),
         TaskSubcommand::Done(args) => handle_done(args, task_ops),
+        TaskSubcommand::Toggle(args) => handle_toggle(args, task_ops),
         TaskSubcommand::Archive(args) => handle_archive(args, task_ops),
         TaskSubcommand::Restore(args) => handle_restore(args, task_ops),
         TaskSubcommand::Delete(args) => handle_delete(args, task_ops),
@@ -265,7 +281,7 @@ mod handlers;
 
 use handlers::{
     handle_add, handle_archive, handle_delete, handle_done, handle_edit, handle_list, handle_move,
-    handle_restore, handle_show,
+    handle_restore, handle_show, handle_toggle,
 };
 
 /// Delegates to [`report_handle_report`] after building a [`ReportCommand`]

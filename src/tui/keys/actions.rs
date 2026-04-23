@@ -252,6 +252,7 @@ fn exec_create_task(app: &App, form: &Form) -> anyhow::Result<()> {
             status: crate::domain::TaskStatus::Todo,
             priority: crate::domain::TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
         })
         .map(|_| ())
 }
