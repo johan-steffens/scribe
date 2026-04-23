@@ -58,7 +58,7 @@ pub use project::{NewProject, Project, ProjectPatch, ProjectStatus, Projects};
 #[doc(inline)]
 pub use reminder::{NewReminder, Reminder, ReminderPatch, Reminders};
 #[doc(inline)]
-pub use task::{NewTask, Task, TaskPatch, TaskPriority, TaskStatus, Tasks};
+pub use task::{NewTask, Task, TaskKind, TaskPatch, TaskPriority, TaskStatus, Tasks};
 #[doc(inline)]
 pub use time_entry::{NewTimeEntry, TimeEntries, TimeEntry, TimeEntryPatch};
 #[doc(inline)]

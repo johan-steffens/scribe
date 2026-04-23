@@ -9,6 +9,8 @@
 //! - **M1** — creates all six core tables and seeds the reserved
 //!   `quick-capture` project.
 //! - **M2** — adds the `persistent` column to the `reminders` table.
+//! - **M3** — creates the `sync_metadata` table.
+//! - **M4** — adds `parent_id` and `kind` columns to the `tasks` table.
 
 use rusqlite_migration::M;
 
@@ -135,6 +137,20 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );";
 
+/// M4 — adds `parent_id` and `kind` columns to the `tasks` table.
+///
+/// `parent_id` enables infinite hierarchical nesting (task → sub-task → sub-sub-task).
+/// It is nullable — a `NULL` parent means a top-level task.
+///
+/// `kind` distinguishes between a full task (`task`) and a lightweight checklist
+/// item (`checklist_item`). This allows UI rendering to treat deep sub-tasks as
+/// simple checkbox items while keeping the same underlying storage.
+pub(super) const M4: &str = "
+ALTER TABLE tasks ADD COLUMN parent_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'
+    CHECK (kind IN ('task', 'checklist_item'));
+CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -145,5 +161,5 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
 /// let migrations = rusqlite_migration::Migrations::new(scribe::db::migrations::all());
 /// ```
 pub(super) fn all() -> Vec<M<'static>> {
-    vec![M::up(M1), M::up(M2), M::up(M3)]
+    vec![M::up(M1), M::up(M2), M::up(M3), M::up(M4)]
 }

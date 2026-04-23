@@ -130,6 +130,9 @@ pub(super) fn handle_edit(args: &TaskEdit, task_ops: &TaskOps) -> anyhow::Result
         due_date,
         clear_due_date: false,
         project_id: None,
+        parent_id: None,
+        clear_parent_id: false,
+        kind: None,
     };
     let task = task_ops.update_task(&args.slug, patch)?;
     match args.output {

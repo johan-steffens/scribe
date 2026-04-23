@@ -9,13 +9,15 @@ use chrono::{NaiveDate, Utc};
 use rusqlite::types::ToSql;
 use rusqlite::{Connection, params};
 
-use crate::domain::{NewTask, ProjectId, Task, TaskId, TaskPatch, TaskPriority, TaskStatus, Tasks};
+use crate::domain::{
+    NewTask, ProjectId, Task, TaskId, TaskKind, TaskPatch, TaskPriority, TaskStatus, Tasks,
+};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
 // ── row mapping ────────────────────────────────────────────────────────────
 
 const SELECT_COLS: &str = "id, slug, project_id, title, description, status, priority, \
-     due_date, archived_at, created_at, updated_at";
+     due_date, parent_id, kind, archived_at, created_at, updated_at";
 
 struct RawRow {
     id: i64,
@@ -26,6 +28,8 @@ struct RawRow {
     status: String,
     priority: String,
     due_date: Option<String>,
+    parent_id: Option<i64>,
+    kind: String,
     archived_at: Option<String>,
     created_at: String,
     updated_at: String,
@@ -58,6 +62,11 @@ impl RawRow {
                 .parse::<TaskPriority>()
                 .map_err(|e| anyhow::anyhow!(e))?,
             due_date,
+            parent_id: self.parent_id.map(TaskId),
+            kind: self
+                .kind
+                .parse::<TaskKind>()
+                .map_err(|e| anyhow::anyhow!(e))?,
             archived_at: parse_dt_opt(self.archived_at)?,
             created_at: parse_dt(&self.created_at)?,
             updated_at: parse_dt(&self.updated_at)?,
@@ -75,9 +84,11 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
         status: row.get(5)?,
         priority: row.get(6)?,
         due_date: row.get(7)?,
-        archived_at: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
+        parent_id: row.get(8)?,
+        kind: row.get(9)?,
+        archived_at: row.get(10)?,
+        created_at: row.get(11)?,
+        updated_at: row.get(12)?,
     })
 }
 
@@ -93,11 +104,13 @@ fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRo
             status: row.get(5)?,
             priority: row.get(6)?,
             due_date: row.get(7)?,
-            archived_at: row.get(8)?,
-            created_at: row.get(9)?,
-            updated_at: row.get(10)?,
+            parent_id: row.get(8)?,
+            kind: row.get(9)?,
+            archived_at: row.get(10)?,
+            created_at: row.get(11)?,
+            updated_at: row.get(12)?,
         },
-        row.get(11)?,
+        row.get(13)?,
     ))
 }
 
@@ -163,8 +176,8 @@ impl Tasks for SqliteTasks {
         conn.execute(
             "INSERT INTO tasks \
              (slug, project_id, title, description, status, priority, \
-              due_date, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)",
+              due_date, parent_id, kind, created_at, updated_at) \
+              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 task.slug,
                 task.project_id.0,
@@ -173,6 +186,9 @@ impl Tasks for SqliteTasks {
                 task.status.to_string(),
                 task.priority.to_string(),
                 due_date_str,
+                task.parent_id.map(|id| id.0),
+                task.kind.to_string(),
+                now.clone(),
                 now,
             ],
         )?;
@@ -263,6 +279,20 @@ impl Tasks for SqliteTasks {
             sets.push(format!("project_id = ?{i}"));
             extra.push(Some(v.0.to_string()));
         }
+        if let Some(ref v) = patch.parent_id {
+            let i = extra.len() + 2;
+            sets.push(format!("parent_id = ?{i}"));
+            extra.push(Some(v.0.to_string()));
+        } else if patch.clear_parent_id {
+            let i = extra.len() + 2;
+            sets.push(format!("parent_id = ?{i}"));
+            extra.push(None);
+        }
+        if let Some(ref v) = patch.kind {
+            let i = extra.len() + 2;
+            sets.push(format!("kind = ?{i}"));
+            extra.push(Some(v.to_string()));
+        }
 
         let where_i = extra.len() + 2;
         let sql = format!(
@@ -340,7 +370,7 @@ pub mod testing {
     //! Re-exports internals so external integration tests can construct
     //! [`super::SqliteTasks`] instances against an in-memory database.
 
-    use super::{Arc, Mutex, NewTask, ProjectId, SqliteTasks, TaskPriority, TaskStatus};
+    use super::{Arc, Mutex, NewTask, ProjectId, SqliteTasks, TaskKind, TaskPriority, TaskStatus};
     use crate::db::open_in_memory;
 
     /// The seeded quick-capture project ID used in tests.
@@ -368,6 +398,8 @@ pub mod testing {
             status: TaskStatus::Todo,
             priority: TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
+            kind: TaskKind::Task,
         }
     }
 }
@@ -382,7 +414,8 @@ impl SqliteTasks {
     pub fn list_all(&self) -> anyhow::Result<Vec<Task>> {
         let conn = self.lock()?;
         let sql = "SELECT t.id, t.slug, t.project_id, t.title, t.description, t.status, \
-             t.priority, t.due_date, t.archived_at, t.created_at, t.updated_at, p.slug \
+             t.priority, t.due_date, t.parent_id, t.kind, t.archived_at, t.created_at, \
+             t.updated_at, p.slug \
              FROM tasks t JOIN projects p ON t.project_id = p.id ORDER BY t.created_at ASC";
         let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], map_row_with_project_slug)?;
@@ -439,16 +472,18 @@ impl SqliteTasks {
             tx.execute(
                 "INSERT INTO tasks \
                  (slug, project_id, title, description, status, priority, \
-                  due_date, archived_at, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
-                 ON CONFLICT(slug) DO UPDATE SET \
-                   title       = excluded.title, \
-                   description = excluded.description, \
-                   status      = excluded.status, \
-                   priority    = excluded.priority, \
-                   due_date    = excluded.due_date, \
-                   archived_at = excluded.archived_at, \
-                   updated_at  = excluded.updated_at",
+                  due_date, parent_id, kind, archived_at, created_at, updated_at) \
+                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) \
+                  ON CONFLICT(slug) DO UPDATE SET \
+                    title       = excluded.title, \
+                    description = excluded.description, \
+                    status      = excluded.status, \
+                    priority    = excluded.priority, \
+                    due_date    = excluded.due_date, \
+                    parent_id   = excluded.parent_id, \
+                    kind        = excluded.kind, \
+                    archived_at = excluded.archived_at, \
+                    updated_at  = excluded.updated_at",
                 rusqlite::params![
                     t.slug,
                     local_project_id.0,
@@ -457,6 +492,8 @@ impl SqliteTasks {
                     t.status.to_string(),
                     t.priority.to_string(),
                     due_date_str,
+                    t.parent_id.map(|id| id.0),
+                    t.kind.to_string(),
                     t.archived_at.map(|dt| dt.to_rfc3339()),
                     t.created_at.to_rfc3339(),
                     t.updated_at.to_rfc3339(),

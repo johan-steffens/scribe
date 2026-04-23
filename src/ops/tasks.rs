@@ -98,6 +98,8 @@ impl TaskOps {
             status: params.status,
             priority: params.priority,
             due_date: params.due_date,
+            parent_id: None,
+            kind: crate::domain::TaskKind::Task,
         })
     }
 
