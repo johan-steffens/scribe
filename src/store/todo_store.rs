@@ -17,7 +17,7 @@ use crate::store::project_store::{parse_dt, parse_dt_opt};
 
 /// Columns selected when mapping a todo row from the tasks table.
 /// Maps task columns to Todo domain fields:
-/// - id, slug, project_id, title, status, archived_at, created_at, updated_at
+/// - `id`, `slug`, `project_id`, `title`, `status`, `archived_at`, `created_at`, `updated_at`
 const SELECT_COLS: &str =
     "id, slug, project_id, title, status, archived_at, created_at, updated_at";
 
@@ -113,17 +113,12 @@ impl SqliteTodos {
 
     /// Maps `done` boolean to a task status string.
     fn done_to_status(done: bool) -> &'static str {
-        if done {
-            "done"
-        } else {
-            "todo"
-        }
+        if done { "done" } else { "todo" }
     }
 
     fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Todo>> {
-        let sql = format!(
-            "SELECT {SELECT_COLS} FROM tasks WHERE slug = ?1 AND kind = 'checklist_item'"
-        );
+        let sql =
+            format!("SELECT {SELECT_COLS} FROM tasks WHERE slug = ?1 AND kind = 'checklist_item'");
         let mut stmt = conn.prepare(&sql)?;
         let mut iter = stmt.query_map(params![slug], map_row)?;
         iter.next()
@@ -264,11 +259,10 @@ impl Todos for SqliteTodos {
 
     fn delete(&self, slug: &str) -> anyhow::Result<()> {
         let conn = self.lock()?;
-        let rows =
-            conn.execute(
-                "DELETE FROM tasks WHERE slug = ?1 AND kind = 'checklist_item'",
-                params![slug],
-            )?;
+        let rows = conn.execute(
+            "DELETE FROM tasks WHERE slug = ?1 AND kind = 'checklist_item'",
+            params![slug],
+        )?;
         if rows == 0 {
             return Err(anyhow::anyhow!("todo '{slug}' not found"));
         }
