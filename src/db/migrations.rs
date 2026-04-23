@@ -12,6 +12,7 @@
 //! - **M3** — creates the `sync_metadata` table.
 //! - **M4** — adds `parent_id` and `kind` columns to the `tasks` table.
 //! - **M5** — migrates all `todos` rows into `tasks` (as `checklist_item` kind) and drops `todos`.
+//! - **M6** — creates `notes` and `links` tables for PKM functionality.
 
 use rusqlite_migration::M;
 
@@ -186,6 +187,38 @@ SELECT
 FROM todos;
 DROP TABLE IF EXISTS todos;";
 
+/// M6 — creates `notes` and `links` tables for PKM (Personal Knowledge Management).
+///
+/// `notes` stores markdown documents with a user-provided slug (no auto-prefix).
+/// Slugs must be valid kebab-case identifiers.
+///
+/// `links` implements the bi-directional link layer: every note can reference
+/// any other note or task slug, and the relationship is stored explicitly so
+/// backlinks (e.g. "哪些笔记引用了这个笔记") can be queried efficiently.
+pub(super) const M6: &str = "
+CREATE TABLE IF NOT EXISTS notes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT    NOT NULL UNIQUE,
+    title       TEXT    NOT NULL,
+    content     TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_slug    ON notes(slug);
+CREATE INDEX IF NOT EXISTS idx_notes_title  ON notes(title);
+
+CREATE TABLE IF NOT EXISTS links (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_slug  TEXT    NOT NULL,
+    target_slug  TEXT    NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(source_slug, target_slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_links_source  ON links(source_slug);
+CREATE INDEX IF NOT EXISTS idx_links_target  ON links(target_slug);";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -196,5 +229,12 @@ DROP TABLE IF EXISTS todos;";
 /// let migrations = rusqlite_migration::Migrations::new(scribe::db::migrations::all());
 /// ```
 pub(super) fn all() -> Vec<M<'static>> {
-    vec![M::up(M1), M::up(M2), M::up(M3), M::up(M4), M::up(M5)]
+    vec![
+        M::up(M1),
+        M::up(M2),
+        M::up(M3),
+        M::up(M4),
+        M::up(M5),
+        M::up(M6),
+    ]
 }

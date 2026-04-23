@@ -9,6 +9,7 @@
 //! mapped to `anyhow::Error` at the store boundary (M-DONT-LEAK-TYPES).
 
 pub mod capture_store;
+pub mod note_store;
 pub mod project_store;
 pub mod reminder_store;
 pub mod task_store;
@@ -24,6 +25,10 @@ pub use task_store::SqliteTasks;
 // Phase 2 stores — wired into the CLI.
 #[doc(inline)]
 pub use capture_store::SqliteCaptureItems;
+#[doc(inline)]
+pub use note_store::SqliteLinks;
+#[doc(inline)]
+pub use note_store::SqliteNotes;
 #[doc(inline)]
 pub use reminder_store::SqliteReminders;
 #[doc(inline)]

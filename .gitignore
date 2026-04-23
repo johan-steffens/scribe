@@ -3,3 +3,6 @@
 # Agent workspace files
 /plans/
 /CLAUDE.md
+
+# General ignores
+/**/.DS_Store

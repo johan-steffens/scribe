@@ -17,6 +17,7 @@
 //! | [`reporting`] | Cross-domain summary and project reports |
 
 pub mod inbox;
+pub mod notes;
 pub mod projects;
 pub mod reminders;
 pub mod reporting;
@@ -26,6 +27,8 @@ pub mod tracker;
 
 #[doc(inline)]
 pub use inbox::InboxOps;
+#[doc(inline)]
+pub use notes::NotesOps;
 #[doc(inline)]
 pub use projects::ProjectOps;
 #[doc(inline)]

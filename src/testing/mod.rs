@@ -41,6 +41,10 @@ pub use crate::ops::reminders::testing as reminder_ops;
 #[doc(inline)]
 pub use crate::ops::inbox::testing as inbox_ops;
 
+/// Re-exports from `crate::ops::notes::testing`.
+#[doc(inline)]
+pub use crate::ops::notes::testing as notes_ops;
+
 /// Re-exports from `crate::ops::tracker::testing`.
 #[doc(inline)]
 pub use crate::ops::tracker::testing as tracker_ops;
@@ -70,6 +74,10 @@ pub use crate::store::time_entry_store::testing as time_entry_store;
 /// Re-exports from `crate::store::capture_store::testing`.
 #[doc(inline)]
 pub use crate::store::capture_store::testing as capture_store;
+
+/// Re-exports from `crate::store::note_store::testing`.
+#[doc(inline)]
+pub use crate::store::note_store::testing as note_store;
 
 // ── domain re-exports ─────────────────────────────────────────────────────
 

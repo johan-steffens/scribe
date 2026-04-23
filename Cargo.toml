@@ -14,6 +14,7 @@ categories = ["command-line-utilities"]
 # Build with: cargo build --features mcp
 # Install with: cargo install --path . --features mcp
 default = []
+test-util = []
 mcp = ["dep:rmcp", "dep:tokio", "dep:schemars"]
 # The `sync` feature gates the cloud-sync subsystem (HTTP client, auth, server).
 # Build with: cargo build --features sync
