@@ -11,6 +11,7 @@
 //! - **M2** — adds the `persistent` column to the `reminders` table.
 //! - **M3** — creates the `sync_metadata` table.
 //! - **M4** — adds `parent_id` and `kind` columns to the `tasks` table.
+//! - **M5** — migrates all `todos` rows into `tasks` (as `checklist_item` kind) and drops `todos`.
 
 use rusqlite_migration::M;
 
@@ -151,6 +152,40 @@ ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'
     CHECK (kind IN ('task', 'checklist_item'));
 CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);";
 
+/// M5 — migrates all `todos` rows into `tasks` as `checklist_item` kind and drops `todos`.
+///
+/// Each existing `todo` becomes a top-level task with:
+/// - `slug` preserved; if a collision exists with an existing task, appends `-migrated`
+///   with a timestamp suffix to ensure uniqueness.
+/// - `status` mapped from `done` — `done = 1` → `status = 'done'`, `done = 0` → `status = 'todo'`.
+/// - `kind = 'checklist_item'` — todos become checklist items, not full tasks.
+/// - `parent_id = NULL` — todos become top-level (no parent task concept existed).
+/// - `priority = 'medium'` and `description = NULL` — reasonable defaults for migrated items.
+/// - `archived_at`, `created_at` preserved as-is.
+///
+/// After all rows are inserted, the `todos` table is dropped.
+pub(super) const M5: &str = "
+INSERT INTO tasks
+    (slug, project_id, title, status, priority, description, parent_id, kind, archived_at, created_at, updated_at)
+SELECT
+    CASE
+        WHEN (SELECT COUNT(*) FROM tasks t WHERE t.slug = todos.slug) > 0
+        THEN todos.slug || '-migrated-' || unixepoch('now')
+        ELSE todos.slug
+    END,
+    project_id,
+    title,
+    CASE WHEN done = 1 THEN 'done' ELSE 'todo' END,
+    'medium',
+    NULL,
+    NULL,
+    'checklist_item',
+    archived_at,
+    created_at,
+    created_at
+FROM todos;
+DROP TABLE IF EXISTS todos;";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -161,5 +196,5 @@ CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);";
 /// let migrations = rusqlite_migration::Migrations::new(scribe::db::migrations::all());
 /// ```
 pub(super) fn all() -> Vec<M<'static>> {
-    vec![M::up(M1), M::up(M2), M::up(M3), M::up(M4)]
+    vec![M::up(M1), M::up(M2), M::up(M3), M::up(M4), M::up(M5)]
 }
