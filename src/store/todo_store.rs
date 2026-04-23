@@ -1,5 +1,9 @@
 //! `SQLite` implementation of the [`Todos`] repository trait.
 //!
+//! Todos are stored as `tasks` rows with `kind = 'checklist_item'`. The
+//! `tasks.status` column encodes the `done` boolean: `'done'` means completed,
+//! any other status (`'todo'`, `'in_progress'`, `'cancelled'`) means not-done.
+//!
 //! Wired into the CLI via [`crate::ops::TodoOps`].
 
 use std::sync::{Arc, Mutex};
@@ -11,14 +15,18 @@ use rusqlite::{Connection, params};
 use crate::domain::{NewTodo, ProjectId, Todo, TodoId, TodoPatch, Todos};
 use crate::store::project_store::{parse_dt, parse_dt_opt};
 
-const SELECT_COLS: &str = "id, slug, project_id, title, done, archived_at, created_at, updated_at";
+/// Columns selected when mapping a todo row from the tasks table.
+/// Maps task columns to Todo domain fields:
+/// - id, slug, project_id, title, status, archived_at, created_at, updated_at
+const SELECT_COLS: &str =
+    "id, slug, project_id, title, status, archived_at, created_at, updated_at";
 
 struct RawRow {
     id: i64,
     slug: String,
     project_id: i64,
     title: String,
-    done: bool,
+    status: String,
     archived_at: Option<String>,
     created_at: String,
     updated_at: String,
@@ -30,7 +38,7 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
         slug: row.get(1)?,
         project_id: row.get(2)?,
         title: row.get(3)?,
-        done: row.get::<_, i64>(4)? != 0,
+        status: row.get(4)?,
         archived_at: row.get(5)?,
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
@@ -45,7 +53,7 @@ fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRo
             slug: row.get(1)?,
             project_id: row.get(2)?,
             title: row.get(3)?,
-            done: row.get::<_, i64>(4)? != 0,
+            status: row.get(4)?,
             archived_at: row.get(5)?,
             created_at: row.get(6)?,
             updated_at: row.get(7)?,
@@ -57,13 +65,14 @@ fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRo
 impl RawRow {
     fn into_todo(self, project_slug: Option<String>) -> anyhow::Result<Todo> {
         let project_slug = project_slug.unwrap_or_else(|| "unknown".to_owned());
+        let done = self.status == "done";
         Ok(Todo {
             id: TodoId(self.id),
             slug: self.slug,
             project_id: ProjectId(self.project_id),
             project_slug,
             title: self.title,
-            done: self.done,
+            done,
             archived_at: parse_dt_opt(self.archived_at)?,
             created_at: parse_dt(&self.created_at)?,
             updated_at: parse_dt(&self.updated_at)?,
@@ -102,8 +111,19 @@ impl SqliteTodos {
             .map_err(|e| anyhow::anyhow!("DB lock poisoned: {e}"))
     }
 
+    /// Maps `done` boolean to a task status string.
+    fn done_to_status(done: bool) -> &'static str {
+        if done {
+            "done"
+        } else {
+            "todo"
+        }
+    }
+
     fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Todo>> {
-        let sql = format!("SELECT {SELECT_COLS} FROM todos WHERE slug = ?1");
+        let sql = format!(
+            "SELECT {SELECT_COLS} FROM tasks WHERE slug = ?1 AND kind = 'checklist_item'"
+        );
         let mut stmt = conn.prepare(&sql)?;
         let mut iter = stmt.query_map(params![slug], map_row)?;
         iter.next()
@@ -111,7 +131,10 @@ impl SqliteTodos {
             .map_err(anyhow::Error::from)?
             .map(|raw| {
                 let project_slug = {
-                    let mut s = conn.prepare("SELECT p.slug FROM projects p JOIN todos t ON t.project_id = p.id WHERE t.slug = ?1")?;
+                    let mut s = conn.prepare(
+                        "SELECT p.slug FROM projects p JOIN tasks t ON t.project_id = p.id
+                         WHERE t.slug = ?1 AND t.kind = 'checklist_item'",
+                    )?;
                     s.query_row(params![slug], |row| row.get(0)).ok()
                 };
                 raw.into_todo(project_slug)
@@ -125,8 +148,9 @@ impl Todos for SqliteTodos {
         let conn = self.lock()?;
         let now = Utc::now().to_rfc3339();
         conn.execute(
-            "INSERT INTO todos (slug, project_id, title, done, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, 0, ?4, ?4)",
+            "INSERT INTO tasks \
+             (slug, project_id, title, status, priority, kind, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, 'todo', 'medium', 'checklist_item', ?4, ?4)",
             params![todo.slug, todo.project_id.0, todo.title, now],
         )?;
         Self::fetch_one(&conn, &todo.slug)?
@@ -145,12 +169,12 @@ impl Todos for SqliteTodos {
         include_archived: bool,
     ) -> anyhow::Result<Vec<Todo>> {
         let conn = self.lock()?;
-        let mut conditions: Vec<String> = Vec::new();
+        let mut conditions: Vec<String> = vec!["kind = 'checklist_item'".to_owned()];
         if !include_archived {
             conditions.push("archived_at IS NULL".to_owned());
         }
         if !include_done {
-            conditions.push("done = 0".to_owned());
+            conditions.push("status != 'done'".to_owned());
         }
         if let Some(pid) = project_id {
             conditions.push(format!("project_id = {}", pid.0));
@@ -160,7 +184,7 @@ impl Todos for SqliteTodos {
         } else {
             format!("WHERE {}", conditions.join(" AND "))
         };
-        let sql = format!("SELECT {SELECT_COLS} FROM todos {where_clause} ORDER BY created_at");
+        let sql = format!("SELECT {SELECT_COLS} FROM tasks {where_clause} ORDER BY created_at");
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], map_row)?;
         rows.map(|r| r.map_err(anyhow::Error::from)?.into_todo(None))
@@ -180,8 +204,8 @@ impl Todos for SqliteTodos {
         }
         if let Some(v) = patch.done {
             let i = extra.len() + 2;
-            sets.push(format!("done = ?{i}"));
-            extra.push(Some(if v { "1".to_owned() } else { "0".to_owned() }));
+            sets.push(format!("status = ?{i}"));
+            extra.push(Some(Self::done_to_status(v).to_owned()));
         }
         if let Some(ref v) = patch.project_id {
             let i = extra.len() + 2;
@@ -191,7 +215,7 @@ impl Todos for SqliteTodos {
 
         let where_i = extra.len() + 2;
         let sql = format!(
-            "UPDATE todos SET {} WHERE slug = ?{where_i}",
+            "UPDATE tasks SET {} WHERE slug = ?{where_i} AND kind = 'checklist_item'",
             sets.join(", ")
         );
 
@@ -212,7 +236,8 @@ impl Todos for SqliteTodos {
         let conn = self.lock()?;
         let now = Utc::now().to_rfc3339();
         let rows = conn.execute(
-            "UPDATE todos SET archived_at = ?1, updated_at = ?1 WHERE slug = ?2",
+            "UPDATE tasks SET archived_at = ?1, updated_at = ?1 \
+             WHERE slug = ?2 AND kind = 'checklist_item'",
             params![now, slug],
         )?;
         if rows == 0 {
@@ -226,7 +251,8 @@ impl Todos for SqliteTodos {
         let conn = self.lock()?;
         let now = Utc::now().to_rfc3339();
         let rows = conn.execute(
-            "UPDATE todos SET archived_at = NULL, updated_at = ?1 WHERE slug = ?2",
+            "UPDATE tasks SET archived_at = NULL, updated_at = ?1 \
+             WHERE slug = ?2 AND kind = 'checklist_item'",
             params![now, slug],
         )?;
         if rows == 0 {
@@ -238,7 +264,11 @@ impl Todos for SqliteTodos {
 
     fn delete(&self, slug: &str) -> anyhow::Result<()> {
         let conn = self.lock()?;
-        let rows = conn.execute("DELETE FROM todos WHERE slug = ?1", params![slug])?;
+        let rows =
+            conn.execute(
+                "DELETE FROM tasks WHERE slug = ?1 AND kind = 'checklist_item'",
+                params![slug],
+            )?;
         if rows == 0 {
             return Err(anyhow::anyhow!("todo '{slug}' not found"));
         }
@@ -249,8 +279,8 @@ impl Todos for SqliteTodos {
         let conn = self.lock()?;
         let now = Utc::now().to_rfc3339();
         conn.execute(
-            "UPDATE todos SET archived_at = ?1, updated_at = ?1 \
-             WHERE project_id = ?2 AND archived_at IS NULL",
+            "UPDATE tasks SET archived_at = ?1, updated_at = ?1 \
+             WHERE project_id = ?2 AND kind = 'checklist_item' AND archived_at IS NULL",
             params![now, project_id.0],
         )?;
         Ok(())
@@ -299,9 +329,10 @@ impl SqliteTodos {
     /// Returns an error if the database query fails.
     pub fn list_all(&self) -> anyhow::Result<Vec<Todo>> {
         let conn = self.lock()?;
-        let sql = "SELECT t.id, t.slug, t.project_id, t.title, t.done, t.archived_at, \
+        let sql = "SELECT t.id, t.slug, t.project_id, t.title, t.status, t.archived_at, \
              t.created_at, t.updated_at, p.slug \
-             FROM todos t JOIN projects p ON t.project_id = p.id ORDER BY t.created_at ASC";
+             FROM tasks t JOIN projects p ON t.project_id = p.id \
+             WHERE t.kind = 'checklist_item' ORDER BY t.created_at ASC";
         let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map([], map_row_with_project_slug)?;
         rows.map(|r| {
@@ -345,19 +376,21 @@ impl SqliteTodos {
         let tx = conn.transaction()?;
         for (local_project_id, t) in todo_data {
             tx.execute(
-                "INSERT INTO todos \
-                 (slug, project_id, title, done, archived_at, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+                "INSERT INTO tasks \
+                 (slug, project_id, title, status, priority, kind, archived_at, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, 'medium', 'checklist_item', ?5, ?6, ?7) \
                  ON CONFLICT(slug) DO UPDATE SET \
                    title       = excluded.title, \
-                   done        = excluded.done, \
+                   status      = excluded.status, \
+                   priority    = excluded.priority, \
+                   kind        = excluded.kind, \
                    archived_at = excluded.archived_at, \
                    updated_at  = excluded.updated_at",
                 rusqlite::params![
                     t.slug,
                     local_project_id.0,
                     t.title,
-                    i64::from(t.done),
+                    Self::done_to_status(t.done),
                     t.archived_at.map(|dt| dt.to_rfc3339()),
                     t.created_at.to_rfc3339(),
                     t.updated_at.to_rfc3339(),
