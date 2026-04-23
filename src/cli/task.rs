@@ -184,6 +184,9 @@ pub struct TaskDone {
 }
 
 /// Arguments for `scribe task toggle`.
+///
+/// Toggles a task's status between `todo` and `done`. Other statuses
+/// (`in_progress`, `cancelled`) are flipped to `done`.
 #[derive(Debug, Args)]
 pub struct TaskToggle {
     /// Task slug to toggle.

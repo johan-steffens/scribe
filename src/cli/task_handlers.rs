@@ -204,16 +204,9 @@ pub(super) fn handle_toggle(args: &TaskToggle, task_ops: &TaskOps) -> anyhow::Re
         },
     )?;
 
-    let status_str = match updated.status {
-        TaskStatus::Todo => "todo",
-        TaskStatus::Done => "done",
-        TaskStatus::InProgress => "in_progress",
-        TaskStatus::Cancelled => "cancelled",
-    };
-
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&updated)?),
-        OutputFormat::Text => println!("Toggled: {} -> {}", updated.slug, status_str),
+        OutputFormat::Text => println!("Toggled: {} -> {}", updated.slug, updated.status),
     }
     Ok(())
 }

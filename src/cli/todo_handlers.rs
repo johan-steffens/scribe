@@ -3,7 +3,6 @@
 //! This file is included by `todo.rs` via `#[path = "todo_handlers.rs"]`.
 
 use serde_json::json;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::{
     OutputFormat, TodoAdd, TodoArchive, TodoDelete, TodoDone, TodoList, TodoMove, TodoRestore,
@@ -11,19 +10,13 @@ use super::{
 };
 use crate::ops::{ProjectOps, TodoOps};
 
-/// Flag to track whether the deprecation warning has been shown.
-/// Uses atomic to allow checking from multiple handlers without mutex.
-static DEPRECATION_WARNED: AtomicBool = AtomicBool::new(false);
-
-/// Prints a deprecation warning to stderr if it hasn't been shown yet.
+/// Prints a deprecation warning to stderr.
 fn warn_deprecation() {
-    if !DEPRECATION_WARNED.swap(true, Ordering::Relaxed) {
-        eprintln!(
-            "WARNING: The `scribe todo` command is deprecated and will be removed in a future release.\n\
-             Todos are now managed as checklist items under `scribe task` commands.\n\
-             Please use `scribe task add`, `scribe task list`, etc. instead."
-        );
-    }
+    eprintln!(
+        "WARNING: The `scribe todo` command is deprecated and will be removed in a future release.\n\
+         Todos are now managed as checklist items under `scribe task` commands.\n\
+         Please use `scribe task add`, `scribe task list`, etc. instead."
+    );
 }
 
 pub(super) fn handle_add(args: &TodoAdd, ops: &TodoOps) -> anyhow::Result<()> {
