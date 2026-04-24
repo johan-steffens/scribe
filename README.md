@@ -147,12 +147,11 @@ long-form notes with automatic cross-linking.
 Notes are Markdown documents stored directly in your SQLite database. Unlike
 tasks and todos, note slugs are user-defined (not auto-prefixed by project).
 
-```sh
-scribe note add my-design-doc --title "API Design Notes"
-scribe note edit my-design-doc --content "# Architecture\n\nSee [[payments-task-api-overhaul]]"
-scribe note list
-scribe note show my-design-doc
-```
+Notes are created and edited in the **TUI** — run `scribe` and press `n` in the
+Notes view (`m` key to switch). AI agents can access notes via MCP tools:
+`read_note`, `write_note`, and `search_notes`.
+
+> **Note:** A CLI interface for notes may be added in a future release.
 
 ### Wiki-style Links
 
@@ -170,15 +169,9 @@ work.
 
 ### Full-text Search
 
-Notes are indexed with SQLite FTS5. AI agents can search your knowledge base:
-
-```sh
-# Via MCP (agent tool)
-scribe_notes_search(query: "architecture decisions")
-```
-
-The MCP server exposes `search_notes` which returns up to 50 matching notes
-ordered by relevance.
+Notes are indexed with SQLite FTS5. AI agents can search your knowledge base
+via the `search_notes` MCP tool, which returns up to 50 matching notes ordered
+by relevance (BM25 ranking).
 
 ---
 

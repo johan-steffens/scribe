@@ -783,13 +783,8 @@ long-form Markdown notes with automatic cross-linking.
 
 ### Creating and editing notes
 
-```sh
-# Create a note with a user-defined slug
-scribe note add my-design-doc --title "API Design Notes"
-
-# Edit the content (opens $EDITOR by default, or use --content)
-scribe note edit my-design-doc --content "# Architecture\n\nSee [[payments-task-api-overhaul]]"
-```
+Notes are created and edited in the **TUI**. Run `scribe` and press `m` to
+switch to the Notes view, then press `n` to create a new note.
 
 Note slugs are user-defined kebab-case strings — no auto-prefix from the project.
 This makes notes portable and easy to reference from any project.
@@ -808,24 +803,14 @@ Also see [[my-other-note]] for related thinking.
 Links are parsed on every save and stored in the `links` table. This creates a
 graph of connections between your knowledge base and your work.
 
-### Listing and showing notes
+### Accessing notes
 
-```sh
-scribe note list
-scribe note show my-design-doc
-```
+| Method | How |
+|--------|-----|
+| **TUI** | Run `scribe`, press `m` for Notes view, `n` to create, `e` to edit |
+| **MCP tools** | `read_note`, `write_note`, `search_notes` (for AI agents) |
 
-### Full-text search
-
-Notes are indexed with SQLite FTS5. Search via the MCP server:
-
-```
-Agent: Search my notes for "architecture decisions"
-→ scribe_notes_search(query: "architecture decisions")
-```
-
-The `search_notes` MCP tool returns up to 50 matching notes ordered by
-relevance (BM25 ranking).
+> **Note:** A CLI interface for notes may be added in a future release.
 
 ---
 
@@ -900,6 +885,16 @@ Lists active, undone todos. Navigation is the same as Tasks.
 | `D` | Archive selected todo (confirmation) |
 | `Space` | Toggle done/undone |
 | `v` | Move selected todo to another project (form) |
+
+### Notes view
+
+Press `m` to switch to the Notes view.
+
+| Key | Action |
+|-----|--------|
+| `n` | New note (form with slug and title) |
+| `e` | Edit selected note title or content |
+| `D` | Delete selected note (confirmation required) |
 
 ### Tracker view
 
