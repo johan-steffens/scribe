@@ -84,8 +84,8 @@ fn render_tab_bar(frame: &mut Frame, area: Rect, app: &App) {
         nav_span(View::Dashboard, "[D]ashboard "),
         nav_span(View::Projects, "[P]rojects "),
         nav_span(View::Tasks, "[T]asks "),
-        nav_span(View::Todos, "[O]Todos"),
-        nav_span(View::Notes, "[N]Notes"),
+        nav_span(View::Todos, "[O]Todos "),
+        nav_span(View::Notes, "[N]Notes "),
     ]);
 
     let line2 = Line::from(vec![
