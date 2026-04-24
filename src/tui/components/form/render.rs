@@ -270,13 +270,11 @@ pub(super) fn handle_text_key(value: &mut String, cursor: &mut usize, code: KeyC
                 *cursor = new_cursor;
             }
         }
-        KeyCode::Left => {
-            if *cursor > 0 {
-                *cursor = value[..*cursor]
-                    .char_indices()
-                    .next_back()
-                    .map_or(0, |(i, _)| i);
-            }
+        KeyCode::Left if *cursor > 0 => {
+            *cursor = value[..*cursor]
+                .char_indices()
+                .next_back()
+                .map_or(0, |(i, _)| i);
         }
         KeyCode::Right if *cursor < value.len() => {
             let next = value[*cursor..]
