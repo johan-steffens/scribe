@@ -147,7 +147,7 @@ pub(super) fn build_create_form(app: &App) -> Option<(Form, FormContext)> {
             ),
             FormContext::CreateTask,
         )),
-        View::Dashboard => None,
+        View::Notes | View::Dashboard => None,
     }
 }
 
@@ -288,6 +288,6 @@ pub(super) fn build_edit_form(app: &App) -> Option<(Form, FormContext)> {
                 FormContext::EditTask(slug),
             ))
         }
-        View::Dashboard | View::Inbox => None,
+        View::Dashboard | View::Inbox | View::Notes => None,
     }
 }

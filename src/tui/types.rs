@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 
-use crate::domain::{CaptureItem, Project, Reminder, Task, TaskId, TimeEntry, Todo};
+use crate::domain::{CaptureItem, Link, Note, Project, Reminder, Task, TaskId, TimeEntry, Todo};
 use crate::tui::components::dialog::ConfirmDialog;
 use crate::tui::components::form::Form;
 
@@ -35,6 +35,8 @@ pub enum View {
     Inbox,
     /// Reminder list.
     Reminders,
+    /// Notes view with split pane and markdown preview.
+    Notes,
 }
 
 // ── ViewState ──────────────────────────────────────────────────────────────
@@ -196,3 +198,7 @@ pub type EntryViewState = ViewState<TimeEntry>;
 pub type CaptureViewState = ViewState<CaptureItem>;
 /// Convenience alias for the reminder list view state.
 pub type ReminderViewState = ViewState<Reminder>;
+/// Convenience alias for the note list view state.
+pub type NoteViewState = ViewState<Note>;
+/// Convenience alias for the inbound links of a note.
+pub type NoteLinks = Vec<Link>;

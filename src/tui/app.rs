@@ -36,8 +36,8 @@ use crate::domain::TimeEntry;
 use crate::ops::TrackerOps;
 use crate::ops::reporting::SummaryReport;
 use crate::tui::types::{
-    CaptureViewState, EntryViewState, Modal, ProjectViewState, ReminderViewState, TaskViewState,
-    TodoViewState, ViewState,
+    CaptureViewState, EntryViewState, Modal, NoteLinks, NoteViewState, ProjectViewState,
+    ReminderViewState, TaskViewState, TodoViewState, ViewState,
 };
 
 // Re-export types so downstream modules can `use crate::tui::app::{App, View, InputMode}`.
@@ -90,6 +90,10 @@ pub struct App {
     pub captures: CaptureViewState,
     /// Per-view list state for reminders.
     pub reminders: ReminderViewState,
+    /// Per-view list state for notes.
+    pub notes: NoteViewState,
+    /// Inbound links for the currently selected note.
+    pub note_links: NoteLinks,
     /// Summary report for the dashboard system overview.
     pub summary: Option<SummaryReport>,
     /// Shared database connection used to refresh data.
@@ -130,6 +134,8 @@ impl App {
             entries: ViewState::new(),
             captures: ViewState::new(),
             reminders: ViewState::new(),
+            notes: ViewState::new(),
+            note_links: Vec::new(),
             summary: None,
             db,
         };
@@ -148,6 +154,7 @@ impl App {
         refresh::refresh_entries(self);
         refresh::refresh_captures(self);
         refresh::refresh_reminders(self);
+        refresh::refresh_notes(self);
         refresh::refresh_summary(self);
     }
 
@@ -209,6 +216,14 @@ impl App {
                     .iter()
                     .map(|r| r.message.as_deref().unwrap_or("").to_owned()),
             ),
+            View::Notes => Self::filter_count(
+                &self.notes.filter,
+                self.notes.items.len(),
+                self.notes
+                    .items
+                    .iter()
+                    .map(|n| format!("{} {}", n.slug, n.title)),
+            ),
         }
     }
 
@@ -231,6 +246,7 @@ impl App {
             View::Tracker => &mut self.entries.selected,
             View::Inbox => &mut self.captures.selected,
             View::Reminders => &mut self.reminders.selected,
+            View::Notes => &mut self.notes.selected,
         }
     }
 

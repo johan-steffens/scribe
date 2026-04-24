@@ -7,11 +7,11 @@ use std::sync::Arc;
 
 use chrono::Utc;
 
-use crate::domain::{CaptureItems, Projects, Reminders, Tasks, TimeEntries, Todos};
+use crate::domain::{CaptureItems, Notes, Projects, Reminders, Tasks, TimeEntries, Todos};
 use crate::ops::ReportingOps;
 use crate::store::{
-    SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
-    SqliteTodos,
+    SqliteCaptureItems, SqliteNotes, SqliteProjects, SqliteReminders, SqliteTasks,
+    SqliteTimeEntries, SqliteTodos,
 };
 
 use super::App;
@@ -102,6 +102,20 @@ pub(super) fn refresh_reminders(app: &mut App) {
         }
         Err(e) => {
             app.last_error = Some(format!("failed to load reminders: {e}"));
+        }
+    }
+}
+
+/// Reloads all notes.
+pub(super) fn refresh_notes(app: &mut App) {
+    let store = SqliteNotes::new(Arc::clone(&app.db));
+    match store.list() {
+        Ok(items) => {
+            app.notes.items = items;
+            clamp(&mut app.notes.selected, app.notes.items.len());
+        }
+        Err(e) => {
+            app.last_error = Some(format!("failed to load notes: {e}"));
         }
     }
 }

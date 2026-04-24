@@ -52,16 +52,16 @@ fn buffer_contains(buf: &Buffer, needle: &str) -> bool {
 
 // ── Form creation helpers ────────────────────────────────────────────────────
 
-/// Opens the "new project" form by pressing 'n' in the projects view.
+/// Opens the "new project" form by pressing 'N' in the projects view.
 fn open_new_project_form(app: &mut App) {
     app.handle_key(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE));
-    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE));
 }
 
-/// Opens the "new task" form by pressing 'n' in the tasks view.
+/// Opens the "new task" form by pressing 'N' in the tasks view.
 fn open_new_task_form(app: &mut App) {
     app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
-    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE));
 }
 
 /// Simulates typing a string into the current form field.
@@ -308,13 +308,13 @@ fn test_form_with_multiple_fields_submits_on_enter_on_last_field() {
     app.handle_key(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE));
 
     // Open the new todo form.
-    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE));
 
     // The form should show "New Todo".
     let buf = render_to_buffer(&app, 80, 24);
     assert!(
         buffer_contains(&buf, "New Todo"),
-        "pressing 'n' in todos view should open a 'New Todo' form"
+        "pressing 'N' in todos view should open a 'New Todo' form"
     );
 
     // Type a todo title.
@@ -384,7 +384,7 @@ fn test_form_handles_empty_submission() {
     let mut app = make_app();
     // Navigate to todos and open new todo form.
     app.handle_key(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE));
-    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE));
 
     // Submit without typing anything.
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));

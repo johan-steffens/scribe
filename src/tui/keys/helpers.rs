@@ -4,10 +4,11 @@
 //! state without performing any mutations or I/O.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use chrono::{NaiveDateTime, TimeZone};
 
-use crate::domain::Task;
+use crate::domain::{Links, Task};
 use crate::tui::app::App;
 use crate::tui::types::{Modal, View};
 
@@ -20,6 +21,11 @@ pub(super) fn switch_view(app: &mut App, view: View) {
     app.show_help = false;
     app.modal = Modal::None;
     current_filter_mut(app).clear();
+
+    // Load note links when entering Notes view.
+    if view == View::Notes {
+        load_note_links(app);
+    }
 }
 
 // ── cursor movement ────────────────────────────────────────────────────────
@@ -33,6 +39,9 @@ pub(super) fn move_selection_down(app: &mut App) {
     let sel = app.selected_mut();
     if *sel + 1 < len {
         *sel += 1;
+        if app.active_view == View::Notes {
+            load_note_links(app);
+        }
     }
 }
 
@@ -41,6 +50,9 @@ pub(super) fn move_selection_up(app: &mut App) {
     let sel = app.selected_mut();
     if *sel > 0 {
         *sel -= 1;
+        if app.active_view == View::Notes {
+            load_note_links(app);
+        }
     }
 }
 
@@ -94,6 +106,40 @@ pub(super) fn selected_reminder(app: &App) -> Option<&crate::domain::Reminder> {
     visible.get(app.reminders.selected).copied()
 }
 
+/// Returns the currently selected visible note, if any.
+pub(super) fn selected_note(app: &App) -> Option<crate::domain::Note> {
+    let filter = app.notes.filter.to_lowercase();
+    let visible: Vec<_> = app
+        .notes
+        .items
+        .iter()
+        .filter(|n| {
+            filter.is_empty()
+                || n.slug.to_lowercase().contains(&filter)
+                || n.title.to_lowercase().contains(&filter)
+        })
+        .collect();
+    visible.get(app.notes.selected).map(|note| (*note).clone())
+}
+
+/// Loads the inbound backlinks for the currently selected note into `app.note_links`.
+pub(super) fn load_note_links(app: &mut App) {
+    let Some(note) = selected_note(app) else {
+        app.note_links.clear();
+        return;
+    };
+    let links_store = crate::store::SqliteLinks::new(Arc::clone(&app.db));
+    match links_store.inbound_for(&note.slug) {
+        Ok(links) => {
+            app.note_links = links;
+        }
+        Err(e) => {
+            app.last_error = Some(format!("failed to load links: {e}"));
+            app.note_links.clear();
+        }
+    }
+}
+
 /// Returns the currently selected visible project, if any.
 pub(super) fn selected_project(app: &App) -> Option<&crate::domain::Project> {
     let filter = app.projects.filter.to_lowercase();
@@ -126,6 +172,7 @@ pub(super) fn current_filter_mut(app: &mut App) -> &mut String {
         View::Tracker => &mut app.entries.filter,
         View::Inbox => &mut app.captures.filter,
         View::Reminders => &mut app.reminders.filter,
+        View::Notes => &mut app.notes.filter,
     }
 }
 

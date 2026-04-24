@@ -17,6 +17,7 @@
 
 pub mod dashboard;
 pub mod inbox;
+pub mod notes;
 pub mod placeholder;
 pub mod projects;
 pub mod reminders;
