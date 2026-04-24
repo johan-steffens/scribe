@@ -234,6 +234,47 @@ impl NotesOps {
         self.notes.list()
     }
 
+    /// Creates a new note with the given title and content.
+    ///
+    /// The slug is auto-generated from the title. After creation,
+    /// [`sync_links`] is called to update the backlinks table based on
+    /// `[[slug]]` patterns found in the content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if slug generation fails or a database error occurs.
+    pub fn write_note(&self, title: &str, content: &str) -> anyhow::Result<Note> {
+        use crate::domain::slug;
+
+        let slug_str = slug::generate("note-", title);
+        let unique_slug = slug::ensure_unique(&slug_str, |candidate| {
+            self.notes
+                .find_by_slug(candidate)
+                .map(|r| r.is_some())
+                .unwrap_or(false)
+        })
+        .map_err(|e| anyhow::anyhow!("slug generation failed: {e}"))?;
+
+        let note = self.notes.create(NewNote {
+            slug: unique_slug,
+            title: title.to_owned(),
+            content: content.to_owned(),
+        })?;
+
+        self.sync_links(&note.slug, content)?;
+
+        Ok(note)
+    }
+
+    /// Searches notes by full-text query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on database failure.
+    pub fn search_notes(&self, query: &str) -> anyhow::Result<Vec<Note>> {
+        self.notes.search_notes(query)
+    }
+
     /// Returns a reference to the underlying links store.
     ///
     /// This is intended for use in tests that need to verify link state.

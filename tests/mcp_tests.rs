@@ -16,10 +16,12 @@ use chrono::{Duration, Utc};
 use scribe::db;
 use scribe::domain::{NewProject, ProjectStatus, TaskPriority, TaskStatus};
 use scribe::ops::inbox::ProcessAction;
+use scribe::ops::notes::NotesOps;
 use scribe::ops::reminders::CreateReminder;
 use scribe::ops::tasks::CreateTask;
 use scribe::ops::tracker::StartTimer;
 use scribe::ops::{InboxOps, ProjectOps, ReminderOps, TaskOps, TodoOps, TrackerOps};
+use scribe::store::{SqliteLinks, SqliteNotes};
 
 /// A test harness that wraps an in-memory database and all ops structs.
 #[derive(Debug)]
@@ -30,6 +32,7 @@ struct TestContext {
     pub tracker: TrackerOps,
     pub inbox: InboxOps,
     pub reminders: ReminderOps,
+    pub notes: NotesOps,
 }
 
 impl TestContext {
@@ -41,6 +44,9 @@ impl TestContext {
         let tracker = TrackerOps::new(Arc::clone(&conn));
         let inbox = InboxOps::new(&conn);
         let reminders = ReminderOps::new(Arc::clone(&conn));
+        let notes_store = SqliteNotes::new(Arc::clone(&conn));
+        let links_store = SqliteLinks::new(Arc::clone(&conn));
+        let notes = NotesOps::new(Arc::new(notes_store), Arc::new(links_store));
         Self {
             projects,
             tasks,
@@ -48,6 +54,7 @@ impl TestContext {
             tracker,
             inbox,
             reminders,
+            notes,
         }
     }
 }
@@ -570,5 +577,110 @@ fn test_domain_project_status_parsing() {
     assert!(
         ProjectStatus::from_str("invalid").is_err(),
         "expected error for invalid status"
+    );
+}
+
+// ── Note ops tests ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_notes_ops_write_and_read() {
+    let ctx = TestContext::new();
+
+    let note = ctx
+        .notes
+        .write_note("Test Note Title", "# Hello\n\nThis is a test note.")
+        .expect("write_note should work");
+
+    assert_eq!(note.title.as_str(), "Test Note Title");
+    assert!(note.slug.starts_with("note-"));
+    assert!(note.content.contains("Hello"));
+
+    let found = ctx.notes.get(&note.slug).expect("get should work");
+    assert!(found.is_some(), "note should be found by slug");
+    assert_eq!(found.unwrap().title.as_str(), "Test Note Title");
+}
+
+#[test]
+fn test_notes_ops_search() {
+    let ctx = TestContext::new();
+
+    ctx.notes
+        .write_note("Meeting Notes", "# Meeting\n\nDiscussed project roadmap.")
+        .expect("first note should be created");
+
+    ctx.notes
+        .write_note("Project Ideas", "# Ideas\n\nBrainstorming new features.")
+        .expect("second note should be created");
+
+    let results = ctx
+        .notes
+        .search_notes("meeting")
+        .expect("search should work");
+
+    assert!(!results.is_empty(), "expected results for 'meeting' query");
+    assert!(
+        results.iter().any(|n| n.title.contains("Meeting")),
+        "expected meeting note in results"
+    );
+}
+
+#[test]
+fn test_notes_ops_search_no_results() {
+    let ctx = TestContext::new();
+
+    ctx.notes
+        .write_note("Test Note", "# Test\n\nSome content here.")
+        .expect("note should be created");
+
+    let results = ctx
+        .notes
+        .search_notes("nonexistent query string")
+        .expect("search should work");
+
+    assert!(
+        results.is_empty(),
+        "expected no results for nonexistent query"
+    );
+}
+
+#[test]
+fn test_notes_ops_get_not_found() {
+    let ctx = TestContext::new();
+
+    let result = ctx.notes.get("nonexistent-note");
+    assert!(result.is_ok(), "get should not error");
+    assert!(
+        result.unwrap().is_none(),
+        "nonexistent note should return None"
+    );
+}
+
+#[test]
+fn test_notes_ops_links_parsing() {
+    use scribe::domain::parse_links;
+
+    let links = parse_links("See [[my-task]] and [[another-note]] for details.");
+    assert_eq!(links.len(), 2);
+    assert!(links.contains(&"my-task".to_owned()));
+    assert!(links.contains(&"another-note".to_owned()));
+}
+
+#[test]
+fn test_notes_ops_write_with_links() {
+    let ctx = TestContext::new();
+
+    // Create a note that references another note via [[slug]] link.
+    let note = ctx
+        .notes
+        .write_note(
+            "Note With Links",
+            "# Links\n\nSee [[my-task]] for the task details.",
+        )
+        .expect("note with links should be created");
+
+    // Verify the note was created with the link content.
+    assert!(
+        note.content.contains("[[my-task]]"),
+        "note content should preserve link syntax"
     );
 }

@@ -170,6 +170,30 @@ impl Notes for SqliteNotes {
     }
 }
 
+impl SqliteNotes {
+    /// Searches notes by full-text query using the FTS5 `notes_fts` table.
+    ///
+    /// Returns notes whose `title` or `content` match the given FTS query.
+    /// Results are ordered by relevance (bm25 ranking).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the FTS table does not exist or a database error occurs.
+    pub fn search_notes(&self, query: &str) -> anyhow::Result<Vec<Note>> {
+        let conn = self.lock()?;
+        let sql = "SELECT n.id, n.slug, n.title, n.content, n.created_at, n.updated_at \
+                  FROM notes n \
+                  JOIN notes_fts f ON n.id = f.rowid \
+                  WHERE notes_fts MATCH ?1 \
+                  ORDER BY bm25(notes_fts) \
+                  LIMIT 50";
+        let mut stmt = conn.prepare(sql)?;
+        let rows = stmt.query_map(params![query], map_row)?;
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_note())
+            .collect()
+    }
+}
+
 // ── SqliteLinks ─────────────────────────────────────────────────────────────
 
 /// `SQLite`-backed implementation of the [`Links`] repository trait.

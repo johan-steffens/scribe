@@ -13,6 +13,7 @@
 //! - **M4** — adds `parent_id` and `kind` columns to the `tasks` table.
 //! - **M5** — migrates all `todos` rows into `tasks` (as `checklist_item` kind) and drops `todos`.
 //! - **M6** — creates `notes` and `links` tables for PKM functionality.
+//! - **M7** — creates FTS5 virtual table for full-text search on notes.
 
 use rusqlite_migration::M;
 
@@ -219,6 +220,41 @@ CREATE TABLE IF NOT EXISTS links (
 CREATE INDEX IF NOT EXISTS idx_links_source  ON links(source_slug);
 CREATE INDEX IF NOT EXISTS idx_links_target  ON links(target_slug);";
 
+/// M7 — creates FTS5 virtual table for full-text search on notes.
+///
+/// The `notes_fts` table indexes `title` and `content` columns from `notes`
+/// using `SQLite`'s FTS5 module. The content is synchronized via triggers so that
+/// inserts/updates/deletes on `notes` automatically update the FTS index.
+///
+/// FTS query syntax supports:
+/// - `word` — simple term search
+/// - `"phrase"` — exact phrase search
+/// - `word*` — prefix matching
+/// - `AND`, `OR` — boolean operators
+pub(super) const M7: &str = "
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    title,
+    content,
+    content='notes',
+    content_rowid='id'
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_fts_title ON notes(title);
+CREATE INDEX IF NOT EXISTS idx_notes_fts_content ON notes(content);
+
+CREATE TRIGGER IF NOT EXISTS notes_fts_insert AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_fts_update AFTER UPDATE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+END;";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -236,5 +272,6 @@ pub(super) fn all() -> Vec<M<'static>> {
         M::up(M4),
         M::up(M5),
         M::up(M6),
+        M::up(M7),
     ]
 }
