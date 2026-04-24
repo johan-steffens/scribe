@@ -120,7 +120,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 fn task_constraints() -> [Constraint; 6] {
     [
         Constraint::Length(4),
-        Constraint::Length(11),
+        Constraint::Length(10),
         Constraint::Length(4), // tree indent column
         Constraint::Min(24),
         Constraint::Min(16),
