@@ -195,6 +195,28 @@ The slug is auto-generated from the project slug and the title:
 Created task: Fix the login bug (payments-task-fix-login)
 ```
 
+### Sub-tasks (hierarchical nesting)
+
+Tasks support infinite hierarchical nesting via the `--parent` flag:
+
+```sh
+# Create a parent task
+scribe task add "Build new feature" --project payments
+
+# Create sub-tasks under it
+scribe task add "Design API" --project payments --parent payments-task-build-new-feature
+scribe task add "Implement backend" --project payments --parent payments-task-build-new-feature
+scribe task add "Write tests" --project payments --parent payments-task-build-new-feature
+```
+
+Sub-tasks inherit the project from their parent but keep their own priority,
+status, and due date. The TUI displays nested tasks with indentation; the CLI
+shows them via `scribe task list --project payments` (all levels shown by
+default).
+
+Use `scribe task toggle <slug>` to quickly check off any task or todo
+(toggles between done and not-done states).
+
 ### Listing tasks
 
 ```sh
@@ -258,9 +280,10 @@ scribe task restore payments-task-fix-login
 
 ## Todos
 
-Todos are simpler than tasks. They have a title, a done flag, and a project —
-no priority, no status field beyond done/undone, no due date. They suit
-checklists and one-off items.
+Todos are simpler than tasks. Under the hood they are stored as tasks with
+`kind = 'checklist_item'` — the same table, different kind. They have a title,
+a done flag, and a project binding — no priority, no status beyond done/undone,
+no due date. They suit checklists and one-off items.
 
 ### Creating a todo
 
@@ -750,6 +773,59 @@ scribe service restart
 # Reinstall the service (use after upgrading Scribe)
 scribe service reinstall
 ```
+
+---
+
+## Notes (Knowledge Management)
+
+Scribe includes a built-in PKM (Personal Knowledge Management) system for
+long-form Markdown notes with automatic cross-linking.
+
+### Creating and editing notes
+
+```sh
+# Create a note with a user-defined slug
+scribe note add my-design-doc --title "API Design Notes"
+
+# Edit the content (opens $EDITOR by default, or use --content)
+scribe note edit my-design-doc --content "# Architecture\n\nSee [[payments-task-api-overhaul]]"
+```
+
+Note slugs are user-defined kebab-case strings — no auto-prefix from the project.
+This makes notes portable and easy to reference from any project.
+
+### Wiki-style links
+
+Use `[[slug]]` syntax in note content to link to other notes, tasks, or projects:
+
+```
+# My API Design Doc
+See [[payments-task-fix-login]] for the login bug details.
+Check [[payments]] for the parent project.
+Also see [[my-other-note]] for related thinking.
+```
+
+Links are parsed on every save and stored in the `links` table. This creates a
+graph of connections between your knowledge base and your work.
+
+### Listing and showing notes
+
+```sh
+scribe note list
+scribe note show my-design-doc
+```
+
+### Full-text search
+
+Notes are indexed with SQLite FTS5. Search via the MCP server:
+
+```
+Agent: Search my notes for "architecture decisions"
+→ scribe_notes_search(query: "architecture decisions")
+```
+
+The `search_notes` MCP tool returns up to 50 matching notes ordered by
+relevance (BM25 ranking).
 
 ---
 

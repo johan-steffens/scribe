@@ -60,11 +60,28 @@ chmod +x scribe && sudo mv scribe /usr/local/bin/
 ## Core Concepts
 
 **Projects** group related work. **Tasks** have priority, status, and due dates.
-**Todos** are lightweight checklists. **Time tracking** links timers to tasks
-or projects. **Reminders** fire desktop notifications at scheduled times.
-**Capture** grabs fleeting thoughts into the inbox for processing later.
+**Todos** are lightweight checklist items (stored as tasks with `kind = 'checklist_item'`).
+**Time tracking** links timers to tasks or projects. **Reminders** fire desktop
+notifications at scheduled times. **Capture** grabs fleeting thoughts into the
+inbox for processing later.
 
 Everything has slugs (`my-task-20260403`) for fast CLI and completion lookup.
+
+### Task Hierarchy (Sub-tasks)
+
+Tasks support infinite hierarchical nesting via an optional `parent_id`. Use
+`--parent` to create sub-tasks:
+
+```sh
+# Create a parent task
+scribe task add "Build new feature"
+
+# Create a sub-task under it
+scribe task add "Write tests" --parent build-new-feature
+```
+
+Sub-tasks inherit the project from their parent. Use `scribe task toggle <slug>`
+to quickly check off items (toggles done/undone for both tasks and todos).
 
 ---
 
@@ -117,6 +134,51 @@ Agent: → scribe sync push
 
 Your agent acts as a smart interface — it knows your projects, tasks, and
 workflow. No more context-switching between apps.
+
+---
+
+## Knowledge Management
+
+Scribe includes a built-in **Personal Knowledge Management (PKM)** system for
+long-form notes with automatic cross-linking.
+
+### Notes
+
+Notes are Markdown documents stored directly in your SQLite database. Unlike
+tasks and todos, note slugs are user-defined (not auto-prefixed by project).
+
+```sh
+scribe note add my-design-doc --title "API Design Notes"
+scribe note edit my-design-doc --content "# Architecture\n\nSee [[payments-task-api-overhaul]]"
+scribe note list
+scribe note show my-design-doc
+```
+
+### Wiki-style Links
+
+Use `[[slug]]` syntax to link notes to other notes, tasks, or projects:
+
+| Link syntax | Resolves to |
+|-------------|-------------|
+| `[[payments-task-fix-login]]` | A task |
+| `[[payments]]` | A project |
+| `[[my-design-doc]]` | Another note |
+
+Links are automatically parsed on save and tracked in the `links` table. This
+lets you build a graph of connections between your knowledge base and your
+work.
+
+### Full-text Search
+
+Notes are indexed with SQLite FTS5. AI agents can search your knowledge base:
+
+```sh
+# Via MCP (agent tool)
+scribe_notes_search(query: "architecture decisions")
+```
+
+The MCP server exposes `search_notes` which returns up to 50 matching notes
+ordered by relevance.
 
 ---
 
