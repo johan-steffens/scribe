@@ -19,7 +19,7 @@ use scribe::tui::app::App;
 /// A minimal test harness that wraps an in-memory database.
 fn make_app_with_conn() -> (App, Arc<Mutex<rusqlite::Connection>>) {
     let conn = Arc::new(Mutex::new(db::open_in_memory().expect("in-memory db")));
-    let app = App::new(Arc::clone(&conn));
+    let app = App::new(Arc::clone(&conn), None);
     (app, conn)
 }
 

@@ -58,6 +58,7 @@ fn handle_edit_note(app: &mut App) {
     let ops = NotesOps::new(
         Arc::new(SqliteNotes::new(Arc::clone(&app.db))),
         Arc::new(SqliteLinks::new(Arc::clone(&app.db))),
+        app.note_editor.clone(),
     );
     match ops.edit_note(&slug) {
         Ok(_) => {

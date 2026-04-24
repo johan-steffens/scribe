@@ -75,7 +75,7 @@ const REMINDER_CHECK_INTERVAL_SECS: u64 = 30;
 ///
 /// Returns an error if terminal setup or teardown fails. Runtime errors (DB
 /// access, etc.) are displayed in the status bar and do not propagate here.
-pub fn run(db: Arc<Mutex<Connection>>, _config: &Config) -> anyhow::Result<()> {
+pub fn run(db: Arc<Mutex<Connection>>, config: &Config) -> anyhow::Result<()> {
     // ── terminal setup ─────────────────────────────────────────────────────
     enable_raw_mode().context("enable raw mode")?;
     let mut stdout = std::io::stdout();
@@ -91,7 +91,7 @@ pub fn run(db: Arc<Mutex<Connection>>, _config: &Config) -> anyhow::Result<()> {
     spawn_reminder_thread(Arc::clone(&db));
 
     // ── run the event loop ─────────────────────────────────────────────────
-    let result = event_loop(&mut terminal, db);
+    let result = event_loop(&mut terminal, db, config.note_editor.clone());
 
     // ── unconditional terminal teardown ────────────────────────────────────
     // Must happen even if the event loop returned an error.
@@ -137,8 +137,9 @@ fn spawn_reminder_thread(db: Arc<Mutex<Connection>>) {
 fn event_loop(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     db: Arc<Mutex<Connection>>,
+    note_editor: Option<String>,
 ) -> anyhow::Result<()> {
-    let mut app = App::new(db);
+    let mut app = App::new(db, note_editor);
 
     loop {
         // Refresh the active timer on every iteration (low-cost DB read).

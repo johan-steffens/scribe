@@ -281,7 +281,7 @@ impl ScribeMcpServer {
 
         let notes_store = SqliteNotes::new(Arc::clone(conn));
         let links_store = SqliteLinks::new(Arc::clone(conn));
-        let notes_ops = NotesOps::new(Arc::new(notes_store), Arc::new(links_store));
+        let notes_ops = NotesOps::new(Arc::new(notes_store), Arc::new(links_store), None);
 
         Self {
             projects: ProjectOps::new(conn),

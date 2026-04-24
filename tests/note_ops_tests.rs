@@ -85,6 +85,7 @@ fn test_edit_note_updates_existing() {
         let ops = NotesOps::new(
             std::sync::Arc::new(store),
             std::sync::Arc::new(make_links()),
+            None,
         );
         let edited = ops.edit_note("existing-note").expect("edit note");
 
@@ -114,6 +115,7 @@ fn test_get_returns_note() {
     let ops = NotesOps::new(
         std::sync::Arc::new(store),
         std::sync::Arc::new(make_links()),
+        None,
     );
     let found = ops.get("get-test-note").expect("get").expect("note exists");
     assert_eq!(found.slug, "get-test-note");
@@ -147,6 +149,7 @@ fn test_list_returns_all_notes() {
     let ops = NotesOps::new(
         std::sync::Arc::new(store),
         std::sync::Arc::new(make_links()),
+        None,
     );
     let all = ops.list().expect("list");
     assert_eq!(all.len(), 2);
@@ -280,6 +283,7 @@ fn test_edit_note_syncs_links() {
         let ops = NotesOps::new(
             std::sync::Arc::new(store),
             std::sync::Arc::new(make_links()),
+            None,
         );
 
         // Pre-existing link.

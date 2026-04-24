@@ -115,6 +115,13 @@ impl TestConfig {
         self.config.time_format = format.into();
         self
     }
+
+    /// Sets the note editor string.
+    #[must_use]
+    pub fn with_note_editor(mut self, editor: impl Into<String>) -> Self {
+        self.config.note_editor = Some(editor.into());
+        self
+    }
 }
 
 impl Default for TestConfig {

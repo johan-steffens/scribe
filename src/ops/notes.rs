@@ -26,7 +26,8 @@ use crate::store::{SqliteLinks, SqliteNotes};
 /// High-level note operations with `$EDITOR` integration.
 ///
 /// Construct via [`NotesOps::new`], passing the shared `SqliteNotes` and
-/// `SqliteLinks` stores.
+/// `SqliteLinks` stores. The optional `note_editor` parameter overrides the
+/// default editor chain (config → `$EDITOR` → `vim`).
 ///
 /// # Examples
 ///
@@ -38,17 +39,22 @@ use crate::store::{SqliteLinks, SqliteNotes};
 /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
 /// let notes = SqliteNotes::new(Arc::clone(&conn));
 /// let links = SqliteLinks::new(conn);
-/// let ops = NotesOps::new(Arc::new(notes), Arc::new(links));
+/// let ops = NotesOps::new(Arc::new(notes), Arc::new(links), None);
 /// ```
 #[derive(Clone, Debug)]
 pub struct NotesOps {
     notes: Arc<SqliteNotes>,
     links: Arc<SqliteLinks>,
+    /// Optional note editor override, falling back to `$EDITOR` env var then `vim`.
+    note_editor: Option<String>,
 }
 
 impl NotesOps {
     /// Creates a new [`NotesOps`] backed by the given `SqliteNotes` and
     /// `SqliteLinks` stores.
+    ///
+    /// The optional `note_editor` parameter sets the preferred editor, falling
+    /// back to `$EDITOR` env var then `vim` when `None`.
     ///
     /// # Examples
     ///
@@ -60,11 +66,19 @@ impl NotesOps {
     /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
     /// let notes = SqliteNotes::new(Arc::clone(&conn));
     /// let links = SqliteLinks::new(conn);
-    /// let ops = NotesOps::new(Arc::new(notes), Arc::new(links));
+    /// let ops = NotesOps::new(Arc::new(notes), Arc::new(links), None);
     /// ```
     #[must_use]
-    pub fn new(notes: Arc<SqliteNotes>, links: Arc<SqliteLinks>) -> Self {
-        Self { notes, links }
+    pub fn new(
+        notes: Arc<SqliteNotes>,
+        links: Arc<SqliteLinks>,
+        note_editor: Option<String>,
+    ) -> Self {
+        Self {
+            notes,
+            links,
+            note_editor,
+        }
     }
 
     /// Synchronizes the `links` table after a note is saved.
@@ -95,9 +109,15 @@ impl NotesOps {
         Ok(())
     }
 
-    /// Returns the editor to use, preferring `EDITOR` env var then `vim`.
-    fn editor() -> String {
-        std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_owned())
+    /// Returns the editor to use.
+    ///
+    /// Uses the configured `note_editor` if set, falling back to `$EDITOR` env
+    /// var, then `vim`.
+    fn editor(&self) -> String {
+        self.note_editor
+            .clone()
+            .or_else(|| std::env::var("EDITOR").ok())
+            .unwrap_or_else(|| "vim".to_owned())
     }
 
     /// Opens an existing note in `$EDITOR` and persists any changes.
@@ -119,7 +139,7 @@ impl NotesOps {
             .find_by_slug(slug)?
             .ok_or_else(|| anyhow::anyhow!("note '{slug}' not found"))?;
 
-        let edited = Self::edit_content(&note.content, &note.title)?;
+        let edited = self.edit_content(&note.content, &note.title)?;
 
         let updated = self.notes.update(
             slug,
@@ -156,7 +176,7 @@ impl NotesOps {
             content: String::new(),
         })?;
 
-        let edited = Self::edit_content("", title)?;
+        let edited = self.edit_content("", title)?;
 
         let updated = self.notes.update(
             slug,
@@ -176,8 +196,8 @@ impl NotesOps {
     ///
     /// Blocks until the editor process exits. The temp file is deleted after
     /// reading regardless of outcome.
-    fn edit_content(initial_content: &str, title: &str) -> anyhow::Result<String> {
-        let editor = Self::editor();
+    fn edit_content(&self, initial_content: &str, title: &str) -> anyhow::Result<String> {
+        let editor = self.editor();
 
         // Build a descriptive temp file name from the title, placed in /tmp/.
         let slug_part = title
@@ -307,6 +327,6 @@ pub mod testing {
     /// Panics if the in-memory database cannot be opened.
     #[must_use]
     pub fn ops() -> NotesOps {
-        NotesOps::new(Arc::new(make_notes()), Arc::new(make_links()))
+        NotesOps::new(Arc::new(make_notes()), Arc::new(make_links()), None)
     }
 }

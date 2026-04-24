@@ -46,7 +46,7 @@ impl TestContext {
         let reminders = ReminderOps::new(Arc::clone(&conn));
         let notes_store = SqliteNotes::new(Arc::clone(&conn));
         let links_store = SqliteLinks::new(Arc::clone(&conn));
-        let notes = NotesOps::new(Arc::new(notes_store), Arc::new(links_store));
+        let notes = NotesOps::new(Arc::new(notes_store), Arc::new(links_store), None);
         Self {
             projects,
             tasks,

@@ -19,7 +19,7 @@
 //! use scribe::tui::app::App;
 //!
 //! let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-//! let mut app = App::new(conn);
+//! let mut app = App::new(conn, None);
 //! assert!(!app.should_quit);
 //! ```
 
@@ -59,8 +59,8 @@ pub use crate::tui::types::{InputMode, View};
 /// use scribe::tui::app::App;
 ///
 /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-/// let mut app = App::new(conn);
-/// app.tick();
+/// let mut app = App::new(conn, None);
+/// assert!(!app.should_quit);
 /// ```
 #[derive(Debug)]
 pub struct App {
@@ -98,6 +98,8 @@ pub struct App {
     pub summary: Option<SummaryReport>,
     /// Shared database connection used to refresh data.
     pub(super) db: Arc<Mutex<Connection>>,
+    /// Default note editor from config, falling back to `$EDITOR` env var then `vim`.
+    pub note_editor: Option<String>,
 }
 
 impl App {
@@ -115,11 +117,11 @@ impl App {
     /// use scribe::tui::app::App;
     ///
     /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-    /// let app = App::new(conn);
+    /// let app = App::new(conn, None);
     /// assert_eq!(app.active_view, scribe::tui::app::View::Dashboard);
     /// ```
     #[must_use]
-    pub fn new(db: Arc<Mutex<Connection>>) -> Self {
+    pub fn new(db: Arc<Mutex<Connection>>, note_editor: Option<String>) -> Self {
         let mut app = Self {
             active_view: View::Dashboard,
             should_quit: false,
@@ -138,6 +140,7 @@ impl App {
             note_links: Vec::new(),
             summary: None,
             db,
+            note_editor,
         };
         app.refresh();
         app

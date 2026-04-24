@@ -16,7 +16,7 @@ use scribe::tui::ui;
 /// A minimal test harness that wraps an in-memory database.
 fn make_app() -> App {
     let conn = Arc::new(Mutex::new(db::open_in_memory().expect("in-memory db")));
-    App::new(conn)
+    App::new(conn, None)
 }
 
 /// Renders `app` into a `Terminal<TestBackend>` and returns a cloned buffer for inspection.

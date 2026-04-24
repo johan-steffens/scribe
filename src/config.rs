@@ -362,6 +362,13 @@ impl Default for DisplayConfig {
     }
 }
 
+/// Raw `[editor]` section as it appears in `config.toml`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct EditorConfig {
+    /// Default editor for notes, falling back to `$EDITOR` env var then `vim`.
+    note: Option<String>,
+}
+
 /// Raw `[setup]` section as it appears in `config.toml`.
 ///
 /// Tracks which optional setup steps the user has completed so that
@@ -385,6 +392,8 @@ pub(crate) struct RawConfig {
     notifications: NotificationsConfig,
     #[serde(default)]
     display: DisplayConfig,
+    #[serde(default)]
+    editor: EditorConfig,
     #[serde(default)]
     setup: SetupConfig,
     #[cfg(feature = "sync")]
@@ -421,6 +430,8 @@ pub struct Config {
     /// `strftime`-compatible time format string (e.g. `"%H:%M"`).
     #[allow(dead_code, reason = "used in Phase 2 display formatting")]
     pub time_format: String,
+    /// Default note editor, falling back to `$EDITOR` env var then `vim`.
+    pub note_editor: Option<String>,
     /// Setup completion state — written by `scribe setup` and `scribe service`.
     pub setup: SetupConfig,
     /// Cloud sync configuration (requires the `sync` feature).
@@ -561,6 +572,18 @@ impl Config {
         self.machine_id.unwrap_or_else(uuid::Uuid::nil)
     }
 
+    /// Returns the effective note editor.
+    ///
+    /// Respects the config file (`note_editor`), falls back to the `$EDITOR`
+    /// environment variable, and finally defaults to `"vim"`.
+    #[must_use]
+    pub fn note_editor(&self) -> String {
+        self.note_editor
+            .clone()
+            .or_else(|| std::env::var("EDITOR").ok())
+            .unwrap_or_else(|| "vim".to_owned())
+    }
+
     // ── private helpers ────────────────────────────────────────────────────
 
     fn from_raw(raw: RawConfig) -> Self {
@@ -584,6 +607,7 @@ impl Config {
             notifications_enabled: raw.notifications.enabled,
             date_format: raw.display.date_format,
             time_format: raw.display.time_format,
+            note_editor: raw.editor.note.filter(|s| !s.is_empty()),
             setup: raw.setup,
             #[cfg(feature = "sync")]
             sync: raw.sync,
@@ -608,6 +632,9 @@ impl Config {
             display: DisplayConfig {
                 date_format: self.date_format.clone(),
                 time_format: self.time_format.clone(),
+            },
+            editor: EditorConfig {
+                note: self.note_editor.clone(),
             },
             setup: self.setup.clone(),
             #[cfg(feature = "sync")]
