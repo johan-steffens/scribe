@@ -89,8 +89,7 @@ impl TaskOps {
         let unique_slug = slug::ensure_unique(&base_slug, |candidate| {
             self.tasks
                 .find_by_slug(candidate)
-                .map(|r| r.is_some())
-                .unwrap_or(false)
+                .is_ok_and(|r| r.is_some())
         })
         .map_err(|e| anyhow::anyhow!("slug generation failed: {e}"))?;
 
