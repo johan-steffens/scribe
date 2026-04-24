@@ -181,6 +181,7 @@ impl SqliteNotes {
     /// Returns an error if the FTS table does not exist or a database error occurs.
     pub fn search_notes(&self, query: &str) -> anyhow::Result<Vec<Note>> {
         let conn = self.lock()?;
+        // Limit results to 50 for performance.
         let sql = "SELECT n.id, n.slug, n.title, n.content, n.created_at, n.updated_at \
                   FROM notes n \
                   JOIN notes_fts f ON n.id = f.rowid \

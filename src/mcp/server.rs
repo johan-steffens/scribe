@@ -326,19 +326,24 @@ fn build_task_hierarchy(tasks: Vec<crate::domain::Task>) -> Vec<HierarchicalTask
     use std::collections::HashMap;
 
     // Recursively build hierarchy.
-    fn build_node(task: crate::domain::Task, children: &[crate::domain::Task]) -> HierarchicalTask {
+    fn build_node(
+        task: &crate::domain::Task,
+        child_groups: &HashMap<Option<crate::domain::TaskId>, Vec<crate::domain::Task>>,
+    ) -> HierarchicalTask {
+        let children = child_groups
+            .get(&Some(task.id))
+            .map_or(&[] as &[crate::domain::Task], std::vec::Vec::as_slice);
         let child_nodes: Vec<HierarchicalTask> = children
             .iter()
-            .map(|c| build_node(c.clone(), &[]))
+            .map(|c| build_node(c, child_groups))
             .collect();
         HierarchicalTask {
-            task,
+            task: task.clone(),
             children: child_nodes,
         }
     }
 
     // Separate roots and children.
-    let mut roots: Vec<HierarchicalTask> = Vec::new();
     let mut child_groups: HashMap<Option<crate::domain::TaskId>, Vec<crate::domain::Task>> =
         HashMap::new();
 
@@ -346,13 +351,10 @@ fn build_task_hierarchy(tasks: Vec<crate::domain::Task>) -> Vec<HierarchicalTask
         child_groups.entry(task.parent_id).or_default().push(task);
     }
 
+    let mut roots: Vec<HierarchicalTask> = Vec::new();
     if let Some(root_tasks) = child_groups.get(&None) {
         for task in root_tasks {
-            let task_children: Vec<crate::domain::Task> = child_groups
-                .get(&Some(task.id))
-                .cloned()
-                .unwrap_or_default();
-            roots.push(build_node(task.clone(), &task_children));
+            roots.push(build_node(task, &child_groups));
         }
     }
 
