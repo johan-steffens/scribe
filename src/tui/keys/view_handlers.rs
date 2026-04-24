@@ -8,8 +8,8 @@
 
 use std::sync::Arc;
 
-use crate::domain::TaskPatch;
 use crate::domain::task::TaskStatus;
+use crate::domain::TaskPatch;
 use crate::ops::tasks::TaskOps;
 use crate::ops::todos::TodoOps;
 use crate::ops::tracker::TrackerOps;
@@ -20,8 +20,8 @@ use crate::tui::types::{ConfirmContext, FormContext, Modal, View};
 
 use super::forms::{build_create_form, build_edit_form};
 use super::helpers::{
-    project_slugs, selected_capture, selected_entry, selected_project, selected_reminder,
-    selected_task, selected_todo,
+    find_visible_parent_index, project_slugs, selected_capture, selected_entry, selected_project,
+    selected_reminder, selected_task, selected_todo, visible_task_at_index, visible_task_count,
 };
 
 // ── create ────────────────────────────────────────────────────────────────
@@ -110,11 +110,17 @@ pub(super) fn handle_space(app: &mut App) {
     }
 }
 
-/// Handles `Enter` — process inbox item or detail view.
+/// Handles `Enter` — process inbox item or detail view, or expand/collapse task.
 pub(super) fn handle_enter(app: &mut App) {
-    if app.active_view != View::Inbox {
-        return;
+    match app.active_view {
+        View::Inbox => handle_inbox_enter(app),
+        View::Tasks => toggle_task_expand(app),
+        _ => {}
     }
+}
+
+/// Handles `Enter` in the inbox view — opens process capture form.
+fn handle_inbox_enter(app: &mut App) {
     let Some(capture) = selected_capture(app) else {
         return;
     };
@@ -141,6 +147,67 @@ pub(super) fn handle_enter(app: &mut App) {
         ],
     );
     app.modal = Modal::Form(form, FormContext::ProcessCapture(slug));
+}
+
+/// Toggles the expanded/collapsed state of the selected task.
+fn toggle_task_expand(app: &mut App) {
+    let Some(task) = visible_task_at_index(app, app.tasks.selected) else {
+        return;
+    };
+    let task_id = task.id;
+    if app.tasks.expanded_tasks.contains(&task_id) {
+        app.tasks.expanded_tasks.remove(&task_id);
+    } else {
+        app.tasks.expanded_tasks.insert(task_id);
+    }
+    // Clamp selection to valid range
+    let max_idx = visible_task_count(app).saturating_sub(1);
+    app.tasks.selected = app.tasks.selected.min(max_idx);
+}
+
+/// Handles `Right` arrow — expand the selected task.
+pub(super) fn handle_right(app: &mut App) {
+    if app.active_view != View::Tasks {
+        return;
+    }
+    let Some(task) = visible_task_at_index(app, app.tasks.selected) else {
+        return;
+    };
+    // Only expand if the task has children
+    let has_children = app
+        .tasks
+        .items
+        .iter()
+        .any(|t| t.parent_id == Some(task.id) && t.archived_at.is_none());
+    if has_children {
+        app.tasks.expanded_tasks.insert(task.id);
+    }
+    // Clamp selection to valid range
+    let max_idx = visible_task_count(app).saturating_sub(1);
+    app.tasks.selected = app.tasks.selected.min(max_idx);
+}
+
+/// Handles `Left` arrow — collapse the selected task, or move to parent.
+pub(super) fn handle_left(app: &mut App) {
+    if app.active_view != View::Tasks {
+        return;
+    }
+    let Some(task) = visible_task_at_index(app, app.tasks.selected) else {
+        return;
+    };
+    // If the task is expanded, collapse it
+    if app.tasks.expanded_tasks.contains(&task.id) {
+        app.tasks.expanded_tasks.remove(&task.id);
+    } else if task.parent_id.is_some() {
+        // Move selection to parent task
+        let parent_id = task.parent_id.unwrap();
+        if let Some(parent_index) = find_visible_parent_index(app, parent_id) {
+            app.tasks.selected = parent_index;
+        }
+    }
+    // Clamp selection to valid range
+    let max_idx = visible_task_count(app).saturating_sub(1);
+    app.tasks.selected = app.tasks.selected.min(max_idx);
 }
 
 /// Handles the `v` key (move todo to a different project).

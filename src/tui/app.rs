@@ -125,7 +125,7 @@ impl App {
             input_mode: InputMode::Normal,
             modal: Modal::None,
             projects: ViewState::new(),
-            tasks: ViewState::new(),
+            tasks: TaskViewState::new(),
             todos: ViewState::new(),
             entries: ViewState::new(),
             captures: ViewState::new(),
@@ -189,11 +189,7 @@ impl App {
                     .iter()
                     .map(|p| format!("{} {}", p.slug, p.name)),
             ),
-            View::Tasks | View::Dashboard => Self::filter_count(
-                &self.tasks.filter,
-                self.tasks.items.len(),
-                self.tasks.items.iter().map(|t| t.title.clone()),
-            ),
+            View::Tasks | View::Dashboard => self.visible_task_count(),
             View::Todos => Self::filter_count(
                 &self.todos.filter,
                 self.todos.items.len(),
@@ -214,6 +210,14 @@ impl App {
                     .map(|r| r.message.as_deref().unwrap_or("").to_owned()),
             ),
         }
+    }
+
+    /// Returns the number of visible tasks in the tree view.
+    ///
+    /// Only top-level tasks and children of expanded parents are counted.
+    fn visible_task_count(&self) -> usize {
+        use crate::tui::keys::helpers;
+        helpers::visible_task_count(self)
     }
 
     /// Returns a mutable reference to the `selected` cursor for the active view.

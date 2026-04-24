@@ -10,7 +10,9 @@
 //! at a time. The key handler in [`super::keys`] routes events to the active
 //! modal first, then to the view.
 
-use crate::domain::{CaptureItem, Project, Reminder, Task, TimeEntry, Todo};
+use std::collections::HashSet;
+
+use crate::domain::{CaptureItem, Project, Reminder, Task, TaskId, TimeEntry, Todo};
 use crate::tui::components::dialog::ConfirmDialog;
 use crate::tui::components::form::Form;
 
@@ -60,6 +62,32 @@ impl<T> ViewState<T> {
             items: Vec::new(),
             selected: 0,
             filter: String::new(),
+        }
+    }
+}
+
+/// Task-specific view state that tracks expanded/collapsed parent tasks.
+#[derive(Debug, Clone)]
+pub struct TaskViewState {
+    /// All tasks loaded from the database (unfiltered).
+    pub items: Vec<Task>,
+    /// Index into the visible subset that is currently highlighted.
+    pub selected: usize,
+    /// Live filter string; empty means no filter is applied.
+    pub filter: String,
+    /// Set of parent task IDs that are currently expanded.
+    pub expanded_tasks: HashSet<TaskId>,
+}
+
+impl TaskViewState {
+    /// Creates an empty [`TaskViewState`] with no items and no filter.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            selected: 0,
+            filter: String::new(),
+            expanded_tasks: HashSet::new(),
         }
     }
 }
@@ -160,8 +188,6 @@ pub enum Modal {
 
 /// Convenience alias for the project list view state.
 pub type ProjectViewState = ViewState<Project>;
-/// Convenience alias for the task list view state.
-pub type TaskViewState = ViewState<Task>;
 /// Convenience alias for the todo list view state.
 pub type TodoViewState = ViewState<Todo>;
 /// Convenience alias for the time-entry list view state.

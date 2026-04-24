@@ -94,6 +94,9 @@ fn handle_normal_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('D') => view_handlers::handle_delete(app),
         KeyCode::Char(' ') => view_handlers::handle_space(app),
         KeyCode::Enter => view_handlers::handle_enter(app),
+        // ── task tree expand/collapse ───────────────────────────────────────
+        KeyCode::Right => view_handlers::handle_right(app),
+        KeyCode::Left => view_handlers::handle_left(app),
         // ── todo-specific move ─────────────────────────────────────────────
         KeyCode::Char('v') if app.active_view == View::Todos => {
             view_handlers::handle_move_todo(app);
