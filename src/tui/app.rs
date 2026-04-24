@@ -161,6 +161,15 @@ impl App {
         refresh::refresh_summary(self);
     }
 
+    /// Reloads notes from the database.
+    ///
+    /// Called by [`switch_view`](crate::tui::keys::helpers::switch_view) when
+    /// entering the Notes view to ensure the note list is populated before
+    /// loading inbound links.
+    pub fn refresh_notes(&mut self) {
+        refresh::refresh_notes(self);
+    }
+
     /// Refreshes the active timer status from the database.
     ///
     /// Called on every event-loop iteration. Errors are stored in

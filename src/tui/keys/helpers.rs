@@ -24,6 +24,7 @@ pub(super) fn switch_view(app: &mut App, view: View) {
 
     // Load note links when entering Notes view.
     if view == View::Notes {
+        app.refresh_notes();
         load_note_links(app);
     }
 }
