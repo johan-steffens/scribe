@@ -18,6 +18,7 @@ _scribe() {
   _scribe_complete_todos()     { _scribe_dynamic_complete todos     }
   _scribe_complete_reminders() { _scribe_dynamic_complete reminders }
   _scribe_complete_captures()  { _scribe_dynamic_complete captures  }
+  _scribe_complete_notes()     { _scribe_dynamic_complete notes     }
 
   # ── leaf argument specs ──────────────────────────────────────────────────
   # Called after words/CURRENT are already shifted to the sub-subcommand level.
@@ -159,6 +160,33 @@ _scribe() {
     esac
   }
 
+  _scribe_args_note() {
+    case $words[1] in
+    (add)
+      _arguments \
+        '--title=[Title]:title: ' \
+        '--output=[Output format]:format:(text json)' \
+        ':slug: ' ;;
+    (create)
+      _arguments \
+        '--content=[Content]:content: ' \
+        '--output=[Output format]:format:(text json)' \
+        ':title: ' ;;
+    (edit)
+      _arguments \
+        '--output=[Output format]:format:(text json)' \
+        ':slug:_scribe_complete_notes' ;;
+    (list)
+      _arguments \
+        '--search=[Search query]:search: ' \
+        '--output=[Output format]:format:(text json)' ;;
+    (show|delete)
+      _arguments \
+        '--output=[Output format]:format:(text json)' \
+        ':slug:_scribe_complete_notes' ;;
+    esac
+  }
+
   _scribe_args_report() {
     case $words[1] in
     (project)
@@ -250,6 +278,17 @@ _scribe() {
     )
     _describe -t commands 'reminder subcommands' s
   }
+  _scribe_list_note_subs() {
+    local -a s; s=(
+      'add:Create and edit a note in $EDITOR'
+      'create:Create a note with inline content'
+      'edit:Edit a note in $EDITOR'
+      'list:List all notes'
+      'show:Show a note by slug'
+      'delete:Delete a note'
+    )
+    _describe -t commands 'note subcommands' s
+  }
   _scribe_list_report_subs() {
     local -a s; s=(
       'project:Report on a specific project'
@@ -279,6 +318,7 @@ _scribe() {
     'service:Manage the background daemon service'
     'sync:Sync state to or from a remote provider'
     'agent:Install skill files for AI coding agents'
+    'note:Create, edit, list, and search notes'
     'completions:Print a shell completion script'
     'help:Print help'
   )
@@ -355,6 +395,12 @@ _scribe() {
         _describe -t commands 'agent subcommands' s
       else
         _arguments '--output=[Output format]:format:(text json)'
+      fi ;;
+    (note)
+      if (( CURRENT == 1 )); then
+        _scribe_list_note_subs
+      else
+        _scribe_args_note
       fi ;;
     (sync)
       if (( CURRENT == 1 )); then

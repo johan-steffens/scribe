@@ -6,33 +6,33 @@
 complete -c scribe -f
 
 # ── top-level subcommands ─────────────────────────────────────────────────────
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a project    -d 'Manage projects'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a task       -d 'Manage tasks'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a todo       -d 'Manage todos'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a track      -d 'Time tracking'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a capture    -d 'Quickly capture a thought into the inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a inbox      -d 'Manage the quick-capture inbox'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a reminder   -d 'Manage reminders'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a report     -d 'Generate reports (summary or domain-specific)'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a setup      -d 'First-run wizard and setup status'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a service    -d 'Manage the background daemon service'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a sync       -d 'Sync state to or from a remote provider'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a agent      -d 'Install skill files for AI coding agents'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a completions -d 'Print a shell completion script for the given shell'
-complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent completions help' \
+complete -c scribe -n 'not __fish_seen_subcommand_from project task todo track capture inbox reminder report setup service sync agent note completions help' \
   -a help       -d 'Print this message or the help of the given subcommand(s)'
 
 # ── global flags ──────────────────────────────────────────────────────────────
@@ -469,6 +469,56 @@ complete -c scribe -n '__fish_seen_subcommand_from agent; and not __fish_seen_su
 
 complete -c scribe -n '__fish_seen_subcommand_from agent; and __fish_seen_subcommand_from install' \
   -l output -d 'Output format' -r -a 'text json'
+
+# ── note subcommands ───────────────────────────────────────────────────────────
+complete -c scribe -n '__fish_seen_subcommand_from note; and not __fish_seen_subcommand_from add create edit list show delete help' \
+  -a add     -d 'Create and edit a note in $EDITOR'
+complete -c scribe -n '__fish_seen_subcommand_from note; and not __fish_seen_subcommand_from add create edit list show delete help' \
+  -a create  -d 'Create a note with inline content'
+complete -c scribe -n '__fish_seen_subcommand_from note; and not __fish_seen_subcommand_from add create edit list show delete help' \
+  -a edit    -d 'Edit a note in $EDITOR'
+complete -c scribe -n '__fish_seen_subcommand_from note; and not __fish_seen_subcommand_from add create edit list show delete help' \
+  -a list    -d 'List all notes'
+complete -c scribe -n '__fish_seen_subcommand_from note; and not __fish_seen_subcommand_from add create edit list show delete help' \
+  -a show    -d 'Show a note by slug'
+complete -c scribe -n '__fish_seen_subcommand_from note; and not __fish_seen_subcommand_from add create edit list show delete help' \
+  -a delete  -d 'Delete a note'
+
+# note add
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from add' \
+  -l title   -d 'Title for the note' -r
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from add' \
+  -l output  -d 'Output format' -r -a 'text json'
+
+# note create
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from create' \
+  -l content -d 'Markdown content' -r
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from create' \
+  -l output  -d 'Output format' -r -a 'text json'
+
+# note edit
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from edit' \
+  -l output  -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from edit' \
+  -a '(scribe __complete notes 2>/dev/null)' -d 'Note slug'
+
+# note list
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from list' \
+  -l search  -d 'Search query' -r
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from list' \
+  -l output  -d 'Output format' -r -a 'text json'
+
+# note show
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from show' \
+  -l output  -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from show' \
+  -a '(scribe __complete notes 2>/dev/null)' -d 'Note slug'
+
+# note delete
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from delete' \
+  -l output  -d 'Output format' -r -a 'text json'
+complete -c scribe -n '__fish_seen_subcommand_from note; and __fish_seen_subcommand_from delete' \
+  -a '(scribe __complete notes 2>/dev/null)' -d 'Note slug'
 
 # ── setup ─────────────────────────────────────────────────────────────────────
 complete -c scribe -n '__fish_seen_subcommand_from setup' \

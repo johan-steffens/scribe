@@ -295,6 +295,15 @@ impl NotesOps {
         self.notes.search_notes(query)
     }
 
+    /// Deletes the note with the given slug.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the note does not exist or a database error occurs.
+    pub fn delete_note(&self, slug: &str) -> anyhow::Result<()> {
+        self.notes.delete(slug)
+    }
+
     /// Returns a reference to the underlying links store.
     ///
     /// This is intended for use in tests that need to verify link state.

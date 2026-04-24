@@ -368,9 +368,9 @@ impl ServiceState {
         let config_says_installed = config.setup.daemon_service_installed;
 
         #[cfg(target_os = "macos")]
-        let file_exists = launchd_plist_path().map(|p| p.exists()).unwrap_or(false);
+        let file_exists = launchd_plist_path().is_ok_and(|p| p.exists());
         #[cfg(target_os = "linux")]
-        let file_exists = systemd_unit_path().map(|p| p.exists()).unwrap_or(false);
+        let file_exists = systemd_unit_path().is_ok_and(|p| p.exists());
         #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let file_exists = false;
 

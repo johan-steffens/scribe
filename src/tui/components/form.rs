@@ -312,15 +312,11 @@ impl Form {
             FormField::Select {
                 options, selected, ..
             } => match code {
-                KeyCode::Char('j') | KeyCode::Down => {
-                    if *selected + 1 < options.len() {
-                        *selected += 1;
-                    }
+                KeyCode::Char('j') | KeyCode::Down if *selected + 1 < options.len() => {
+                    *selected += 1;
                 }
-                KeyCode::Char('k') | KeyCode::Up => {
-                    if *selected > 0 {
-                        *selected -= 1;
-                    }
+                KeyCode::Char('k') | KeyCode::Up if *selected > 0 => {
+                    *selected -= 1;
                 }
                 _ => {}
             },

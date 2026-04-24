@@ -17,6 +17,7 @@ pub mod agent;
 pub mod capture;
 pub mod complete;
 pub mod inbox;
+pub mod note;
 pub mod parse;
 pub mod project;
 pub mod prompt;
@@ -41,6 +42,8 @@ pub use capture::CaptureCommand;
 pub use complete::CompletionShell;
 #[doc(inline)]
 pub use inbox::InboxCommand;
+#[doc(inline)]
+pub use note::NoteCommand;
 #[doc(inline)]
 pub use project::ProjectCommand;
 #[doc(inline)]
@@ -114,6 +117,8 @@ pub enum Commands {
         #[command(subcommand)]
         command: AgentCommand,
     },
+    /// Create, edit, list, and search notes.
+    Note(NoteCommand),
     /// Print a shell completion script for the given shell.
     Completions {
         /// Shell to generate completions for.

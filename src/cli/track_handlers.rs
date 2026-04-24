@@ -62,7 +62,7 @@ pub(super) fn handle_stop(args: &TrackStop, ops: &TrackerOps) -> anyhow::Result<
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&entry)?),
         OutputFormat::Text => {
-            println!("Stopped timer: {} ({mins}m {secs}s)", entry.slug,);
+            println!("Stopped timer: {} ({mins}m {secs}s)", entry.slug);
         }
     }
     Ok(())
