@@ -508,21 +508,31 @@ impl SqliteTasks {
     /// write fails.
     pub fn upsert_all_with_slug_resolution(&self, tasks: &[Task]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, tasks)?;
+        tx.commit()?;
+        Ok(())
+    }
 
+    /// Upserts tasks on an existing connection/transaction (slug resolution included).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any project/parent slug cannot be resolved or a write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, tasks: &[Task]) -> anyhow::Result<()> {
         let task_data: Vec<_> = tasks
             .iter()
             .map(|t| {
-                let local_project_id = Self::resolve_project_id(&conn, &t.project_slug)?;
+                let local_project_id = Self::resolve_project_id(conn, &t.project_slug)?;
                 let due_date_str = t.due_date.map(|d| d.format("%Y-%m-%d").to_string());
                 Ok((local_project_id, due_date_str, t))
             })
             .collect::<anyhow::Result<_>>()?;
 
-        let tx = conn.transaction()?;
         // Pass 1: upsert rows without parent_id so children can be written
         // before parents exist locally.
         for (local_project_id, due_date_str, t) in &task_data {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO tasks \
                  (slug, project_id, title, description, status, priority, \
                   due_date, parent_id, kind, archived_at, created_at, updated_at) \
@@ -555,22 +565,20 @@ impl SqliteTasks {
         // Pass 2: resolve parent_slug → local parent_id (or clear parent).
         for (_, _, t) in &task_data {
             if let Some(parent_slug) = t.parent_slug.as_deref() {
-                let local_parent_id = Self::resolve_task_id(&tx, parent_slug)?
+                let local_parent_id = Self::resolve_task_id(conn, parent_slug)?
                     .ok_or_else(|| anyhow::anyhow!("parent task '{parent_slug}' not found"))?
                     .0;
-                tx.execute(
+                conn.execute(
                     "UPDATE tasks SET parent_id = ?1 WHERE slug = ?2",
                     params![local_parent_id, t.slug],
                 )?;
             } else {
-                // Explicit clear — top-level task.
-                tx.execute(
+                conn.execute(
                     "UPDATE tasks SET parent_id = NULL WHERE slug = ?1",
                     params![t.slug],
                 )?;
             }
         }
-        tx.commit()?;
         Ok(())
     }
 }

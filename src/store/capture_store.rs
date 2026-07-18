@@ -167,8 +167,19 @@ impl SqliteCaptureItems {
     pub fn upsert_all(&self, items: &[CaptureItem]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
         let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, items)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Upserts capture items on an existing connection/transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, items: &[CaptureItem]) -> anyhow::Result<()> {
         for item in items {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO capture_items (slug, body, processed, created_at) \
                  VALUES (?1, ?2, ?3, ?4) \
                  ON CONFLICT(slug) DO UPDATE SET \
@@ -182,7 +193,6 @@ impl SqliteCaptureItems {
                 ],
             )?;
         }
-        tx.commit()?;
         Ok(())
     }
 }

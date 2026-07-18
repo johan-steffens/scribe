@@ -358,22 +358,33 @@ impl SqliteTodos {
     /// database write fails.
     pub fn upsert_all_with_slug_resolution(&self, todos: &[Todo]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, todos)?;
+        tx.commit()?;
+        Ok(())
+    }
 
+    /// Upserts checklist items on an existing connection/transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any project slug cannot be resolved or a write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, todos: &[Todo]) -> anyhow::Result<()> {
         let todo_data: Vec<_> = todos
             .iter()
             .map(|t| {
-                let local_project_id = Self::resolve_project_id(&conn, &t.project_slug)?;
+                let local_project_id = Self::resolve_project_id(conn, &t.project_slug)?;
                 Ok((local_project_id, t))
             })
             .collect::<anyhow::Result<_>>()?;
 
-        let tx = conn.transaction()?;
         for (local_project_id, t) in todo_data {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO tasks \
                  (slug, project_id, title, status, priority, kind, archived_at, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, 'medium', 'checklist_item', ?5, ?6, ?7) \
                  ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
                    title       = excluded.title, \
                    status      = excluded.status, \
                    priority    = excluded.priority, \
@@ -391,7 +402,6 @@ impl SqliteTodos {
                 ],
             )?;
         }
-        tx.commit()?;
         Ok(())
     }
 }

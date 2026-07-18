@@ -347,8 +347,19 @@ impl SqliteProjects {
     pub fn upsert_all(&self, projects: &[Project]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
         let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, projects)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Upserts projects on an existing connection/transaction (no nested TX).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, projects: &[Project]) -> anyhow::Result<()> {
         for p in projects {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO projects \
                  (slug, name, description, status, is_reserved, archived_at, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
@@ -370,7 +381,6 @@ impl SqliteProjects {
                 ],
             )?;
         }
-        tx.commit()?;
         Ok(())
     }
 }

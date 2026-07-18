@@ -168,10 +168,10 @@ impl StateSnapshot {
     ///
     /// Returns an error if any database write fails.
     pub fn write_to_db(&self, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
-        use crate::domain::{Links, parse_links};
+        use crate::domain::parse_links;
         use crate::store::{
-            SqliteCaptureItems, SqliteLinks, SqliteNotes, SqliteProjects, SqliteReminders,
-            SqliteTasks, SqliteTimeEntries, SqliteTodos,
+            SqliteCaptureItems, SqliteNotes, SqliteProjects, SqliteReminders, SqliteTasks,
+            SqliteTimeEntries, SqliteTodos,
         };
 
         tracing::debug!(
@@ -185,29 +185,42 @@ impl StateSnapshot {
             "write_to_db: starting"
         );
 
-        SqliteProjects::new(Arc::clone(conn)).upsert_all(&self.projects)?;
-        SqliteTasks::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.tasks)?;
+        // Single transaction: all domain upserts + link rebuild commit or roll back together.
+        let mut guard = conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("DB lock poisoned: {e}"))?;
+        let tx = guard.transaction()?;
+
+        SqliteProjects::upsert_all_on(&tx, &self.projects)?;
+        SqliteTasks::upsert_all_on(&tx, &self.tasks)?;
         // Inbound legacy: apply remote todos as checklist_item rows.
         if !self.todos.is_empty() {
-            SqliteTodos::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.todos)?;
+            SqliteTodos::upsert_all_on(&tx, &self.todos)?;
         }
-        SqliteTimeEntries::new(Arc::clone(conn))
-            .upsert_all_with_slug_resolution(&self.time_entries)?;
-        SqliteReminders::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.reminders)?;
-        SqliteCaptureItems::new(Arc::clone(conn)).upsert_all(&self.capture_items)?;
-        SqliteNotes::new(Arc::clone(conn)).upsert_all(&self.notes)?;
+        SqliteTimeEntries::upsert_all_on(&tx, &self.time_entries)?;
+        SqliteReminders::upsert_all_on(&tx, &self.reminders)?;
+        SqliteCaptureItems::upsert_all_on(&tx, &self.capture_items)?;
+        SqliteNotes::upsert_all_on(&tx, &self.notes)?;
 
         // Rebuild backlinks from note content after notes are persisted.
-        let links = SqliteLinks::new(Arc::clone(conn));
         for note in &self.notes {
-            links.delete_all_for(&note.slug)?;
+            tx.execute(
+                "DELETE FROM links WHERE source_slug = ?1 OR target_slug = ?1",
+                rusqlite::params![note.slug],
+            )?;
             for target in parse_links(&note.content) {
-                if target != note.slug {
-                    let _ = links.create(&note.slug, &target);
+                if target == note.slug {
+                    continue;
                 }
+                tx.execute(
+                    "INSERT OR IGNORE INTO links (source_slug, target_slug, created_at) \
+                     VALUES (?1, ?2, ?3)",
+                    rusqlite::params![note.slug, target, chrono::Utc::now().to_rfc3339(),],
+                )?;
             }
         }
 
+        tx.commit()?;
         tracing::debug!("write_to_db: complete");
         Ok(())
     }

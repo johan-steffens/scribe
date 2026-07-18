@@ -12,8 +12,10 @@
 //!
 //! | Entity type | Conflict resolution |
 //! |---|---|
-//! | `Project`, `Task`, `Todo` | Remote `updated_at` > local → replace; otherwise keep local |
-//! | `TimeEntry`, `Reminder`, `CaptureItem` | Insert-or-keep (no `updated_at`; never replace) |
+//! | `Project`, `Task`, `Todo`, `Note` | Remote `updated_at` > local → replace; otherwise keep local |
+//! | `TimeEntry` | Field-wise: stopped timer wins; later `ended_at`/`archived_at` |
+//! | `Reminder` | Field-wise: `fired`/`persistent` OR; archive prefers set |
+//! | `CaptureItem` | Field-wise: `processed` OR |
 //!
 //! # Persistence
 //!
@@ -321,9 +323,11 @@ impl SyncEngine {
     ///
     /// Merge rules (keyed by `slug`):
     /// - Remote-only entities: inserted into local.
-    /// - Both exist, remote `updated_at` > local: remote replaces local.
-    /// - Both exist, local `updated_at` >= remote: local is preserved.
-    /// - `TimeEntry`, `Reminder`, `CaptureItem` (no `updated_at`): insert-or-keep only.
+    /// - `Project`, `Task`, `Todo`, `Note`: remote wins when `updated_at` is newer.
+    /// - `TimeEntry`: field-wise — stopped (`ended_at` set) wins over running;
+    ///   later `ended_at` / `archived_at` win; empty note filled from remote.
+    /// - `Reminder`: `fired` and `persistent` are OR'd; archive prefers set.
+    /// - `CaptureItem`: `processed` is OR'd (processed wins over unprocessed).
     pub fn merge_into(local: &mut StateSnapshot, remote: &StateSnapshot) {
         merge_entities(
             &mut local.projects,
@@ -343,25 +347,23 @@ impl SyncEngine {
             |t| &t.slug,
             |rem, loc| rem.updated_at > loc.updated_at,
         );
-        // TimeEntry, Reminder, CaptureItem have no `updated_at` field —
-        // use insert-or-keep semantics (remote_wins always returns false).
-        merge_entities(
+        merge_entities_combine(
             &mut local.time_entries,
             &remote.time_entries,
             |e| &e.slug,
-            |_rem, _loc| false,
+            combine_time_entry,
         );
-        merge_entities(
+        merge_entities_combine(
             &mut local.reminders,
             &remote.reminders,
             |r| &r.slug,
-            |_rem, _loc| false,
+            combine_reminder,
         );
-        merge_entities(
+        merge_entities_combine(
             &mut local.capture_items,
             &remote.capture_items,
             |c| &c.slug,
-            |_rem, _loc| false,
+            combine_capture_item,
         );
         merge_entities(
             &mut local.notes,
@@ -384,7 +386,7 @@ impl SyncEngine {
     }
 }
 
-// ── private merge helper ───────────────────────────────────────────────────
+// ── private merge helpers ──────────────────────────────────────────────────
 
 /// Merges `remote` entities into `local` using slug-keyed conflict resolution.
 ///
@@ -436,4 +438,97 @@ fn merge_entities<T: Clone>(
         replaced_count,
         "merge: complete"
     );
+}
+
+/// Merges remote into local, always combining both sides when a slug conflicts.
+///
+/// `combine(local, remote) -> merged` must be pure and return a complete entity.
+fn merge_entities_combine<T: Clone>(
+    local: &mut Vec<T>,
+    remote: &[T],
+    slug_of: impl Fn(&T) -> &str,
+    combine: impl Fn(&T, &T) -> T,
+) {
+    let mut local_index: HashMap<String, usize> = local
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (slug_of(e).to_owned(), i))
+        .collect();
+
+    for remote_entity in remote {
+        let slug = slug_of(remote_entity).to_owned();
+        if let Some(idx) = local_index.get(&slug).copied() {
+            local[idx] = combine(&local[idx], remote_entity);
+        } else {
+            let new_idx = local.len();
+            local.push(remote_entity.clone());
+            local_index.insert(slug, new_idx);
+        }
+    }
+}
+
+/// Field-wise merge for time entries: stopped timers and later timestamps win.
+fn combine_time_entry(local: &TimeEntry, remote: &TimeEntry) -> TimeEntry {
+    let mut merged = local.clone();
+
+    // Prefer non-null `ended_at` (stop wins over still-running). If both set,
+    // keep the later stop time.
+    match (local.ended_at, remote.ended_at) {
+        (None, Some(r)) => merged.ended_at = Some(r),
+        (Some(l), Some(r)) if r > l => merged.ended_at = Some(r),
+        _ => {}
+    }
+
+    // Prefer archived when either side archived; later archive timestamp wins.
+    match (local.archived_at, remote.archived_at) {
+        (None, Some(r)) => merged.archived_at = Some(r),
+        (Some(l), Some(r)) if r > l => merged.archived_at = Some(r),
+        _ => {}
+    }
+
+    // Fill empty note from remote.
+    let local_note_empty = local.note.as_ref().is_none_or(|s| s.trim().is_empty());
+    if local_note_empty && remote.note.as_ref().is_some_and(|s| !s.trim().is_empty()) {
+        merged.note.clone_from(&remote.note);
+    }
+
+    // Prefer remote task link when local has none.
+    if merged.task_slug.is_none() && remote.task_slug.is_some() {
+        merged.task_id = remote.task_id;
+        merged.task_slug.clone_from(&remote.task_slug);
+    }
+
+    merged
+}
+
+/// Field-wise merge for reminders: `fired` / `persistent` OR; archive prefers set.
+fn combine_reminder(local: &Reminder, remote: &Reminder) -> Reminder {
+    let mut merged = local.clone();
+    merged.fired = local.fired || remote.fired;
+    merged.persistent = local.persistent || remote.persistent;
+
+    match (local.archived_at, remote.archived_at) {
+        (None, Some(r)) => merged.archived_at = Some(r),
+        (Some(l), Some(r)) if r > l => merged.archived_at = Some(r),
+        _ => {}
+    }
+
+    let local_msg_empty = local.message.as_ref().is_none_or(|s| s.trim().is_empty());
+    if local_msg_empty
+        && remote
+            .message
+            .as_ref()
+            .is_some_and(|s| !s.trim().is_empty())
+    {
+        merged.message.clone_from(&remote.message);
+    }
+
+    merged
+}
+
+/// Field-wise merge for capture items: `processed` is sticky (OR).
+fn combine_capture_item(local: &CaptureItem, remote: &CaptureItem) -> CaptureItem {
+    let mut merged = local.clone();
+    merged.processed = local.processed || remote.processed;
+    merged
 }
