@@ -6,3 +6,7 @@
 
 # General ignores
 /**/.DS_Store
+
+# Local tool dumps (must not ship in the repo)
+/repomix-output.xml
+/repomix-output*.xml

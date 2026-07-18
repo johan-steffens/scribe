@@ -119,8 +119,6 @@ VALUES ('quick-capture', 'Quick Capture', 'active', 1,
 
 // ── migrations ─────────────────────────────────────────────────────────────
 
-// ── migrations ─────────────────────────────────────────────────────────────
-
 /// M2 — adds the `persistent` column to `reminders`.
 ///
 /// `persistent = 1` causes the notification to use a blocking `display alert`
@@ -195,7 +193,7 @@ DROP TABLE IF EXISTS todos;";
 ///
 /// `links` implements the bi-directional link layer: every note can reference
 /// any other note or task slug, and the relationship is stored explicitly so
-/// backlinks (e.g. "哪些笔记引用了这个笔记") can be queried efficiently.
+/// backlinks (e.g. "which notes reference this note") can be queried efficiently.
 pub(super) const M6: &str = "
 CREATE TABLE IF NOT EXISTS notes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
