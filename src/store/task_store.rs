@@ -36,7 +36,11 @@ struct RawRow {
 }
 
 impl RawRow {
-    fn into_task(self, project_slug: Option<String>) -> anyhow::Result<Task> {
+    fn into_task(
+        self,
+        project_slug: Option<String>,
+        parent_slug: Option<String>,
+    ) -> anyhow::Result<Task> {
         let project_slug = project_slug.unwrap_or_else(|| "unknown".to_owned());
         let due_date = self
             .due_date
@@ -63,6 +67,7 @@ impl RawRow {
                 .map_err(|e| anyhow::anyhow!(e))?,
             due_date,
             parent_id: self.parent_id.map(TaskId),
+            parent_slug,
             kind: self
                 .kind
                 .parse::<TaskKind>()
@@ -93,7 +98,9 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RawRow> {
 }
 
 #[cfg(feature = "sync")]
-fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRow, String)> {
+fn map_row_with_slugs(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<(RawRow, String, Option<String>)> {
     Ok((
         RawRow {
             id: row.get(0)?,
@@ -111,6 +118,7 @@ fn map_row_with_project_slug(row: &rusqlite::Row<'_>) -> rusqlite::Result<(RawRo
             updated_at: row.get(12)?,
         },
         row.get(13)?,
+        row.get(14)?,
     ))
 }
 
@@ -126,10 +134,17 @@ fn fetch_one(conn: &Connection, slug: &str) -> anyhow::Result<Option<Task>> {
                 let mut s = conn.prepare(
                     "SELECT p.slug FROM projects p JOIN tasks t ON t.project_id = p.id WHERE t.slug = ?1",
                 )?;
-                s.query_row(params![slug], |row| row.get(0))
-                    .ok()
+                s.query_row(params![slug], |row| row.get(0)).ok()
             };
-            raw.into_task(project_slug)
+            let parent_slug = {
+                let mut s = conn.prepare(
+                    "SELECT parent.slug FROM tasks child \
+                     JOIN tasks parent ON child.parent_id = parent.id \
+                     WHERE child.slug = ?1",
+                )?;
+                s.query_row(params![slug], |row| row.get(0)).ok()
+            };
+            raw.into_task(project_slug, parent_slug)
         })
         .transpose()
 }
@@ -230,7 +245,7 @@ impl Tasks for SqliteTasks {
         let sql = format!("SELECT {SELECT_COLS} FROM tasks {where_clause} ORDER BY created_at");
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task(None))
+        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task(None, None))
             .collect()
     }
 
@@ -413,15 +428,20 @@ impl SqliteTasks {
     /// Returns an error if the database query fails.
     pub fn list_all(&self) -> anyhow::Result<Vec<Task>> {
         let conn = self.lock()?;
+        // LEFT JOIN parent so hierarchical tasks carry a portable parent_slug
+        // for multi-device sync (local parent_id values are not portable).
         let sql = "SELECT t.id, t.slug, t.project_id, t.title, t.description, t.status, \
              t.priority, t.due_date, t.parent_id, t.kind, t.archived_at, t.created_at, \
-             t.updated_at, p.slug \
-             FROM tasks t JOIN projects p ON t.project_id = p.id ORDER BY t.created_at ASC";
+             t.updated_at, p.slug, parent.slug \
+             FROM tasks t \
+             JOIN projects p ON t.project_id = p.id \
+             LEFT JOIN tasks parent ON t.parent_id = parent.id \
+             ORDER BY t.created_at ASC";
         let mut stmt = conn.prepare(sql)?;
-        let rows = stmt.query_map([], map_row_with_project_slug)?;
+        let rows = stmt.query_map([], map_row_with_slugs)?;
         rows.map(|r| {
-            let (raw, project_slug) = r.map_err(anyhow::Error::from)?;
-            raw.into_task(Some(project_slug))
+            let (raw, project_slug, parent_slug) = r.map_err(anyhow::Error::from)?;
+            raw.into_task(Some(project_slug), parent_slug)
         })
         .collect()
     }
@@ -442,14 +462,26 @@ impl SqliteTasks {
         Ok(ProjectId(id))
     }
 
-    /// Inserts or updates each task by slug, resolving project slugs to local IDs.
+    /// Resolves a task slug to its local numeric ID, if present.
+    fn resolve_task_id(conn: &Connection, task_slug: &str) -> anyhow::Result<Option<TaskId>> {
+        let result = conn.query_row(
+            "SELECT id FROM tasks WHERE slug = ?1",
+            params![task_slug],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(id) => Ok(Some(TaskId(id))),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Inserts or updates each task by slug, resolving project and parent slugs
+    /// to local IDs.
     ///
-    /// This is the sync-safe version of `upsert_all`. It resolves `project_slug`
-    /// to the local `project_id` before inserting, avoiding foreign key mismatches
-    /// when syncing from remote.
-    ///
-    /// `slug` and `created_at` are write-once fields excluded from the update
-    /// set. All other mutable fields are updated on conflict.
+    /// Hierarchy is applied in a second pass so parents do not need to appear
+    /// before children in the input slice. `parent_id` from the remote is
+    /// **ignored** — only `parent_slug` is portable across databases.
     ///
     /// # Errors
     ///
@@ -468,19 +500,21 @@ impl SqliteTasks {
             .collect::<anyhow::Result<_>>()?;
 
         let tx = conn.transaction()?;
-        for (local_project_id, due_date_str, t) in task_data {
+        // Pass 1: upsert rows without parent_id so children can be written
+        // before parents exist locally.
+        for (local_project_id, due_date_str, t) in &task_data {
             tx.execute(
                 "INSERT INTO tasks \
                  (slug, project_id, title, description, status, priority, \
                   due_date, parent_id, kind, archived_at, created_at, updated_at) \
-                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) \
+                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8, ?9, ?10, ?11) \
                   ON CONFLICT(slug) DO UPDATE SET \
+                    project_id  = excluded.project_id, \
                     title       = excluded.title, \
                     description = excluded.description, \
                     status      = excluded.status, \
                     priority    = excluded.priority, \
                     due_date    = excluded.due_date, \
-                    parent_id   = excluded.parent_id, \
                     kind        = excluded.kind, \
                     archived_at = excluded.archived_at, \
                     updated_at  = excluded.updated_at",
@@ -492,13 +526,30 @@ impl SqliteTasks {
                     t.status.to_string(),
                     t.priority.to_string(),
                     due_date_str,
-                    t.parent_id.map(|id| id.0),
                     t.kind.to_string(),
                     t.archived_at.map(|dt| dt.to_rfc3339()),
                     t.created_at.to_rfc3339(),
                     t.updated_at.to_rfc3339(),
                 ],
             )?;
+        }
+        // Pass 2: resolve parent_slug → local parent_id (or clear parent).
+        for (_, _, t) in &task_data {
+            if let Some(parent_slug) = t.parent_slug.as_deref() {
+                let local_parent_id = Self::resolve_task_id(&tx, parent_slug)?
+                    .ok_or_else(|| anyhow::anyhow!("parent task '{parent_slug}' not found"))?
+                    .0;
+                tx.execute(
+                    "UPDATE tasks SET parent_id = ?1 WHERE slug = ?2",
+                    params![local_parent_id, t.slug],
+                )?;
+            } else {
+                // Explicit clear — top-level task.
+                tx.execute(
+                    "UPDATE tasks SET parent_id = NULL WHERE slug = ?1",
+                    params![t.slug],
+                )?;
+            }
         }
         tx.commit()?;
         Ok(())

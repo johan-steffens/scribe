@@ -19,6 +19,7 @@ mod tests {
             time_entries: vec![],
             reminders: vec![],
             capture_items: vec![],
+            notes: vec![],
         }
     }
 

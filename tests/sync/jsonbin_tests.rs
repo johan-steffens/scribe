@@ -68,6 +68,7 @@ fn snap_with_project() -> StateSnapshot {
         time_entries: vec![],
         reminders: vec![],
         capture_items: vec![],
+        notes: vec![],
     }
 }
 
@@ -83,6 +84,7 @@ fn empty_snap() -> StateSnapshot {
         time_entries: vec![],
         reminders: vec![],
         capture_items: vec![],
+        notes: vec![],
     }
 }
 

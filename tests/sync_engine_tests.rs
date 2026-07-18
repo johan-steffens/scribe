@@ -18,6 +18,7 @@ mod tests {
             time_entries: vec![],
             reminders: vec![],
             capture_items: vec![],
+            notes: vec![],
         }
     }
 
@@ -33,7 +34,9 @@ mod tests {
     fn test_snapshot_content_hash_changes_when_data_changes() {
         let mut snap = empty_snap();
         let h1 = snap.content_hash();
-        snap.schema_version = 2;
+        // SCHEMA_VERSION is part of the hashable payload — bump it off the
+        // current constant so the hash must change.
+        snap.schema_version = StateSnapshot::SCHEMA_VERSION.wrapping_add(1);
         let h2 = snap.content_hash();
         assert_ne!(h1, h2);
     }

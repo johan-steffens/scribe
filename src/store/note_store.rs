@@ -170,6 +170,47 @@ impl Notes for SqliteNotes {
     }
 }
 
+#[cfg(feature = "sync")]
+impl SqliteNotes {
+    /// Returns every note row for snapshot sync.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query fails.
+    pub fn list_all(&self) -> anyhow::Result<Vec<Note>> {
+        self.list()
+    }
+
+    /// Inserts or updates each note by slug.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub fn upsert_all(&self, notes: &[Note]) -> anyhow::Result<()> {
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
+        for n in notes {
+            tx.execute(
+                "INSERT INTO notes (slug, title, content, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5) \
+                 ON CONFLICT(slug) DO UPDATE SET \
+                   title      = excluded.title, \
+                   content    = excluded.content, \
+                   updated_at = excluded.updated_at",
+                params![
+                    n.slug,
+                    n.title,
+                    n.content,
+                    n.created_at.to_rfc3339(),
+                    n.updated_at.to_rfc3339(),
+                ],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+}
+
 impl SqliteNotes {
     /// Searches notes by full-text query using the FTS5 `notes_fts` table.
     ///

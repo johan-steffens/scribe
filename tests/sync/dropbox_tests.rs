@@ -101,6 +101,7 @@ async fn dropbox_provider_push_returns_transport_error_when_api_unreachable() {
             time_entries: vec![],
             reminders: vec![],
             capture_items: vec![],
+            notes: vec![],
         })
         .await;
 

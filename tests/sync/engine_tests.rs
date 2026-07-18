@@ -45,6 +45,7 @@ fn empty_snap() -> StateSnapshot {
         time_entries: vec![],
         reminders: vec![],
         capture_items: vec![],
+        notes: vec![],
     }
 }
 
@@ -78,6 +79,7 @@ fn make_task(slug: &str, project_slug: &str, updated_secs_ago: i64) -> Task {
         priority: TaskPriority::Medium,
         due_date: None,
         parent_id: None,
+        parent_slug: None,
         kind: TaskKind::Task,
         archived_at: None,
         created_at: t,

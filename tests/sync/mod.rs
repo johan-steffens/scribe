@@ -17,3 +17,6 @@ mod dropbox_tests;
 
 #[cfg(feature = "sync")]
 mod jsonbin_tests;
+
+#[cfg(feature = "sync")]
+mod snapshot_v2_tests;

@@ -17,10 +17,11 @@ use crate::domain::{ProjectId, TaskId};
 /// This allows UI rendering to treat deep sub-tasks as simple checkbox items
 /// while keeping the same underlying storage. Checklist items do not have
 /// their own status/priority — they inherit from their parent task.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskKind {
     /// A standard task with full status, priority, and due date fields.
+    #[default]
     Task,
     /// A lightweight checklist item nested under a parent task.
     /// Rendered as a simple checkbox in the UI.
@@ -158,8 +159,22 @@ pub struct Task {
     /// Optional due date (date only, no time component).
     pub due_date: Option<NaiveDate>,
     /// Optional parent task ID for hierarchical nesting. `None` means top-level.
+    ///
+    /// Local-only numeric id. Sync must use [`Self::parent_slug`] for cross-device
+    /// resolution — raw `parent_id` values are not portable between databases.
+    #[serde(default)]
     pub parent_id: Option<TaskId>,
+    /// Slug of the parent task, when nested. Used for sync-safe hierarchy.
+    ///
+    /// Populated on read from the DB join; resolved to a local `parent_id` on
+    /// sync write. Defaults to `None` when deserialising older snapshots.
+    #[serde(default)]
+    pub parent_slug: Option<String>,
     /// Kind of task — either a full task or a lightweight checklist item.
+    ///
+    /// Defaults to [`TaskKind::Task`] when deserialising older snapshots that
+    /// predate the hierarchical-task / checklist migration.
+    #[serde(default)]
     pub kind: TaskKind,
     /// Timestamp when archived; `None` means the task is active.
     pub archived_at: Option<DateTime<Utc>>,
