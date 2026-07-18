@@ -219,8 +219,7 @@ fn random_suffix() -> String {
     // are Knuth's MMIX parameters, widely used for non-cryptographic randomness.
     let seed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.subsec_nanos())
-        .unwrap_or(0xDEAD_BEEF);
+        .map_or(0xDEAD_BEEF, |d| d.subsec_nanos());
 
     let mut state = u64::from(seed);
     let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyz0123456789".chars().collect();

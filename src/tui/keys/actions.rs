@@ -9,12 +9,13 @@
 
 use std::sync::Arc;
 
-use crate::domain::Projects;
+use crate::domain::{Projects, slug};
+use crate::ops::notes::NotesOps;
 use crate::ops::reminders::CreateReminder;
 use crate::ops::todos::TodoOps;
 use crate::ops::tracker::{StartTimer, TrackerOps};
 use crate::ops::{InboxOps, ProjectOps, ReminderOps, TaskOps};
-use crate::store::SqliteProjects;
+use crate::store::{SqliteLinks, SqliteNotes, SqliteProjects};
 use crate::tui::app::App;
 use crate::tui::components::form::Form;
 use crate::tui::types::{ConfirmContext, FormContext};
@@ -65,6 +66,7 @@ pub(super) fn execute_form(app: &mut App, form: &Form, ctx: FormContext) {
         FormContext::CreateTask => exec_create_task(app, form),
         FormContext::EditTask(slug) => exec_edit_task(app, form, &slug),
         FormContext::ProcessCapture(slug) => exec_process_capture(app, form, &slug),
+        FormContext::CreateNote => exec_create_note(app, form),
     };
     apply_result(app, result);
 }
@@ -252,6 +254,7 @@ fn exec_create_task(app: &App, form: &Form) -> anyhow::Result<()> {
             status: crate::domain::TaskStatus::Todo,
             priority: crate::domain::TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
         })
         .map(|_| ())
 }
@@ -285,4 +288,25 @@ fn exec_process_capture(app: &App, form: &Form, capture_slug: &str) -> anyhow::R
         _ => crate::ops::inbox::ProcessAction::Discard,
     };
     ops.process(capture_slug, action).map(|_| ())
+}
+
+fn exec_create_note(app: &App, form: &Form) -> anyhow::Result<()> {
+    let title = form.field_value(0).trim().to_owned();
+    if title.is_empty() {
+        return Err(anyhow::anyhow!("note title cannot be empty"));
+    }
+    let slug_raw = form.field_value(1).trim().to_owned();
+    let note_slug = if slug_raw.is_empty() {
+        // DOCUMENTED-MAGIC: empty prefix keeps the slug short and portable
+        // (notes are not project-scoped).
+        slug::generate("", &title)
+    } else {
+        slug_raw
+    };
+    let ops = NotesOps::new(
+        Arc::new(SqliteNotes::new(Arc::clone(&app.db))),
+        Arc::new(SqliteLinks::new(Arc::clone(&app.db))),
+        app.note_editor.clone(),
+    );
+    ops.create_and_edit(&title, &note_slug).map(|_| ())
 }

@@ -103,6 +103,8 @@ pub struct SyncSummary {
     pub reminders_updated: u32,
     pub capture_items_added: u32,
     pub capture_items_updated: u32,
+    pub notes_added: u32,
+    pub notes_updated: u32,
     pub last_sync_at: Option<DateTime<Utc>>,
     pub error: Option<String>,
 }
@@ -135,6 +137,8 @@ impl SyncSummary {
             + self.reminders_updated
             + self.capture_items_added
             + self.capture_items_updated
+            + self.notes_added
+            + self.notes_updated
     }
 
     #[must_use]
@@ -148,6 +152,7 @@ impl SyncSummary {
             diff_counts(&original.reminders, &merged.reminders);
         let (capture_items_added, capture_items_updated) =
             diff_counts(&original.capture_items, &merged.capture_items);
+        let (notes_added, notes_updated) = diff_counts(&original.notes, &merged.notes);
 
         Self {
             projects_added,
@@ -162,6 +167,8 @@ impl SyncSummary {
             reminders_updated,
             capture_items_added,
             capture_items_updated,
+            notes_added,
+            notes_updated,
             last_sync_at: Some(Utc::now()),
             error: None,
         }
@@ -355,6 +362,12 @@ impl SyncEngine {
             &remote.capture_items,
             |c| &c.slug,
             |_rem, _loc| false,
+        );
+        merge_entities(
+            &mut local.notes,
+            &remote.notes,
+            |n| &n.slug,
+            |rem, loc| rem.updated_at > loc.updated_at,
         );
     }
 

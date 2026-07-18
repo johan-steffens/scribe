@@ -8,7 +8,7 @@ use scribe::tui::app::{App, InputMode, View};
 
 fn make_app() -> App {
     let conn = Arc::new(Mutex::new(db::open_in_memory().expect("in-memory db")));
-    App::new(conn)
+    App::new(conn, None)
 }
 
 fn key(code: KeyCode) -> KeyEvent {

@@ -74,7 +74,7 @@ fn fire_impl(reminder: &Reminder, body: &str) {
              buttons {{\"Dismiss\"}} giving up after 0",
         )
     } else {
-        format!("display notification \"{safe_body}\" with title \"{safe_title}\"",)
+        format!("display notification \"{safe_body}\" with title \"{safe_title}\"")
     };
 
     match Command::new("osascript").args(["-e", &script]).status() {

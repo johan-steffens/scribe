@@ -21,7 +21,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use crate::tui::app::{App, View};
 use crate::tui::components::status_bar;
 use crate::tui::types::Modal;
-use crate::tui::views::{dashboard, inbox, projects, reminders, tasks, todos, tracker};
+use crate::tui::views::{dashboard, inbox, notes, projects, reminders, tasks, todos, tracker};
 
 // ── public entry point ─────────────────────────────────────────────────────
 
@@ -84,7 +84,8 @@ fn render_tab_bar(frame: &mut Frame, area: Rect, app: &App) {
         nav_span(View::Dashboard, "[D]ashboard "),
         nav_span(View::Projects, "[P]rojects "),
         nav_span(View::Tasks, "[T]asks "),
-        nav_span(View::Todos, "[O]Todos"),
+        nav_span(View::Todos, "[O]Todos "),
+        nav_span(View::Notes, "[N]Notes "),
     ]);
 
     let line2 = Line::from(vec![
@@ -115,6 +116,11 @@ fn render_main(frame: &mut Frame, area: Rect, app: &App) {
         View::Tracker => tracker::render(frame, area, app),
         View::Inbox => inbox::render(frame, area, app),
         View::Reminders => reminders::render(frame, area, app),
+        View::Notes => {
+            notes::render(frame, area, app);
+            // Notes does not paint its own modals (unlike todos/inbox).
+            render_modal(frame, area, app);
+        }
     }
 }
 
@@ -161,14 +167,16 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         ("r", "Tracker"),
         ("i", "Inbox"),
         ("m", "Reminders"),
+        ("n", "Notes view"),
         ("j / ↓", "Move selection down"),
         ("k / ↑", "Move selection up"),
-        ("n", "New item"),
-        ("e", "Edit selected"),
+        ("N", "New item"),
+        ("e", "Edit selected / note"),
         ("D", "Delete/archive selected"),
         ("Space", "Toggle done / start-stop timer"),
         ("Enter", "Process inbox item"),
         ("v", "Move todo to different project"),
+        ("g", "Go to linked task (Notes)"),
         ("/", "Enter filter mode"),
         ("Esc", "Clear filter / close modal / dismiss error"),
         ("Tab", "Next form field (in form)"),

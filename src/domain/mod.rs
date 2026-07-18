@@ -16,6 +16,7 @@
 //! | [`reminder`] | [`Reminder`], [`Reminders`] trait |
 
 pub mod capture;
+pub mod note;
 pub mod project;
 pub mod reminder;
 pub mod slug;
@@ -49,16 +50,22 @@ pub struct CaptureItemId(pub i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ReminderId(pub i64);
 
+/// Strongly-typed primary key for a [`note::Note`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct NoteId(pub i64);
+
 // ── inline re-exports ──────────────────────────────────────────────────────
 
 #[doc(inline)]
 pub use capture::{CaptureItem, CaptureItems, NewCaptureItem};
 #[doc(inline)]
+pub use note::{Link, Links, NewNote, Note, NotePatch, Notes, parse_links};
+#[doc(inline)]
 pub use project::{NewProject, Project, ProjectPatch, ProjectStatus, Projects};
 #[doc(inline)]
 pub use reminder::{NewReminder, Reminder, ReminderPatch, Reminders};
 #[doc(inline)]
-pub use task::{NewTask, Task, TaskPatch, TaskPriority, TaskStatus, Tasks};
+pub use task::{NewTask, Task, TaskKind, TaskPatch, TaskPriority, TaskStatus, Tasks};
 #[doc(inline)]
 pub use time_entry::{NewTimeEntry, TimeEntries, TimeEntry, TimeEntryPatch};
 #[doc(inline)]

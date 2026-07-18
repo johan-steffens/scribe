@@ -68,6 +68,7 @@ fn handle_normal_key(app: &mut App, key: KeyEvent) {
         KeyCode::Char('r') => helpers::switch_view(app, View::Tracker),
         KeyCode::Char('i') => helpers::switch_view(app, View::Inbox),
         KeyCode::Char('m') => helpers::switch_view(app, View::Reminders),
+        KeyCode::Char('n') => helpers::switch_view(app, View::Notes),
         KeyCode::Char('?') => {
             app.show_help = !app.show_help;
         }
@@ -89,11 +90,16 @@ fn handle_normal_key(app: &mut App, key: KeyEvent) {
             app.show_help = false;
         }
         // ── create / edit / delete ─────────────────────────────────────────
-        KeyCode::Char('n') => view_handlers::handle_new(app),
+        KeyCode::Char('N') => view_handlers::handle_new(app),
         KeyCode::Char('e') => view_handlers::handle_edit(app),
         KeyCode::Char('D') => view_handlers::handle_delete(app),
         KeyCode::Char(' ') => view_handlers::handle_space(app),
         KeyCode::Enter => view_handlers::handle_enter(app),
+        // ── notes-specific ────────────────────────────────────────────────
+        KeyCode::Char('g') => view_handlers::handle_go_to_linked(app),
+        // ── task tree expand/collapse ───────────────────────────────────────
+        KeyCode::Right => view_handlers::handle_right(app),
+        KeyCode::Left => view_handlers::handle_left(app),
         // ── todo-specific move ─────────────────────────────────────────────
         KeyCode::Char('v') if app.active_view == View::Todos => {
             view_handlers::handle_move_todo(app);
@@ -111,9 +117,15 @@ pub(super) fn handle_filter_key(app: &mut App, key: KeyEvent) {
             app.input_mode = InputMode::Normal;
             helpers::current_filter_mut(app).clear();
             *app.selected_mut() = 0;
+            if app.active_view == View::Notes {
+                helpers::load_note_links(app);
+            }
         }
         KeyCode::Enter => {
             app.input_mode = InputMode::Normal;
+            if app.active_view == View::Notes {
+                helpers::load_note_links(app);
+            }
         }
         KeyCode::Backspace => {
             helpers::current_filter_mut(app).pop();
@@ -122,10 +134,16 @@ pub(super) fn handle_filter_key(app: &mut App, key: KeyEvent) {
             if *sel >= new_len && new_len > 0 {
                 *sel = new_len - 1;
             }
+            if app.active_view == View::Notes {
+                helpers::load_note_links(app);
+            }
         }
         KeyCode::Char(c) => {
             helpers::current_filter_mut(app).push(c);
             *app.selected_mut() = 0;
+            if app.active_view == View::Notes {
+                helpers::load_note_links(app);
+            }
         }
         _ => {}
     }

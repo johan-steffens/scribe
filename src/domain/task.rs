@@ -2,12 +2,52 @@
 //!
 //! Tasks are the primary unit of work. They belong to a project and carry a
 //! status, priority, and optional due date. Slugs are auto-generated from the
-//! title, e.g. `payments-task-fix-login`.
+//! title, e.g. `payments-task-fix-login`. Tasks support infinite hierarchical
+//! nesting via an optional `parent_id` reference to another task.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{ProjectId, TaskId};
+
+// ── kind enum ──────────────────────────────────────────────────────────────
+
+/// Distinguishes between a full task and a lightweight checklist item.
+///
+/// This allows UI rendering to treat deep sub-tasks as simple checkbox items
+/// while keeping the same underlying storage. Checklist items do not have
+/// their own status/priority — they inherit from their parent task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskKind {
+    /// A standard task with full status, priority, and due date fields.
+    #[default]
+    Task,
+    /// A lightweight checklist item nested under a parent task.
+    /// Rendered as a simple checkbox in the UI.
+    ChecklistItem,
+}
+
+impl std::fmt::Display for TaskKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Task => write!(f, "task"),
+            Self::ChecklistItem => write!(f, "checklist_item"),
+        }
+    }
+}
+
+impl std::str::FromStr for TaskKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "task" => Ok(Self::Task),
+            "checklist_item" => Ok(Self::ChecklistItem),
+            other => Err(format!("unknown task kind '{other}'")),
+        }
+    }
+}
 
 // ── status enum ────────────────────────────────────────────────────────────
 
@@ -96,7 +136,8 @@ impl std::str::FromStr for TaskPriority {
 /// A task record as stored in the database.
 ///
 /// Tasks belong to a project (`project_id`) and have an auto-generated slug
-/// derived from the project slug and title.
+/// derived from the project slug and title. They support infinite hierarchical
+/// nesting via an optional `parent_id` reference to another task's primary key.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Task {
     /// Internal numeric primary key (not exposed to users).
@@ -117,6 +158,24 @@ pub struct Task {
     pub priority: TaskPriority,
     /// Optional due date (date only, no time component).
     pub due_date: Option<NaiveDate>,
+    /// Optional parent task ID for hierarchical nesting. `None` means top-level.
+    ///
+    /// Local-only numeric id. Sync must use [`Self::parent_slug`] for cross-device
+    /// resolution — raw `parent_id` values are not portable between databases.
+    #[serde(default)]
+    pub parent_id: Option<TaskId>,
+    /// Slug of the parent task, when nested. Used for sync-safe hierarchy.
+    ///
+    /// Populated on read from the DB join; resolved to a local `parent_id` on
+    /// sync write. Defaults to `None` when deserialising older snapshots.
+    #[serde(default)]
+    pub parent_slug: Option<String>,
+    /// Kind of task — either a full task or a lightweight checklist item.
+    ///
+    /// Defaults to [`TaskKind::Task`] when deserialising older snapshots that
+    /// predate the hierarchical-task / checklist migration.
+    #[serde(default)]
+    pub kind: TaskKind,
     /// Timestamp when archived; `None` means the task is active.
     pub archived_at: Option<DateTime<Utc>>,
     /// Creation timestamp (UTC).
@@ -218,6 +277,10 @@ pub struct NewTask {
     pub priority: TaskPriority,
     /// Optional due date.
     pub due_date: Option<NaiveDate>,
+    /// Optional parent task ID for nesting.
+    pub parent_id: Option<TaskId>,
+    /// Kind of task (defaults to `Task`).
+    pub kind: TaskKind,
 }
 
 /// Partial update for mutable task fields.
@@ -241,4 +304,10 @@ pub struct TaskPatch {
     pub clear_due_date: bool,
     /// New project assignment, if moving to a different project.
     pub project_id: Option<ProjectId>,
+    /// New parent task ID, if re-nesting.
+    pub parent_id: Option<TaskId>,
+    /// Whether to clear the parent (move to top-level).
+    pub clear_parent_id: bool,
+    /// New kind, if changing.
+    pub kind: Option<TaskKind>,
 }

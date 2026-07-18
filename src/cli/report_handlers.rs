@@ -552,7 +552,7 @@ fn handle_track_report_impl(
                     let mins = d.num_minutes();
                     let secs = d.num_seconds() % 60;
                     let note = e.note.as_deref().unwrap_or("");
-                    println!("{:<45} {mins:>4}m {secs:02}s  {}", e.slug, note,);
+                    println!("{:<45} {mins:>4}m {secs:02}s  {}", e.slug, note);
                 }
                 let total_mins = total.num_minutes();
                 let total_secs = total.num_seconds() % 60;

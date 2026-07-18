@@ -260,32 +260,26 @@ pub(super) fn handle_text_key(value: &mut String, cursor: &mut usize, code: KeyC
             value.insert(*cursor, c);
             *cursor += c.len_utf8();
         }
-        KeyCode::Backspace => {
-            if *cursor > 0 {
-                let new_cursor = value[..*cursor]
-                    .char_indices()
-                    .next_back()
-                    .map_or(0, |(i, _)| i);
-                value.drain(new_cursor..*cursor);
-                *cursor = new_cursor;
-            }
+        KeyCode::Backspace if *cursor > 0 => {
+            let new_cursor = value[..*cursor]
+                .char_indices()
+                .next_back()
+                .map_or(0, |(i, _)| i);
+            value.drain(new_cursor..*cursor);
+            *cursor = new_cursor;
         }
-        KeyCode::Left => {
-            if *cursor > 0 {
-                *cursor = value[..*cursor]
-                    .char_indices()
-                    .next_back()
-                    .map_or(0, |(i, _)| i);
-            }
+        KeyCode::Left if *cursor > 0 => {
+            *cursor = value[..*cursor]
+                .char_indices()
+                .next_back()
+                .map_or(0, |(i, _)| i);
         }
-        KeyCode::Right => {
-            if *cursor < value.len() {
-                let next = value[*cursor..]
-                    .char_indices()
-                    .nth(1)
-                    .map_or(value.len(), |(i, _)| *cursor + i);
-                *cursor = next;
-            }
+        KeyCode::Right if *cursor < value.len() => {
+            let next = value[*cursor..]
+                .char_indices()
+                .nth(1)
+                .map_or(value.len(), |(i, _)| *cursor + i);
+            *cursor = next;
         }
         KeyCode::Home => {
             *cursor = 0;

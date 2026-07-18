@@ -6,7 +6,7 @@ use serde_json::json;
 
 use super::{
     OutputFormat, TaskAdd, TaskArchive, TaskDelete, TaskDone, TaskEdit, TaskList, TaskMove,
-    TaskRestore, TaskShow,
+    TaskRestore, TaskShow, TaskToggle,
 };
 use crate::domain::{TaskPatch, TaskStatus};
 use crate::ops::tasks::CreateTask;
@@ -32,6 +32,16 @@ pub(super) fn handle_add(
 
     let due_date = args.due.as_deref().map(parse_due_date).transpose()?;
 
+    // Resolve parent task slug to parent_id if provided.
+    let parent_id = if let Some(ref parent_slug) = args.parent {
+        let parent = task_ops
+            .get_task(parent_slug)?
+            .ok_or_else(|| anyhow::anyhow!("parent task '{parent_slug}' not found"))?;
+        Some(parent.id)
+    } else {
+        None
+    };
+
     let task = task_ops.create_task(CreateTask {
         project_slug: project.slug.clone(),
         project_id: project.id,
@@ -40,6 +50,7 @@ pub(super) fn handle_add(
         status: TaskStatus::Todo,
         priority: args.priority,
         due_date,
+        parent_id,
     })?;
 
     match args.output {
@@ -130,6 +141,9 @@ pub(super) fn handle_edit(args: &TaskEdit, task_ops: &TaskOps) -> anyhow::Result
         due_date,
         clear_due_date: false,
         project_id: None,
+        parent_id: None,
+        clear_parent_id: false,
+        kind: None,
     };
     let task = task_ops.update_task(&args.slug, patch)?;
     match args.output {
@@ -168,6 +182,31 @@ pub(super) fn handle_done(args: &TaskDone, task_ops: &TaskOps) -> anyhow::Result
     match args.output {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&task)?),
         OutputFormat::Text => println!("Done: {}", task.slug),
+    }
+    Ok(())
+}
+
+pub(super) fn handle_toggle(args: &TaskToggle, task_ops: &TaskOps) -> anyhow::Result<()> {
+    let task = task_ops
+        .get_task(&args.slug)?
+        .ok_or_else(|| anyhow::anyhow!("task '{}' not found", args.slug))?;
+
+    let new_status = match task.status {
+        TaskStatus::Done => TaskStatus::Todo,
+        TaskStatus::Todo | TaskStatus::InProgress | TaskStatus::Cancelled => TaskStatus::Done,
+    };
+
+    let updated = task_ops.update_task(
+        &args.slug,
+        TaskPatch {
+            status: Some(new_status),
+            ..Default::default()
+        },
+    )?;
+
+    match args.output {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&updated)?),
+        OutputFormat::Text => println!("Toggled: {} -> {}", updated.slug, updated.status),
     }
     Ok(())
 }

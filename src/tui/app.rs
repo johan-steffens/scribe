@@ -19,7 +19,7 @@
 //! use scribe::tui::app::App;
 //!
 //! let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-//! let mut app = App::new(conn);
+//! let mut app = App::new(conn, None);
 //! assert!(!app.should_quit);
 //! ```
 
@@ -36,8 +36,8 @@ use crate::domain::TimeEntry;
 use crate::ops::TrackerOps;
 use crate::ops::reporting::SummaryReport;
 use crate::tui::types::{
-    CaptureViewState, EntryViewState, Modal, ProjectViewState, ReminderViewState, TaskViewState,
-    TodoViewState, ViewState,
+    CaptureViewState, EntryViewState, Modal, NoteLinks, NoteViewState, ProjectViewState,
+    ReminderViewState, TaskViewState, TodoViewState, ViewState,
 };
 
 // Re-export types so downstream modules can `use crate::tui::app::{App, View, InputMode}`.
@@ -59,8 +59,8 @@ pub use crate::tui::types::{InputMode, View};
 /// use scribe::tui::app::App;
 ///
 /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-/// let mut app = App::new(conn);
-/// app.tick();
+/// let mut app = App::new(conn, None);
+/// assert!(!app.should_quit);
 /// ```
 #[derive(Debug)]
 pub struct App {
@@ -90,10 +90,16 @@ pub struct App {
     pub captures: CaptureViewState,
     /// Per-view list state for reminders.
     pub reminders: ReminderViewState,
+    /// Per-view list state for notes.
+    pub notes: NoteViewState,
+    /// Inbound links for the currently selected note.
+    pub note_links: NoteLinks,
     /// Summary report for the dashboard system overview.
     pub summary: Option<SummaryReport>,
     /// Shared database connection used to refresh data.
     pub(super) db: Arc<Mutex<Connection>>,
+    /// Default note editor from config, falling back to `$EDITOR` env var then `vim`.
+    pub note_editor: Option<String>,
 }
 
 impl App {
@@ -111,11 +117,11 @@ impl App {
     /// use scribe::tui::app::App;
     ///
     /// let conn = Arc::new(Mutex::new(open_in_memory().unwrap()));
-    /// let app = App::new(conn);
+    /// let app = App::new(conn, None);
     /// assert_eq!(app.active_view, scribe::tui::app::View::Dashboard);
     /// ```
     #[must_use]
-    pub fn new(db: Arc<Mutex<Connection>>) -> Self {
+    pub fn new(db: Arc<Mutex<Connection>>, note_editor: Option<String>) -> Self {
         let mut app = Self {
             active_view: View::Dashboard,
             should_quit: false,
@@ -125,13 +131,16 @@ impl App {
             input_mode: InputMode::Normal,
             modal: Modal::None,
             projects: ViewState::new(),
-            tasks: ViewState::new(),
+            tasks: TaskViewState::new(),
             todos: ViewState::new(),
             entries: ViewState::new(),
             captures: ViewState::new(),
             reminders: ViewState::new(),
+            notes: ViewState::new(),
+            note_links: Vec::new(),
             summary: None,
             db,
+            note_editor,
         };
         app.refresh();
         app
@@ -148,7 +157,17 @@ impl App {
         refresh::refresh_entries(self);
         refresh::refresh_captures(self);
         refresh::refresh_reminders(self);
+        refresh::refresh_notes(self);
         refresh::refresh_summary(self);
+    }
+
+    /// Reloads notes from the database.
+    ///
+    /// Called by [`switch_view`](crate::tui::keys::helpers::switch_view) when
+    /// entering the Notes view to ensure the note list is populated before
+    /// loading inbound links.
+    pub fn refresh_notes(&mut self) {
+        refresh::refresh_notes(self);
     }
 
     /// Refreshes the active timer status from the database.
@@ -189,11 +208,7 @@ impl App {
                     .iter()
                     .map(|p| format!("{} {}", p.slug, p.name)),
             ),
-            View::Tasks | View::Dashboard => Self::filter_count(
-                &self.tasks.filter,
-                self.tasks.items.len(),
-                self.tasks.items.iter().map(|t| t.title.clone()),
-            ),
+            View::Tasks | View::Dashboard => self.visible_task_count(),
             View::Todos => Self::filter_count(
                 &self.todos.filter,
                 self.todos.items.len(),
@@ -213,7 +228,23 @@ impl App {
                     .iter()
                     .map(|r| r.message.as_deref().unwrap_or("").to_owned()),
             ),
+            View::Notes => Self::filter_count(
+                &self.notes.filter,
+                self.notes.items.len(),
+                self.notes
+                    .items
+                    .iter()
+                    .map(|n| format!("{} {}", n.slug, n.title)),
+            ),
         }
+    }
+
+    /// Returns the number of visible tasks in the tree view.
+    ///
+    /// Only top-level tasks and children of expanded parents are counted.
+    fn visible_task_count(&self) -> usize {
+        use crate::tui::keys::helpers;
+        helpers::visible_task_count(self)
     }
 
     /// Returns a mutable reference to the `selected` cursor for the active view.
@@ -227,6 +258,7 @@ impl App {
             View::Tracker => &mut self.entries.selected,
             View::Inbox => &mut self.captures.selected,
             View::Reminders => &mut self.reminders.selected,
+            View::Notes => &mut self.notes.selected,
         }
     }
 

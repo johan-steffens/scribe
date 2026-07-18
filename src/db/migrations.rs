@@ -9,6 +9,11 @@
 //! - **M1** — creates all six core tables and seeds the reserved
 //!   `quick-capture` project.
 //! - **M2** — adds the `persistent` column to the `reminders` table.
+//! - **M3** — creates the `sync_metadata` table.
+//! - **M4** — adds `parent_id` and `kind` columns to the `tasks` table.
+//! - **M5** — migrates all `todos` rows into `tasks` (as `checklist_item` kind) and drops `todos`.
+//! - **M6** — creates `notes` and `links` tables for PKM functionality.
+//! - **M7** — creates FTS5 virtual table for full-text search on notes.
 
 use rusqlite_migration::M;
 
@@ -114,8 +119,6 @@ VALUES ('quick-capture', 'Quick Capture', 'active', 1,
 
 // ── migrations ─────────────────────────────────────────────────────────────
 
-// ── migrations ─────────────────────────────────────────────────────────────
-
 /// M2 — adds the `persistent` column to `reminders`.
 ///
 /// `persistent = 1` causes the notification to use a blocking `display alert`
@@ -135,6 +138,118 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );";
 
+/// M4 — adds `parent_id` and `kind` columns to the `tasks` table.
+///
+/// `parent_id` enables infinite hierarchical nesting (task → sub-task → sub-sub-task).
+/// It is nullable — a `NULL` parent means a top-level task.
+///
+/// `kind` distinguishes between a full task (`task`) and a lightweight checklist
+/// item (`checklist_item`). This allows UI rendering to treat deep sub-tasks as
+/// simple checkbox items while keeping the same underlying storage.
+pub(super) const M4: &str = "
+ALTER TABLE tasks ADD COLUMN parent_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'
+    CHECK (kind IN ('task', 'checklist_item'));
+CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);";
+
+/// M5 — migrates all `todos` rows into `tasks` as `checklist_item` kind and drops `todos`.
+///
+/// Each existing `todo` becomes a top-level task with:
+/// - `slug` preserved; if a collision exists with an existing task, appends `-migrated`
+///   with a timestamp suffix to ensure uniqueness.
+/// - `status` mapped from `done` — `done = 1` → `status = 'done'`, `done = 0` → `status = 'todo'`.
+/// - `kind = 'checklist_item'` — todos become checklist items, not full tasks.
+/// - `parent_id = NULL` — todos become top-level (no parent task concept existed).
+/// - `priority = 'medium'` and `description = NULL` — reasonable defaults for migrated items.
+/// - `archived_at`, `created_at` preserved as-is.
+///
+/// After all rows are inserted, the `todos` table is dropped.
+pub(super) const M5: &str = "
+INSERT INTO tasks
+    (slug, project_id, title, status, priority, description, parent_id, kind, archived_at, created_at, updated_at)
+SELECT
+    CASE
+        WHEN (SELECT COUNT(*) FROM tasks t WHERE t.slug = todos.slug) > 0
+        THEN todos.slug || '-migrated-' || unixepoch('now')
+        ELSE todos.slug
+    END,
+    project_id,
+    title,
+    CASE WHEN done = 1 THEN 'done' ELSE 'todo' END,
+    'medium',
+    NULL,
+    NULL,
+    'checklist_item',
+    archived_at,
+    created_at,
+    created_at
+FROM todos;
+DROP TABLE IF EXISTS todos;";
+
+/// M6 — creates `notes` and `links` tables for PKM (Personal Knowledge Management).
+///
+/// `notes` stores markdown documents with a user-provided slug (no auto-prefix).
+/// Slugs must be valid kebab-case identifiers.
+///
+/// `links` implements the bi-directional link layer: every note can reference
+/// any other note or task slug, and the relationship is stored explicitly so
+/// backlinks (e.g. "which notes reference this note") can be queried efficiently.
+pub(super) const M6: &str = "
+CREATE TABLE IF NOT EXISTS notes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT    NOT NULL UNIQUE,
+    title       TEXT    NOT NULL,
+    content     TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_slug    ON notes(slug);
+CREATE INDEX IF NOT EXISTS idx_notes_title  ON notes(title);
+
+CREATE TABLE IF NOT EXISTS links (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_slug  TEXT    NOT NULL,
+    target_slug  TEXT    NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(source_slug, target_slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_links_source  ON links(source_slug);
+CREATE INDEX IF NOT EXISTS idx_links_target  ON links(target_slug);";
+
+/// M7 — creates FTS5 virtual table for full-text search on notes.
+///
+/// The `notes_fts` table indexes `title` and `content` columns from `notes`
+/// using `SQLite`'s FTS5 module. The content is synchronized via triggers so that
+/// inserts/updates/deletes on `notes` automatically update the FTS index.
+///
+/// FTS query syntax supports:
+/// - `word` — simple term search
+/// - `"phrase"` — exact phrase search
+/// - `word*` — prefix matching
+/// - `AND`, `OR` — boolean operators
+pub(super) const M7: &str = "
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    title,
+    content,
+    content='notes',
+    content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS notes_fts_insert AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_fts_update AFTER UPDATE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+END;";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -145,5 +260,13 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
 /// let migrations = rusqlite_migration::Migrations::new(scribe::db::migrations::all());
 /// ```
 pub(super) fn all() -> Vec<M<'static>> {
-    vec![M::up(M1), M::up(M2), M::up(M3)]
+    vec![
+        M::up(M1),
+        M::up(M2),
+        M::up(M3),
+        M::up(M4),
+        M::up(M5),
+        M::up(M6),
+        M::up(M7),
+    ]
 }

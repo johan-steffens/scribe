@@ -27,6 +27,7 @@
 //!     time_entries: vec![],
 //!     reminders: vec![],
 //!     capture_items: vec![],
+//!     notes: vec![],
 //! };
 //! let (port, _handle) = start_server(0, "my-secret".to_owned(), snap, Default::default()).await;
 //! println!("listening on port {port}");

@@ -79,6 +79,7 @@ fn summary_report_counts_projects_and_tasks() {
             status: TaskStatus::Todo,
             priority: TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
         })
         .expect("task creation should succeed");
 
@@ -92,6 +93,7 @@ fn summary_report_counts_projects_and_tasks() {
             status: TaskStatus::Done,
             priority: TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
         })
         .expect("done task creation should succeed");
 
@@ -156,6 +158,7 @@ fn task_report_returns_task_details() {
             status: TaskStatus::Todo,
             priority: TaskPriority::Medium,
             due_date: None,
+            parent_id: None,
         })
         .expect("task creation should succeed");
 

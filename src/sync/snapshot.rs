@@ -17,7 +17,9 @@
 //! [`StateSnapshot::SCHEMA_VERSION`] must be bumped whenever a breaking change
 //! is made to the snapshot format (e.g. a field is removed, renamed, or its
 //! type changes in a non-backwards-compatible way). Additive changes (new
-//! optional fields) do NOT require a bump.
+//! optional fields with `#[serde(default)]`) do NOT require a bump, but a bump
+//! is recommended when semantics change (e.g. checklist items live only under
+//! `tasks` with `kind`, not dual-written to `todos`).
 
 use std::sync::{Arc, Mutex};
 
@@ -27,7 +29,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::domain::{CaptureItem, Project, Reminder, Task, TimeEntry, Todo};
+use crate::domain::{CaptureItem, Note, Project, Reminder, Task, TimeEntry, Todo};
 
 // ── snapshot struct ────────────────────────────────────────────────────────
 
@@ -45,9 +47,15 @@ pub struct StateSnapshot {
     pub schema_version: u32,
     /// All project records at snapshot time.
     pub projects: Vec<Project>,
-    /// All task records at snapshot time.
+    /// All task records (including `checklist_item` kind) at snapshot time.
     pub tasks: Vec<Task>,
-    /// All todo records at snapshot time.
+    /// Legacy todo array for inbound compatibility with pre-1.1 remotes.
+    ///
+    /// On **outbound** snapshots this is always empty — checklist items are
+    /// carried under [`Self::tasks`] with `kind = checklist_item`. On
+    /// **inbound**, non-empty `todos` are still applied so older peers can
+    /// push checklist data.
+    #[serde(default)]
     pub todos: Vec<Todo>,
     /// All time entry records at snapshot time.
     pub time_entries: Vec<TimeEntry>,
@@ -55,6 +63,9 @@ pub struct StateSnapshot {
     pub reminders: Vec<Reminder>,
     /// All capture-inbox items at snapshot time.
     pub capture_items: Vec<CaptureItem>,
+    /// All notes at snapshot time (PKM layer).
+    #[serde(default)]
+    pub notes: Vec<Note>,
 }
 
 // ── snapshot impl ──────────────────────────────────────────────────────────
@@ -66,7 +77,11 @@ impl StateSnapshot {
     /// type incompatibly, or reordering enum variants. Additive changes (adding
     /// new optional fields) do NOT require a bump. Remote providers use this
     /// value to reject snapshots they cannot interpret.
-    pub const SCHEMA_VERSION: u32 = 1;
+    ///
+    /// **v2** — hierarchical tasks (`parent_slug` / `kind` on `Task`), notes in
+    /// the snapshot, and checklist items carried only under `tasks` (outbound
+    /// `todos` is empty).
+    pub const SCHEMA_VERSION: u32 = 2;
 
     /// Returns a hex-encoded SHA-256 hash of the snapshot's data content.
     ///
@@ -90,6 +105,7 @@ impl StateSnapshot {
             time_entries: &self.time_entries,
             reminders: &self.reminders,
             capture_items: &self.capture_items,
+            notes: &self.notes,
         };
 
         // Serialise to JSON bytes, then SHA-256 hash, then hex-encode.
@@ -104,21 +120,25 @@ impl StateSnapshot {
 
     /// Builds a snapshot from the live database including all rows (even archived).
     ///
+    /// Checklist items are included under [`Self::tasks`] with
+    /// `kind = checklist_item`. [`Self::todos`] is left empty on outbound so
+    /// entities are not dual-represented.
+    ///
     /// # Errors
     ///
     /// Returns an error if any database query fails.
     pub fn from_db(conn: &Arc<Mutex<Connection>>, machine_id: Uuid) -> anyhow::Result<Self> {
         use crate::store::{
-            SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
-            SqliteTodos,
+            SqliteCaptureItems, SqliteNotes, SqliteProjects, SqliteReminders, SqliteTasks,
+            SqliteTimeEntries,
         };
 
         let projects = SqliteProjects::new(Arc::clone(conn)).list_all()?;
         let tasks = SqliteTasks::new(Arc::clone(conn)).list_all()?;
-        let todos = SqliteTodos::new(Arc::clone(conn)).list_all()?;
         let time_entries = SqliteTimeEntries::new(Arc::clone(conn)).list_all()?;
         let reminders = SqliteReminders::new(Arc::clone(conn)).list_all()?;
         let capture_items = SqliteCaptureItems::new(Arc::clone(conn)).list_all()?;
+        let notes = SqliteNotes::new(Arc::clone(conn)).list_all()?;
 
         Ok(Self {
             snapshot_at: Utc::now(),
@@ -126,10 +146,12 @@ impl StateSnapshot {
             schema_version: Self::SCHEMA_VERSION,
             projects,
             tasks,
-            todos,
+            // Outbound: no dual write of checklist_items as todos.
+            todos: Vec::new(),
             time_entries,
             reminders,
             capture_items,
+            notes,
         })
     }
 
@@ -140,13 +162,16 @@ impl StateSnapshot {
     /// local numeric IDs, avoiding foreign key mismatches when syncing from
     /// upstream.
     ///
+    /// After notes are written, `[[slug]]` backlinks are rebuilt from content.
+    ///
     /// # Errors
     ///
     /// Returns an error if any database write fails.
     pub fn write_to_db(&self, conn: &Arc<Mutex<Connection>>) -> anyhow::Result<()> {
+        use crate::domain::{Links, parse_links};
         use crate::store::{
-            SqliteCaptureItems, SqliteProjects, SqliteReminders, SqliteTasks, SqliteTimeEntries,
-            SqliteTodos,
+            SqliteCaptureItems, SqliteLinks, SqliteNotes, SqliteProjects, SqliteReminders,
+            SqliteTasks, SqliteTimeEntries, SqliteTodos,
         };
 
         tracing::debug!(
@@ -156,22 +181,42 @@ impl StateSnapshot {
             time_entries = self.time_entries.len(),
             reminders = self.reminders.len(),
             capture_items = self.capture_items.len(),
+            notes = self.notes.len(),
             "write_to_db: starting"
         );
 
         SqliteProjects::new(Arc::clone(conn)).upsert_all(&self.projects)?;
         SqliteTasks::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.tasks)?;
-        SqliteTodos::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.todos)?;
+        // Inbound legacy: apply remote todos as checklist_item rows.
+        if !self.todos.is_empty() {
+            SqliteTodos::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.todos)?;
+        }
         SqliteTimeEntries::new(Arc::clone(conn))
             .upsert_all_with_slug_resolution(&self.time_entries)?;
         SqliteReminders::new(Arc::clone(conn)).upsert_all_with_slug_resolution(&self.reminders)?;
         SqliteCaptureItems::new(Arc::clone(conn)).upsert_all(&self.capture_items)?;
+        SqliteNotes::new(Arc::clone(conn)).upsert_all(&self.notes)?;
+
+        // Rebuild backlinks from note content after notes are persisted.
+        let links = SqliteLinks::new(Arc::clone(conn));
+        for note in &self.notes {
+            links.delete_all_for(&note.slug)?;
+            for target in parse_links(&note.content) {
+                if target != note.slug {
+                    let _ = links.create(&note.slug, &target);
+                }
+            }
+        }
 
         tracing::debug!("write_to_db: complete");
         Ok(())
     }
 
     /// Returns the total count of all entities across all tables.
+    ///
+    /// Counts `tasks` + legacy `todos` + other domains. Callers that build
+    /// snapshots via [`Self::from_db`] will not double-count checklist items
+    /// because outbound `todos` is empty.
     #[must_use]
     pub fn entities(&self) -> usize {
         self.projects.len()
@@ -180,6 +225,7 @@ impl StateSnapshot {
             + self.time_entries.len()
             + self.reminders.len()
             + self.capture_items.len()
+            + self.notes.len()
     }
 }
 
@@ -198,4 +244,5 @@ struct HashableSnapshot<'a> {
     time_entries: &'a [TimeEntry],
     reminders: &'a [Reminder],
     capture_items: &'a [CaptureItem],
+    notes: &'a [Note],
 }

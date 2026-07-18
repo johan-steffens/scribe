@@ -84,6 +84,8 @@ pub enum CompleteEntity {
     Captures,
     /// Active (non-archived) time entries: `slug\tproject_slug started_at`.
     Entries,
+    /// Notes: `slug\ttitle`.
+    Notes,
 }
 
 // ── static completion handler ─────────────────────────────────────────────
@@ -130,6 +132,7 @@ pub fn run_complete(entity: CompleteEntity) -> anyhow::Result<()> {
         CompleteEntity::Reminders => print_reminders(&conn),
         CompleteEntity::Captures => print_captures(&conn),
         CompleteEntity::Entries => print_entries(&conn),
+        CompleteEntity::Notes => print_notes(&conn),
     }
 }
 
@@ -234,6 +237,18 @@ fn print_entries(conn: &Connection) -> anyhow::Result<()> {
         let project_slug: String = row.get(1)?;
         let started_at: String = row.get(2)?;
         println!("{slug}\t{project_slug} {started_at}");
+    }
+    Ok(())
+}
+
+/// Prints `slug\ttitle` for every note.
+fn print_notes(conn: &Connection) -> anyhow::Result<()> {
+    let mut stmt = conn.prepare("SELECT slug, title FROM notes ORDER BY slug")?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let slug: String = row.get(0)?;
+        let title: String = row.get(1)?;
+        println!("{slug}\t{title}");
     }
     Ok(())
 }

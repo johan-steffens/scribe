@@ -26,7 +26,8 @@ use std::sync::{Arc, Mutex};
 use clap::Parser;
 
 use cli::{Cli, Commands};
-use ops::{InboxOps, ProjectOps, ReminderOps, TaskOps, TodoOps, TrackerOps};
+use ops::{InboxOps, NotesOps, ProjectOps, ReminderOps, TaskOps, TodoOps, TrackerOps};
+use store::{SqliteLinks, SqliteNotes};
 
 /// Runs the Scribe application by dispatching commands or launching the TUI.
 ///
@@ -123,6 +124,11 @@ pub fn run() -> anyhow::Result<()> {
     let tracker_ops = TrackerOps::new(Arc::clone(&conn));
     let inbox_ops = InboxOps::new(&conn);
     let reminder_ops = ReminderOps::new(Arc::clone(&conn));
+    let note_ops = NotesOps::new(
+        Arc::new(SqliteNotes::new(Arc::clone(&conn))),
+        Arc::new(SqliteLinks::new(Arc::clone(&conn))),
+        Some(config.note_editor()),
+    );
 
     // Fire any due reminders on startup and send OS notifications.
     if let Ok(due) = reminder_ops.check_due() {
@@ -157,6 +163,9 @@ pub fn run() -> anyhow::Result<()> {
         }
         Some(Commands::Reminder(cmd)) => {
             cli::reminder::run(&cmd, &reminder_ops, &project_ops, &conn)?;
+        }
+        Some(Commands::Note(cmd)) => {
+            cli::note::run(&cmd, &note_ops)?;
         }
         Some(Commands::Report(cmd)) => {
             cli::report_handlers::handle_report(&cmd, Arc::clone(&conn), &project_ops)?;

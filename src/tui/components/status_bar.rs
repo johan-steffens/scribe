@@ -84,6 +84,7 @@ fn render_hint_line(frame: &mut Frame, area: Rect, app: &App) {
             crate::tui::app::View::Tracker => app.entries.filter.as_str(),
             crate::tui::app::View::Inbox => app.captures.filter.as_str(),
             crate::tui::app::View::Reminders => app.reminders.filter.as_str(),
+            crate::tui::app::View::Notes => app.notes.filter.as_str(),
         };
         let line = Line::from(vec![
             Span::styled(
