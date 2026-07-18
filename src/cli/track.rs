@@ -39,10 +39,13 @@ pub enum TrackSubcommand {
 /// Arguments for `scribe track start`.
 #[derive(Debug, Args)]
 pub struct TrackStart {
-    /// Project slug (defaults to `quick-capture`).
+    /// Project slug (defaults to `quick-capture` when `--task` is omitted).
+    ///
+    /// When `--task` is set, the project is taken from the task. If both are
+    /// set, the project must match the task's project.
     #[arg(long)]
     pub project: Option<String>,
-    /// Optional task slug to link the timer to.
+    /// Optional task slug to link the timer to (also selects that task's project).
     #[arg(long)]
     pub task: Option<String>,
     /// Optional free-text note.

@@ -57,6 +57,12 @@ Examples:
 - `fix(tui): handle empty project list gracefully`
 - `docs(readme): add installation instructions`
 
+### Version bumps
+
+Every incremental change that ships (each PR) must bump the **patch** version in
+`Cargo.toml` (e.g. `1.1.0` → `1.1.1`) and refresh `Cargo.lock` so the package
+metadata matches. Use minor/major only for intentional feature milestones or
+breaking changes — not for routine fix/feat batches.
 ## Quality Requirements
 
 All commits must pass before merging:

@@ -131,9 +131,11 @@ pub struct TodoSlugParam {
 /// Parameters for `timer_start`.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct TimerStartParams {
-    /// Project slug; defaults to `quick-capture`.
+    /// Project slug; defaults to `quick-capture` when `task_slug` is omitted.
+    /// When `task_slug` is set, the project is taken from the task (must match
+    /// if both are provided).
     pub project_slug: Option<String>,
-    /// Optional linked task slug.
+    /// Optional linked task slug (also selects that task's project).
     pub task_slug: Option<String>,
     /// Optional free-text note.
     pub note: Option<String>,
@@ -588,22 +590,33 @@ impl ScribeMcpServer {
     async fn timer_start(&self, Parameters(p): Parameters<TimerStartParams>) -> String {
         use crate::ops::tracker::StartTimer;
 
-        let project_slug = p.project_slug.unwrap_or_else(|| "quick-capture".to_owned());
-
-        let (slug, project_id) = match self.tracker.resolve_project(&project_slug) {
-            Ok(pair) => pair,
-            Err(e) => return err_json(e),
-        };
-
-        let task_id = if let Some(ref ts) = p.task_slug {
-            match self.tasks.get_task(ts) {
-                Ok(Some(t)) => Some(t.id),
+        // When task_slug is set, inherit that task's project (same rules as CLI).
+        let resolved = if let Some(ref ts) = p.task_slug {
+            let task = match self.tasks.get_task(ts) {
+                Ok(Some(t)) => t,
                 Ok(None) => return err_json(format!("task '{ts}' not found")),
+                Err(e) => return err_json(e),
+            };
+            if let Some(ref explicit) = p.project_slug
+                && explicit != &task.project_slug
+            {
+                return err_json(format!(
+                    "task '{ts}' belongs to project '{}', not '{explicit}'",
+                    task.project_slug
+                ));
+            }
+            match self.tracker.resolve_project(&task.project_slug) {
+                Ok((slug, project_id)) => (slug, project_id, Some(task.id)),
                 Err(e) => return err_json(e),
             }
         } else {
-            None
+            let project_slug = p.project_slug.unwrap_or_else(|| "quick-capture".to_owned());
+            match self.tracker.resolve_project(&project_slug) {
+                Ok((slug, project_id)) => (slug, project_id, None),
+                Err(e) => return err_json(e),
+            }
         };
+        let (slug, project_id, task_id) = resolved;
 
         match self.tracker.start_timer(StartTimer {
             project_slug: slug,

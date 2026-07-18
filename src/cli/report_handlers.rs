@@ -81,7 +81,8 @@ pub fn handle_report(
     let ops = ReportingOps::new(conn);
 
     match &cmd.subcommand {
-        None => handle_inbox_report_impl(cmd, &ops, &cmd.output, cmd.detailed),
+        // Bare `scribe report` → full summary (README / GUIDE contract).
+        None => handle_summary_report(cmd, &ops),
         Some(ReportSubcommand::Inbox { common }) => {
             handle_inbox_report_impl(cmd, &ops, &common.output, common.detailed)
         }
@@ -564,16 +565,7 @@ fn handle_track_report_impl(
     Ok(())
 }
 
-/// Main summary report handler (used when no subcommand is provided).
-///
-/// This handler is called from `handle_report` when `cmd.subcommand` is `None`.
-/// Note: The actual summary report is rendered inside the match arms above
-/// (e.g., `handle_inbox_report`) since each domain has its own report structure.
-/// For a true global summary, use `ops.summary_report()` directly.
-#[allow(
-    dead_code,
-    reason = "summary_report handler is reserved for future use when summary subcommand is added"
-)]
+/// Global summary report handler — used when no domain subcommand is provided.
 fn handle_summary_report(cmd: &ReportCommand, ops: &ReportingOps) -> anyhow::Result<()> {
     let (since, until) = compute_time_window(cmd.today, cmd.week);
     let report = ops.summary_report(since, until)?;
