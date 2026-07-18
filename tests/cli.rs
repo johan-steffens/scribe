@@ -4,8 +4,16 @@
 //! `scribe inbox list/process`, `scribe setup --wizard`, `scribe sync configure`)
 //! by spawning the actual binary and asserting on stdout/stderr output.
 //!
-//! Each test uses isolated temporary directories for config and database
-//! to prevent interference.
+//! # Isolation (required for CI)
+//!
+//! Each test uses isolated temporary directories for config and database.
+//! Helpers set `HOME`, **`XDG_CONFIG_HOME`**, and **`XDG_DATA_HOME`** under that
+//! temp tree via [`isolate_xdg`].
+//!
+//! On Linux, `directories::ProjectDirs` prefers XDG vars over `HOME`. GitHub
+//! Actions exports `XDG_*`, so isolating only `HOME` lets parallel tests race
+//! on the runner's shared config (see `test_sync_one_shot_succeeds_after_configure`
+//! postmortem in `CONTRIBUTING.md`).
 
 use assert_cmd::Command;
 use predicates::prelude::*;

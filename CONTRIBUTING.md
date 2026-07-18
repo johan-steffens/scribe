@@ -81,6 +81,58 @@ Run all checks locally before pushing:
 cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features && cargo llvm-cov --all-features --workspace --fail-under-lines 50
 ```
 
+### CI parity (local vs GitHub Actions)
+
+CI runs on **Linux**. Config paths come from `directories::ProjectDirs`, which on
+Linux prefers **`XDG_CONFIG_HOME` / `XDG_DATA_HOME` over `HOME`**. macOS uses
+`~/Library/Application Support/...` and largely ignores XDG, so a green local
+run on a Mac does **not** prove Linux isolation is correct.
+
+**Case study (PR #20 → failed CI after merge):**
+`test_sync_one_shot_succeeds_after_configure` passed on macOS and failed in CI
+with `sync is not enabled`. CLI tests set `HOME` to a temp dir but not XDG.
+The runner already exported `XDG_CONFIG_HOME`, so every parallel test wrote
+`config.toml` to the **same host path** and raced. Configure set
+`sync.enabled = true`; another test clobbered the file; one-shot sync saw
+`enabled = false`.
+
+**Rules for integration tests that spawn the `scribe` binary:**
+
+1. Isolate **`HOME` and `XDG_CONFIG_HOME` and `XDG_DATA_HOME`** (see
+   `isolate_xdg` in `tests/cli.rs`). Setting only `HOME` is not enough on Linux.
+2. Prefer `SCRIBE_TEST_DB` for the database (already used widely).
+3. Prefer `SCRIBE_TEST_KEYCHAIN_BOOTSTRAP` so keychain never hits the real OS store.
+4. After any test that **writes config**, assert the file exists under the
+   isolated tree (not the developer/runner home).
+
+**Recommended pre-push sequence** (catches races + matches CI feature flags):
+
+```sh
+# 1. Standard quality gate
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+
+# 2. Full suite with high parallelism (surface races)
+cargo test --all-features -- --test-threads=8
+
+# 3. Linux-like XDG environment (critical when developing on macOS)
+#    Even on macOS this ensures helpers override host XDG if present.
+export XDG_CONFIG_HOME="${TMPDIR:-/tmp}/scribe-ci-xdg/config"
+export XDG_DATA_HOME="${TMPDIR:-/tmp}/scribe-ci-xdg/data"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+cargo test --all-features --test cli -- --test-threads=8
+
+# 4. Coverage (same threshold as CI)
+cargo llvm-cov --all-features --workspace --fail-under-lines 50
+```
+
+If you have Docker/Linux available, a full parity check is:
+
+```sh
+docker run --rm -v "$PWD":/app -w /app rust:1.85 \
+  bash -c 'cargo test --all-features -- --test-threads=8'
+```
+
 ## Project Structure
 
 ```
