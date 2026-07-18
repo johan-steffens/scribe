@@ -116,7 +116,11 @@ fn render_main(frame: &mut Frame, area: Rect, app: &App) {
         View::Tracker => tracker::render(frame, area, app),
         View::Inbox => inbox::render(frame, area, app),
         View::Reminders => reminders::render(frame, area, app),
-        View::Notes => notes::render(frame, area, app),
+        View::Notes => {
+            notes::render(frame, area, app);
+            // Notes does not paint its own modals (unlike todos/inbox).
+            render_modal(frame, area, app);
+        }
     }
 }
 
