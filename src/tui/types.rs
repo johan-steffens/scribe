@@ -168,6 +168,8 @@ pub enum FormContext {
     ///
     /// The inner string is the capture item slug.
     ProcessCapture(String),
+    /// Create a new note (opens `$EDITOR` after form submit).
+    CreateNote,
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────

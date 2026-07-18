@@ -783,11 +783,22 @@ long-form Markdown notes with automatic cross-linking.
 
 ### Creating and editing notes
 
-Notes are created and edited in the **TUI**. Run `scribe` and press `m` to
-switch to the Notes view, then press `n` to create a new note.
-
 Note slugs are user-defined kebab-case strings — no auto-prefix from the project.
 This makes notes portable and easy to reference from any project.
+
+**CLI:**
+
+```sh
+scribe note add "Architecture draft"           # creates + opens $EDITOR
+scribe note create --title "Quick" --content "Body"
+scribe note list
+scribe note show arch-draft
+scribe note edit arch-draft
+scribe note delete arch-draft
+```
+
+**TUI:** Run `scribe`, press `n` for the Notes view, then `N` (Shift+n) to
+create or `e` to edit (suspends into `$EDITOR` / configured `note_editor`).
 
 ### Wiki-style links
 
@@ -807,10 +818,9 @@ graph of connections between your knowledge base and your work.
 
 | Method | How |
 |--------|-----|
-| **TUI** | Run `scribe`, press `m` for Notes view, `n` to create, `e` to edit |
+| **CLI** | `scribe note add|create|list|show|edit|delete` |
+| **TUI** | Run `scribe`, press `n` for Notes view, `N` to create, `e` to edit |
 | **MCP tools** | `read_note`, `write_note`, `search_notes` (for AI agents) |
-
-> **Note:** A CLI interface for notes may be added in a future release.
 
 ---
 

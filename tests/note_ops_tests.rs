@@ -95,6 +95,30 @@ fn test_edit_note_updates_existing() {
 }
 
 #[test]
+fn test_write_note_rejects_empty_title() {
+    let ops = make_ops();
+    let err = ops
+        .write_note("   ", "body")
+        .expect_err("empty title must fail");
+    assert!(
+        err.to_string().contains("title cannot be empty"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn test_create_and_edit_rejects_empty_slug() {
+    let ops = make_ops();
+    let err = ops
+        .create_and_edit("Title", "  ")
+        .expect_err("empty slug must fail");
+    assert!(
+        err.to_string().contains("slug cannot be empty"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
 fn test_edit_note_not_found_returns_error() {
     let ops = make_ops();
     let err = ops.edit_note("does-not-exist").unwrap_err();

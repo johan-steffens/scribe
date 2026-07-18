@@ -16,7 +16,7 @@
 //! 6. Delete the temp file.
 
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write as _;
 use std::process::Command;
 use std::sync::Arc;
 
@@ -98,13 +98,13 @@ impl NotesOps {
         self.links.delete_all_for(source_slug)?;
 
         // Insert new links for each unique target slug.
+        // `SqliteLinks::create` uses INSERT OR IGNORE and re-reads the row, so
+        // duplicates are fine and real DB failures still surface as errors.
         for target_slug in &target_slugs {
-            // Skip self-referential links.
             if target_slug == source_slug {
                 continue;
             }
-            // Ignore errors for duplicate links (INSERT OR IGNORE handles this).
-            let _ = self.links.create(source_slug, target_slug);
+            self.links.create(source_slug, target_slug)?;
         }
         Ok(())
     }
@@ -169,6 +169,15 @@ impl NotesOps {
     /// Returns an error if a note with that `slug` already exists, the editor
     /// fails to start, or a database error occurs during creation.
     pub fn create_and_edit(&self, title: &str, slug: &str) -> anyhow::Result<Note> {
+        let title = title.trim();
+        let slug = slug.trim();
+        if title.is_empty() {
+            return Err(anyhow::anyhow!("note title cannot be empty"));
+        }
+        if slug.is_empty() {
+            return Err(anyhow::anyhow!("note slug cannot be empty"));
+        }
+
         // Create with empty content; editor will fill it in.
         self.notes.create(NewNote {
             slug: slug.to_owned(),
@@ -199,23 +208,39 @@ impl NotesOps {
     fn edit_content(&self, initial_content: &str, title: &str) -> anyhow::Result<String> {
         let editor = self.editor();
 
-        // Build a descriptive temp file name from the title, placed in /tmp/.
-        let slug_part = title
+        // OS temp dir via `tempfile` (portable; cleaned up on drop).
+        // DOCUMENTED-MAGIC: prefix includes a short title fragment so editors
+        // that show the path in the title bar remain recognisable to the user.
+        let slug_part: String = title
             .split_whitespace()
             .take(3)
             .collect::<Vec<_>>()
             .join("-")
             .chars()
-            .filter(|c| c.is_alphanumeric())
-            .collect::<String>();
-        let tmp_path = PathBuf::from("/tmp").join(format!("scribe-note-{slug_part}.md"));
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .take(40)
+            .collect();
+        let prefix = if slug_part.is_empty() {
+            "scribe-note-".to_owned()
+        } else {
+            format!("scribe-note-{slug_part}-")
+        };
+        let mut tmp = tempfile::Builder::new()
+            .prefix(&prefix)
+            .suffix(".md")
+            .tempfile()
+            .map_err(|e| anyhow::anyhow!("failed to create temp file: {e}"))?;
 
-        fs::write(&tmp_path, initial_content)
+        tmp.write_all(initial_content.as_bytes())
             .map_err(|e| anyhow::anyhow!("failed to write to temp file: {e}"))?;
+        tmp.flush()
+            .map_err(|e| anyhow::anyhow!("failed to flush temp file: {e}"))?;
+
+        let tmp_path = tmp.path().to_path_buf();
 
         // Spawn editor and wait for it to exit.
         let status = Command::new(&editor)
-            .arg(tmp_path.as_os_str())
+            .arg(&tmp_path)
             .status()
             .map_err(|e| anyhow::anyhow!("failed to spawn editor '{editor}': {e}"))?;
 
@@ -225,13 +250,9 @@ impl NotesOps {
             ));
         }
 
-        // Read back whatever the user saved.
+        // Read back whatever the user saved; `tmp` drops and removes the file.
         let content = fs::read_to_string(&tmp_path)
             .map_err(|e| anyhow::anyhow!("failed to read temp file after editing: {e}"))?;
-
-        // Delete the temp file now that we've read it.
-        fs::remove_file(&tmp_path)
-            .map_err(|e| anyhow::anyhow!("failed to delete temp file: {e}"))?;
 
         Ok(content)
     }
@@ -266,6 +287,11 @@ impl NotesOps {
     pub fn write_note(&self, title: &str, content: &str) -> anyhow::Result<Note> {
         use crate::domain::slug;
 
+        let title = title.trim();
+        if title.is_empty() {
+            return Err(anyhow::anyhow!("note title cannot be empty"));
+        }
+
         let slug_str = slug::generate("note-", title);
         let unique_slug = slug::ensure_unique(&slug_str, |candidate| {
             self.notes
@@ -280,7 +306,7 @@ impl NotesOps {
             content: content.to_owned(),
         })?;
 
-        self.sync_links(&note.slug, content)?;
+        self.sync_links(&note.slug, &note.content)?;
 
         Ok(note)
     }

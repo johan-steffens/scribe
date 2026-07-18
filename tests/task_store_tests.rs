@@ -34,6 +34,22 @@ fn test_create_and_find() {
 }
 
 #[test]
+fn test_list_includes_project_slug() {
+    let s = make_store();
+    s.create(new_task("qc-task-listed", "Listed"))
+        .expect("create");
+    let tasks = s.list(None, None, None, false).expect("list");
+    let t = tasks
+        .iter()
+        .find(|t| t.slug == "qc-task-listed")
+        .expect("listed task present");
+    assert_eq!(
+        t.project_slug, "quick-capture",
+        "list must join project slug (not leave 'unknown')"
+    );
+}
+
+#[test]
 fn test_archive_and_restore() {
     let s = make_store();
     s.create(new_task("t1", "T1")).expect("create");

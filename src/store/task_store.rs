@@ -226,27 +226,46 @@ impl Tasks for SqliteTasks {
         let conn = self.lock()?;
         let mut conditions: Vec<String> = Vec::new();
         if !include_archived {
-            conditions.push("archived_at IS NULL".to_owned());
+            conditions.push("t.archived_at IS NULL".to_owned());
         }
         if let Some(pid) = project_id {
-            conditions.push(format!("project_id = {}", pid.0));
+            conditions.push(format!("t.project_id = {}", pid.0));
         }
         if let Some(s) = &status {
-            conditions.push(format!("status = '{s}'"));
+            conditions.push(format!("t.status = '{s}'"));
         }
         if let Some(p) = &priority {
-            conditions.push(format!("priority = '{p}'"));
+            conditions.push(format!("t.priority = '{p}'"));
         }
         let where_clause = if conditions.is_empty() {
             String::new()
         } else {
             format!("WHERE {}", conditions.join(" AND "))
         };
-        let sql = format!("SELECT {SELECT_COLS} FROM tasks {where_clause} ORDER BY created_at");
+        // Join project (and optional parent) so list results carry real slugs
+        // instead of the "unknown" placeholder used when no join is performed.
+        let sql = format!(
+            "SELECT t.id, t.slug, t.project_id, t.title, t.description, t.status, \
+             t.priority, t.due_date, t.parent_id, t.kind, t.archived_at, t.created_at, \
+             t.updated_at, p.slug, parent.slug \
+             FROM tasks t \
+             JOIN projects p ON t.project_id = p.id \
+             LEFT JOIN tasks parent ON t.parent_id = parent.id \
+             {where_clause} ORDER BY t.created_at"
+        );
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map([], map_row)?;
-        rows.map(|r| r.map_err(anyhow::Error::from)?.into_task(None, None))
-            .collect()
+        // First 13 columns match `map_row`; 13/14 are project and parent slugs.
+        let rows = stmt.query_map([], |row| {
+            let raw = map_row(row)?;
+            let project_slug: String = row.get(13)?;
+            let parent_slug: Option<String> = row.get(14)?;
+            Ok((raw, project_slug, parent_slug))
+        })?;
+        rows.map(|r| {
+            let (raw, project_slug, parent_slug) = r.map_err(anyhow::Error::from)?;
+            raw.into_task(Some(project_slug), parent_slug)
+        })
+        .collect()
     }
 
     fn update(&self, slug: &str, patch: TaskPatch) -> anyhow::Result<Task> {

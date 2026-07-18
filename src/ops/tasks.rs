@@ -10,9 +10,9 @@ use chrono::NaiveDate;
 use rusqlite::Connection;
 
 use crate::domain::{
-    NewTask, ProjectId, Task, TaskId, TaskPatch, TaskPriority, TaskStatus, Tasks, slug,
+    NewTask, ProjectId, Projects, Task, TaskId, TaskPatch, TaskPriority, TaskStatus, Tasks, slug,
 };
-use crate::store::SqliteTasks;
+use crate::store::{SqliteProjects, SqliteTasks};
 
 /// Parameters for creating a new task via [`TaskOps`].
 ///
@@ -53,6 +53,7 @@ pub struct CreateTask {
 #[derive(Clone, Debug)]
 pub struct TaskOps {
     tasks: SqliteTasks,
+    projects: SqliteProjects,
 }
 
 impl TaskOps {
@@ -70,7 +71,8 @@ impl TaskOps {
     #[must_use]
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
         Self {
-            tasks: SqliteTasks::new(conn),
+            tasks: SqliteTasks::new(Arc::clone(&conn)),
+            projects: SqliteProjects::new(conn),
         }
     }
 
@@ -79,13 +81,41 @@ impl TaskOps {
     /// The slug format is `{project_slug}-task-{title-slug}`, with a random
     /// 4-character suffix appended on collision.
     ///
+    /// Validates that the title is non-empty and that the owning project exists
+    /// and is not archived (mirrors [`crate::ops::TodoOps::create`]).
+    ///
     /// # Errors
     ///
-    /// Returns an error if slug generation fails after all retries, or if a
-    /// database error occurs.
+    /// Returns an error if the title is empty, the project is missing or
+    /// archived, slug generation fails after all retries, or a database error
+    /// occurs.
     pub fn create_task(&self, params: CreateTask) -> anyhow::Result<Task> {
-        let prefix = format!("{}-task-", params.project_slug);
-        let base_slug = slug::generate(&prefix, &params.title);
+        let title = params.title.trim();
+        if title.is_empty() {
+            return Err(anyhow::anyhow!("task title cannot be empty"));
+        }
+
+        let project = self
+            .projects
+            .find_by_slug(&params.project_slug)?
+            .ok_or_else(|| anyhow::anyhow!("project '{}' not found", params.project_slug))?;
+
+        if project.archived_at.is_some() {
+            return Err(anyhow::anyhow!(
+                "project '{}' is archived; restore it before adding tasks",
+                params.project_slug
+            ));
+        }
+
+        // Prefer the live project id so callers cannot attach to a stale id.
+        // `params.project_id` is retained on `CreateTask` for call-site
+        // convenience but is not trusted.
+        let _ = params.project_id;
+        let project_id = project.id;
+        let project_slug = project.slug;
+
+        let prefix = format!("{project_slug}-task-");
+        let base_slug = slug::generate(&prefix, title);
         let unique_slug = slug::ensure_unique(&base_slug, |candidate| {
             self.tasks
                 .find_by_slug(candidate)
@@ -95,8 +125,8 @@ impl TaskOps {
 
         self.tasks.create(NewTask {
             slug: unique_slug,
-            project_id: params.project_id,
-            title: params.title,
+            project_id,
+            title: title.to_owned(),
             description: params.description,
             status: params.status,
             priority: params.priority,

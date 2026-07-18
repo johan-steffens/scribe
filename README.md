@@ -147,11 +147,18 @@ long-form notes with automatic cross-linking.
 Notes are Markdown documents stored directly in your SQLite database. Unlike
 tasks and todos, note slugs are user-defined (not auto-prefixed by project).
 
-Notes are created and edited in the **TUI** — run `scribe` and press `n` in the
-Notes view (`m` key to switch). AI agents can access notes via MCP tools:
-`read_note`, `write_note`, and `search_notes`.
+Notes can be managed from the **CLI**, **TUI**, or **MCP**:
 
-> **Note:** A CLI interface for notes may be added in a future release.
+```sh
+scribe note add "Architecture draft"          # open $EDITOR
+scribe note create --title "..." --content "..."
+scribe note list
+scribe note show arch-draft
+scribe note edit arch-draft
+```
+
+In the TUI, press `m` for the Notes view, then `n` / `e` to create or edit.
+AI agents use MCP tools: `read_note`, `write_note`, and `search_notes`.
 
 ### Wiki-style Links
 
@@ -181,8 +188,8 @@ Run `scribe` (no arguments) to open the full-screen interface:
 
 | Key | Action |
 |-----|--------|
-| `d/p/t/o/r/i/m` | Switch views (Dashboard/Projects/Tasks/Todos/Tracker/Inbox/Reminders) |
-| `n` | New item |
+| `d/p/t/o/n/r/i/m` | Switch views (Dashboard/Projects/Tasks/Todos/**Notes**/Tracker/Inbox/Reminders) |
+| `N` | New item (Shift+n — `n` alone is the Notes view) |
 | `e` | Edit selected |
 | `Space` | Toggle done / start timer |
 | `?` | Help |

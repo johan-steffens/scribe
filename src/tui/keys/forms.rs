@@ -147,7 +147,27 @@ pub(super) fn build_create_form(app: &App) -> Option<(Form, FormContext)> {
             ),
             FormContext::CreateTask,
         )),
-        View::Notes | View::Dashboard => None,
+        View::Notes => Some((
+            Form::new(
+                "New Note",
+                vec![
+                    FormField::Text {
+                        label: "Title".into(),
+                        value: String::new(),
+                        placeholder: "Note title…".into(),
+                        cursor: 0,
+                    },
+                    FormField::Text {
+                        label: "Slug (kebab-case, optional)".into(),
+                        value: String::new(),
+                        placeholder: "auto-from-title".into(),
+                        cursor: 0,
+                    },
+                ],
+            ),
+            FormContext::CreateNote,
+        )),
+        View::Dashboard => None,
     }
 }
 

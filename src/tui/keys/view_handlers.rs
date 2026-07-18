@@ -281,9 +281,8 @@ pub(super) fn handle_left(app: &mut App) {
     // If the task is expanded, collapse it
     if app.tasks.expanded_tasks.contains(&task.id) {
         app.tasks.expanded_tasks.remove(&task.id);
-    } else if task.parent_id.is_some() {
+    } else if let Some(parent_id) = task.parent_id {
         // Move selection to parent task
-        let parent_id = task.parent_id.unwrap();
         if let Some(parent_index) = find_visible_parent_index(app, parent_id) {
             app.tasks.selected = parent_index;
         }
