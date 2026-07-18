@@ -247,14 +247,9 @@ fn exec_create_task(app: &App, form: &Form) -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("title cannot be empty"));
     }
     let project_slug = form.field_value(1).to_owned();
-    // DOCUMENTED-MAGIC: field 2 is Priority select — order matches form options
-    // (low, medium, high, urgent); default selected index is medium (1).
-    let priority = match form.select_index(2) {
-        0 => crate::domain::TaskPriority::Low,
-        1 => crate::domain::TaskPriority::Medium,
-        2 => crate::domain::TaskPriority::High,
-        _ => crate::domain::TaskPriority::Urgent,
-    };
+    // Field 2 = Priority select; field 3 = optional due date (YYYY-MM-DD).
+    let priority = super::helpers::priority_from_select(form.select_index(2));
+    let due_date = super::helpers::parse_due_date(form.field_value(3))?;
     let p = SqliteProjects::new(Arc::clone(&app.db))
         .find_by_slug(&project_slug)?
         .ok_or_else(|| anyhow::anyhow!("project '{project_slug}' not found"))?;
@@ -266,7 +261,7 @@ fn exec_create_task(app: &App, form: &Form) -> anyhow::Result<()> {
             description: None,
             status: crate::domain::TaskStatus::Todo,
             priority,
-            due_date: None,
+            due_date,
             parent_id: None,
         })
         .map(|_| ())
@@ -277,11 +272,20 @@ fn exec_edit_task(app: &App, form: &Form, task_slug: &str) -> anyhow::Result<()>
     if title.is_empty() {
         return Err(anyhow::anyhow!("title cannot be empty"));
     }
+    // Field 1 = Priority select; field 2 = due date (empty clears).
+    let priority = super::helpers::priority_from_select(form.select_index(1));
+    let due_raw = form.field_value(2);
+    let due_date = super::helpers::parse_due_date(due_raw)?;
+    // Empty due field clears; a valid date sets. Invalid non-empty fails above.
+    let clear_due_date = due_raw.trim().is_empty();
     TaskOps::new(Arc::clone(&app.db))
         .update_task(
             task_slug,
             crate::domain::TaskPatch {
                 title: Some(title),
+                priority: Some(priority),
+                due_date,
+                clear_due_date,
                 ..Default::default()
             },
         )

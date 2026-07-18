@@ -235,6 +235,10 @@ fn test_task_form_has_required_fields() {
         buffer_contains(&buf, "Priority"),
         "form should have a 'Priority' field"
     );
+    assert!(
+        buffer_contains(&buf, "Due"),
+        "form should have a 'Due' field"
+    );
 }
 
 #[test]
@@ -288,12 +292,14 @@ fn test_task_form_creates_with_selected_priority() {
     open_new_task_form(&mut app);
 
     type_text(&mut app, "Urgent ship");
-    // Title → Project → Priority
+    // Title → Project → Priority → Due
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
     app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
     // Default selected is medium (index 1); j twice → urgent (index 3).
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    // Advance to Due (last field) and submit empty due.
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
     app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
     app.refresh();
@@ -304,6 +310,88 @@ fn test_task_form_creates_with_selected_priority() {
         .find(|t| t.title == "Urgent ship")
         .expect("task created");
     assert_eq!(task.priority, TaskPriority::Urgent);
+}
+
+#[test]
+fn test_task_form_creates_with_due_date() {
+    use chrono::NaiveDate;
+
+    let mut app = make_app();
+    open_new_task_form(&mut app);
+
+    type_text(&mut app, "Dated task");
+    // Title → Project → Priority → Due
+    for _ in 0..3 {
+        app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    }
+    type_text(&mut app, "2026-08-01");
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    app.refresh();
+    let task = app
+        .tasks
+        .items
+        .iter()
+        .find(|t| t.title == "Dated task")
+        .expect("task created");
+    assert_eq!(
+        task.due_date,
+        Some(NaiveDate::from_ymd_opt(2026, 8, 1).expect("date"))
+    );
+}
+
+#[test]
+fn test_edit_task_form_updates_priority_and_due() {
+    use chrono::NaiveDate;
+    use scribe::domain::{ProjectId, TaskPriority};
+    use scribe::ops::tasks::{CreateTask, TaskOps};
+
+    let conn = Arc::new(Mutex::new(db::open_in_memory().expect("in-memory db")));
+    TaskOps::new(Arc::clone(&conn))
+        .create_task(CreateTask {
+            project_slug: "quick-capture".to_owned(),
+            project_id: ProjectId(1),
+            title: "Edit me".to_owned(),
+            description: None,
+            status: scribe::domain::TaskStatus::Todo,
+            priority: TaskPriority::Medium,
+            due_date: None,
+            parent_id: None,
+        })
+        .expect("create task");
+
+    let mut app = App::new(conn, None);
+    app.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE));
+
+    let buf = render_to_buffer(&app, 80, 24);
+    assert!(buffer_contains(&buf, "Edit Task"), "edit form should open");
+    assert!(
+        buffer_contains(&buf, "Priority"),
+        "edit form should include Priority"
+    );
+    assert!(buffer_contains(&buf, "Due"), "edit form should include Due");
+
+    // Keep title; Tab to Priority → High (index 2; medium is 1, so j once).
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    // Tab to Due and set a date.
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    type_text(&mut app, "2026-09-15");
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    app.refresh();
+    let task = app
+        .tasks
+        .items
+        .iter()
+        .find(|t| t.title == "Edit me")
+        .expect("task still listed");
+    assert_eq!(task.priority, TaskPriority::High);
+    assert_eq!(
+        task.due_date,
+        Some(NaiveDate::from_ymd_opt(2026, 9, 15).expect("date"))
+    );
 }
 
 #[test]
