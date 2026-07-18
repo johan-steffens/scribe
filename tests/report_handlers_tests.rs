@@ -58,11 +58,12 @@ fn test_report_reminders_json_output() {
 }
 
 #[test]
-fn test_report_none_defaults_to_inbox() {
+fn test_report_none_defaults_to_summary() {
     let dir = TempDir::new().expect("tempdir");
     run(&dir, &["report"])
         .success()
-        .stdout(predicate::str::contains("Inbox Status Report"));
+        .stdout(predicate::str::contains("Scribe Summary Report"))
+        .stdout(predicate::str::contains("Projects:"));
 }
 
 #[test]
@@ -70,7 +71,7 @@ fn test_report_none_with_today_flag_succeeds() {
     let dir = TempDir::new().expect("tempdir");
     run(&dir, &["report", "--today"])
         .success()
-        .stdout(predicate::str::contains("Inbox Status Report"));
+        .stdout(predicate::str::contains("Scribe Summary Report"));
 }
 
 #[test]
@@ -78,17 +79,24 @@ fn test_report_none_with_week_flag_succeeds() {
     let dir = TempDir::new().expect("tempdir");
     run(&dir, &["report", "--week"])
         .success()
-        .stdout(predicate::str::contains("Inbox Status Report"));
+        .stdout(predicate::str::contains("Scribe Summary Report"));
 }
 
 #[test]
 fn test_report_none_with_detailed_flag_is_accepted() {
-    // The --detailed flag is accepted but inbox reports don't have a detailed mode,
-    // so it simply shows the standard inbox report
     let dir = TempDir::new().expect("tempdir");
     run(&dir, &["report", "--detailed"])
         .success()
-        .stdout(predicate::str::contains("Inbox Status Report"));
+        .stdout(predicate::str::contains("Detailed Scribe Summary Report"));
+}
+
+#[test]
+fn test_report_none_json_is_summary_payload() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["report", "--output", "json"])
+        .success()
+        .stdout(predicate::str::contains("\"active_projects\""))
+        .stdout(predicate::str::contains("\"pending_tasks\""));
 }
 
 #[test]

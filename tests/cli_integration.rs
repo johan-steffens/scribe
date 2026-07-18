@@ -562,6 +562,67 @@ fn test_track_start_blocked_when_already_running() {
 }
 
 #[test]
+fn test_track_start_with_task_inherits_project() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["project", "add", "work", "--name", "Work Project"]).success();
+    run(&dir, &["task", "add", "Ship feature", "--project", "work"]).success();
+
+    // Resolve task slug from list JSON.
+    let list = scribe(&dir)
+        .args(["task", "list", "--output", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let tasks: serde_json::Value = serde_json::from_slice(&list).expect("task list json");
+    let task_slug = tasks[0]["slug"].as_str().expect("slug");
+
+    let start = scribe(&dir)
+        .args(["track", "start", "--task", task_slug, "--output", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let entry: serde_json::Value = serde_json::from_slice(&start).expect("start json");
+
+    // Entry slug is prefixed with the project slug.
+    let entry_slug = entry["slug"].as_str().expect("entry slug");
+    assert!(
+        entry_slug.starts_with("work-entry-"),
+        "timer must use task's project, got {entry_slug}"
+    );
+
+    run(&dir, &["track", "stop"]).success();
+}
+
+#[test]
+fn test_track_start_task_project_mismatch_fails() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["project", "add", "alpha", "--name", "Alpha"]).success();
+    run(&dir, &["project", "add", "beta", "--name", "Beta"]).success();
+    run(&dir, &["task", "add", "Alpha work", "--project", "alpha"]).success();
+
+    let list = scribe(&dir)
+        .args(["task", "list", "--output", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let tasks: serde_json::Value = serde_json::from_slice(&list).expect("task list json");
+    let task_slug = tasks[0]["slug"].as_str().expect("slug");
+
+    run(
+        &dir,
+        &["track", "start", "--task", task_slug, "--project", "beta"],
+    )
+    .failure()
+    .stderr(predicates::str::contains("belongs to project"));
+}
+
+#[test]
 fn test_track_stop_when_no_timer_fails() {
     let dir = TempDir::new().expect("tempdir");
     run(&dir, &["track", "stop"])

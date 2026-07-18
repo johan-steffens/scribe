@@ -18,27 +18,35 @@ pub(super) fn handle_start(
     ops: &TrackerOps,
     task_ops: &TaskOps,
 ) -> anyhow::Result<()> {
-    let project_slug = args
-        .project
-        .clone()
-        .unwrap_or_else(|| "quick-capture".to_owned());
+    // When `--task` is set, the timer belongs to that task's project unless
+    // `--project` is also set and must then match (or we refuse).
+    let (project_slug, project_id, task_id) = if let Some(ref task_slug) = args.task {
+        let task = task_ops
+            .get_task(task_slug)?
+            .ok_or_else(|| anyhow::anyhow!("task '{task_slug}' not found"))?;
 
-    let (slug, project_id) = ops.resolve_project(&project_slug)?;
+        if let Some(ref explicit_project) = args.project
+            && explicit_project != &task.project_slug
+        {
+            anyhow::bail!(
+                "task '{task_slug}' belongs to project '{}', not '{explicit_project}'",
+                task.project_slug
+            );
+        }
 
-    // Resolve optional task slug to a TaskId.
-    let task_id = args
-        .task
-        .as_deref()
-        .map(|task_slug| {
-            task_ops
-                .get_task(task_slug)?
-                .ok_or_else(|| anyhow::anyhow!("task '{task_slug}' not found"))
-                .map(|t| t.id)
-        })
-        .transpose()?;
+        let (slug, project_id) = ops.resolve_project(&task.project_slug)?;
+        (slug, project_id, Some(task.id))
+    } else {
+        let project_slug = args
+            .project
+            .clone()
+            .unwrap_or_else(|| "quick-capture".to_owned());
+        let (slug, project_id) = ops.resolve_project(&project_slug)?;
+        (slug, project_id, None)
+    };
 
     let entry = ops.start_timer(StartTimer {
-        project_slug: slug,
+        project_slug,
         project_id,
         task_id,
         note: args.note.clone(),
