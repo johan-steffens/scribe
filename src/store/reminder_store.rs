@@ -378,13 +378,24 @@ impl SqliteReminders {
     /// any database write fails.
     pub fn upsert_all_with_slug_resolution(&self, reminders: &[Reminder]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, reminders)?;
+        tx.commit()?;
+        Ok(())
+    }
 
+    /// Upserts reminders on an existing connection/transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any project/task slug cannot be resolved or a write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, reminders: &[Reminder]) -> anyhow::Result<()> {
         let reminder_data: Vec<_> = reminders
             .iter()
             .map(|r| {
-                let local_project_id = Self::resolve_project_id(&conn, &r.project_slug)?;
+                let local_project_id = Self::resolve_project_id(conn, &r.project_slug)?;
                 let local_task_id = if let Some(ref task_slug) = r.task_slug {
-                    Some(Self::resolve_task_id(&conn, task_slug)?)
+                    Some(Self::resolve_task_id(conn, task_slug)?)
                 } else {
                     None
                 };
@@ -392,14 +403,15 @@ impl SqliteReminders {
             })
             .collect::<anyhow::Result<_>>()?;
 
-        let tx = conn.transaction()?;
         for (local_project_id, local_task_id, r) in reminder_data {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO reminders \
                  (slug, project_id, task_id, remind_at, message, fired, persistent, \
                   archived_at, created_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
                  ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
+                   task_id     = excluded.task_id, \
                    remind_at   = excluded.remind_at, \
                    message     = excluded.message, \
                    fired       = excluded.fired, \
@@ -418,7 +430,6 @@ impl SqliteReminders {
                 ],
             )?;
         }
-        tx.commit()?;
         Ok(())
     }
 }

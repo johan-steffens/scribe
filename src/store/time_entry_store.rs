@@ -369,13 +369,24 @@ impl SqliteTimeEntries {
     /// any database write fails.
     pub fn upsert_all_with_slug_resolution(&self, entries: &[TimeEntry]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, entries)?;
+        tx.commit()?;
+        Ok(())
+    }
 
+    /// Upserts time entries on an existing connection/transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any project/task slug cannot be resolved or a write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, entries: &[TimeEntry]) -> anyhow::Result<()> {
         let entry_data: Vec<_> = entries
             .iter()
             .map(|e| {
-                let local_project_id = Self::resolve_project_id(&conn, &e.project_slug)?;
+                let local_project_id = Self::resolve_project_id(conn, &e.project_slug)?;
                 let local_task_id = if let Some(ref task_slug) = e.task_slug {
-                    Some(Self::resolve_task_id(&conn, task_slug)?)
+                    Some(Self::resolve_task_id(conn, task_slug)?)
                 } else {
                     None
                 };
@@ -383,13 +394,14 @@ impl SqliteTimeEntries {
             })
             .collect::<anyhow::Result<_>>()?;
 
-        let tx = conn.transaction()?;
         for (local_project_id, local_task_id, e) in entry_data {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO time_entries \
                  (slug, project_id, task_id, started_at, ended_at, note, archived_at, created_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
                  ON CONFLICT(slug) DO UPDATE SET \
+                   project_id  = excluded.project_id, \
+                   task_id     = excluded.task_id, \
                    started_at  = excluded.started_at, \
                    ended_at    = excluded.ended_at, \
                    note        = excluded.note, \
@@ -406,7 +418,6 @@ impl SqliteTimeEntries {
                 ],
             )?;
         }
-        tx.commit()?;
         Ok(())
     }
 }

@@ -189,8 +189,19 @@ impl SqliteNotes {
     pub fn upsert_all(&self, notes: &[Note]) -> anyhow::Result<()> {
         let mut conn = self.lock()?;
         let tx = conn.transaction()?;
+        Self::upsert_all_on(&tx, notes)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Upserts notes on an existing connection/transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database write fails.
+    pub(crate) fn upsert_all_on(conn: &Connection, notes: &[Note]) -> anyhow::Result<()> {
         for n in notes {
-            tx.execute(
+            conn.execute(
                 "INSERT INTO notes (slug, title, content, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5) \
                  ON CONFLICT(slug) DO UPDATE SET \
@@ -206,7 +217,6 @@ impl SqliteNotes {
                 ],
             )?;
         }
-        tx.commit()?;
         Ok(())
     }
 }

@@ -4,7 +4,7 @@
 //! correctly handles complex sync scenarios including:
 //! - Bidirectional sync with remote having newer and local having newer data
 //! - Multi-entity sync across all domain types
-//! - Insert-only semantics for `TimeEntry`, `Reminder`, and `CaptureItem`
+//! - Field-wise merge for `TimeEntry`, `Reminder`, `CaptureItem`
 //! - Idempotent push avoidance when content hash is unchanged
 //! - Full round-trip sync cycles
 
@@ -474,7 +474,7 @@ fn merge_todo_remote_newer_wins() {
     );
 }
 
-// ── merge_into: TimeEntry tests (insert-or-keep semantics) ───────────────────
+// ── merge_into: TimeEntry tests (field-wise) ─────────────────────────────────
 
 #[test]
 fn merge_time_entry_remote_only_is_inserted() {
@@ -486,18 +486,23 @@ fn merge_time_entry_remote_only_is_inserted() {
 }
 
 #[test]
-fn merge_time_entry_both_exist_local_preserved() {
-    // TimeEntry uses insert-or-keep semantics - no updated_at comparison.
+fn merge_time_entry_remote_stop_wins_over_local_running() {
     let mut local = empty_snap();
-    local
-        .time_entries
-        .push(make_time_entry("shared-entry", "proj"));
+    let mut running = make_time_entry("shared-entry", "proj");
+    running.ended_at = None;
+    local.time_entries.push(running);
+
     let mut remote = empty_snap();
-    remote
-        .time_entries
-        .push(make_time_entry("shared-entry", "proj"));
+    let mut stopped = make_time_entry("shared-entry", "proj");
+    stopped.ended_at = Some(Utc::now());
+    remote.time_entries.push(stopped);
+
     SyncEngine::merge_into(&mut local, &remote);
     assert_eq!(local.time_entries.len(), 1);
+    assert!(
+        local.time_entries[0].ended_at.is_some(),
+        "remote stop must win over local still-running"
+    );
 }
 
 #[test]
@@ -517,7 +522,7 @@ fn merge_multiple_time_entries_from_both_sides() {
     assert!(slugs.contains(&"remote-entry"));
 }
 
-// ── merge_into: Reminder tests (insert-or-keep semantics) ───────────────────
+// ── merge_into: Reminder tests (field-wise) ─────────────────────────────────
 
 #[test]
 fn merge_reminder_remote_only_inserted() {
@@ -531,21 +536,22 @@ fn merge_reminder_remote_only_inserted() {
 }
 
 #[test]
-fn merge_reminder_both_exist_local_preserved() {
-    // Reminder uses insert-or-keep semantics.
+fn merge_reminder_fired_is_sticky_or() {
     let mut local = empty_snap();
-    local
-        .reminders
-        .push(make_reminder("shared-reminder", "proj"));
+    let mut loc = make_reminder("shared-reminder", "proj");
+    loc.fired = false;
+    local.reminders.push(loc);
+
     let mut remote = empty_snap();
-    remote
-        .reminders
-        .push(make_reminder("shared-reminder", "proj"));
+    let mut rem = make_reminder("shared-reminder", "proj");
+    rem.fired = true;
+    remote.reminders.push(rem);
+
     SyncEngine::merge_into(&mut local, &remote);
-    assert_eq!(local.reminders.len(), 1);
+    assert!(local.reminders[0].fired, "fired must stick via OR merge");
 }
 
-// ── merge_into: CaptureItem tests (insert-or-keep semantics) ───────────────
+// ── merge_into: CaptureItem tests (field-wise) ─────────────────────────────
 
 #[test]
 fn merge_capture_item_remote_only_inserted() {
@@ -559,17 +565,22 @@ fn merge_capture_item_remote_only_inserted() {
 }
 
 #[test]
-fn merge_capture_item_both_exist_local_preserved() {
+fn merge_capture_item_processed_is_sticky_or() {
     let mut local = empty_snap();
-    local
-        .capture_items
-        .push(make_capture_item("shared-capture"));
+    let mut loc = make_capture_item("shared-capture");
+    loc.processed = false;
+    local.capture_items.push(loc);
+
     let mut remote = empty_snap();
-    remote
-        .capture_items
-        .push(make_capture_item("shared-capture"));
+    let mut rem = make_capture_item("shared-capture");
+    rem.processed = true;
+    remote.capture_items.push(rem);
+
     SyncEngine::merge_into(&mut local, &remote);
-    assert_eq!(local.capture_items.len(), 1);
+    assert!(
+        local.capture_items[0].processed,
+        "processed must stick via OR merge"
+    );
 }
 
 // ── merge_into: Multi-entity complex scenarios ──────────────────────────────
