@@ -4,8 +4,16 @@
 //! `scribe inbox list/process`, `scribe setup --wizard`, `scribe sync configure`)
 //! by spawning the actual binary and asserting on stdout/stderr output.
 //!
-//! Each test uses isolated temporary directories for config and database
-//! to prevent interference.
+//! # Isolation (required for CI)
+//!
+//! Each test uses isolated temporary directories for config and database.
+//! Helpers set `HOME`, **`XDG_CONFIG_HOME`**, and **`XDG_DATA_HOME`** under that
+//! temp tree via [`isolate_xdg`].
+//!
+//! On Linux, `directories::ProjectDirs` prefers XDG vars over `HOME`. GitHub
+//! Actions exports `XDG_*`, so isolating only `HOME` lets parallel tests race
+//! on the runner's shared config (see `test_sync_one_shot_succeeds_after_configure`
+//! postmortem in `CONTRIBUTING.md`).
 
 use assert_cmd::Command;
 use predicates::prelude::*;
@@ -32,10 +40,24 @@ fn scribe_with_db(dir: &TempDir) -> Command {
     cmd
 }
 
+/// Isolates config/data paths for a child `scribe` process.
+///
+/// On Linux, `directories::ProjectDirs` prefers `XDG_CONFIG_HOME` /
+/// `XDG_DATA_HOME` over `HOME`. CI runners often export those variables, so
+/// setting only `HOME` is **not** enough — parallel CLI tests then race on the
+/// runner's shared config directory and can clear `sync.enabled` mid-test.
+fn isolate_xdg(cmd: &mut Command, home: &TempDir) {
+    cmd.env("HOME", home.path());
+    // DOCUMENTED-MAGIC: pin XDG roots under the per-test HOME so ProjectDirs
+    // never falls through to the host runner's ~/.config or ~/.local/share.
+    cmd.env("XDG_CONFIG_HOME", home.path().join(".config"));
+    cmd.env("XDG_DATA_HOME", home.path().join(".local/share"));
+}
+
 /// Returns a `Command` for the `scribe` binary with an isolated home directory.
 fn scribe_with_home(home: &TempDir) -> Command {
     let mut cmd = Command::cargo_bin("scribe").expect("binary not found");
-    cmd.env("HOME", home.path());
+    isolate_xdg(&mut cmd, home);
     // Also isolate the keychain bootstrap file in the home directory
     cmd.env(
         "SCRIBE_TEST_KEYCHAIN_BOOTSTRAP",
@@ -49,7 +71,7 @@ fn scribe_with_home(home: &TempDir) -> Command {
 /// Returns a `Command` for the `scribe` binary with isolated config and DB.
 fn scribe_with_config(home: &TempDir, db_path: &TempDir) -> Command {
     let mut cmd = Command::cargo_bin("scribe").expect("binary not found");
-    cmd.env("HOME", home.path());
+    isolate_xdg(&mut cmd, home);
     cmd.env("SCRIBE_TEST_DB", db_path.path().join("test.db"));
     // Also isolate the keychain bootstrap file
     cmd.env(
@@ -514,13 +536,37 @@ fn test_sync_one_shot_succeeds_after_configure() {
         .args(["sync", "configure", "--provider", "file"])
         .write_stdin(format!("{}\n", sync_file.display()))
         .assert()
-        .success();
+        .success()
+        .stdout(predicate::str::contains("Sync configured successfully"));
 
-    // One-shot sync should work.
+    // Configure must persist under the isolated home (Linux: XDG_CONFIG_HOME,
+    // macOS: Library/Application Support — both are rooted at HOME here).
+    let config_candidates = [
+        home.path().join(".config/scribe/config.toml"),
+        home.path()
+            .join("Library/Application Support/scribe/config.toml"),
+    ];
+    let config_text = config_candidates
+        .iter()
+        .find_map(|p| std::fs::read_to_string(p).ok())
+        .unwrap_or_else(|| {
+            panic!("config.toml not found under isolated HOME; tried {config_candidates:?}")
+        });
+    assert!(
+        config_text.contains("enabled = true"),
+        "configure must set sync.enabled; config was:\n{config_text}"
+    );
+    assert!(
+        config_text.contains("provider = \"file\""),
+        "configure must set file provider; config was:\n{config_text}"
+    );
+
+    // One-shot sync should work against the persisted config.
     scribe_with_config(&home, &db)
         .args(["sync"])
         .assert()
-        .success();
+        .success()
+        .stdout(predicate::str::contains("Sync complete"));
 }
 
 // ── Service status tests ───────────────────────────────────────────────────────
