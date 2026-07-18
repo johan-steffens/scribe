@@ -522,6 +522,48 @@ fn merge_multiple_time_entries_from_both_sides() {
     assert!(slugs.contains(&"remote-entry"));
 }
 
+#[test]
+fn merge_enforces_single_running_timer() {
+    let mut local = empty_snap();
+    let mut older = make_time_entry("local-runner", "proj");
+    older.id = TimeEntryId(1);
+    older.started_at = Utc::now() - Duration::hours(2);
+    older.ended_at = None;
+    local.time_entries.push(older);
+
+    let mut remote = empty_snap();
+    let mut newer = make_time_entry("remote-runner", "proj");
+    newer.id = TimeEntryId(2);
+    newer.started_at = Utc::now() - Duration::hours(1);
+    newer.ended_at = None;
+    remote.time_entries.push(newer);
+
+    SyncEngine::merge_into(&mut local, &remote);
+
+    let running: Vec<_> = local
+        .time_entries
+        .iter()
+        .filter(|e| e.ended_at.is_none())
+        .collect();
+    assert_eq!(
+        running.len(),
+        1,
+        "merge must leave at most one running timer"
+    );
+    assert_eq!(running[0].slug, "remote-runner");
+
+    let stopped = local
+        .time_entries
+        .iter()
+        .find(|e| e.slug == "local-runner")
+        .expect("older local runner still present");
+    assert_eq!(
+        stopped.ended_at,
+        Some(stopped.started_at),
+        "older runner stopped with zero duration"
+    );
+}
+
 // ── merge_into: Reminder tests (field-wise) ─────────────────────────────────
 
 #[test]

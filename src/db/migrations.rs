@@ -14,6 +14,7 @@
 //! - **M5** — migrates all `todos` rows into `tasks` (as `checklist_item` kind) and drops `todos`.
 //! - **M6** — creates `notes` and `links` tables for PKM functionality.
 //! - **M7** — creates FTS5 virtual table for full-text search on notes.
+//! - **M8** — enforces at most one running timer (`ended_at IS NULL`).
 
 use rusqlite_migration::M;
 
@@ -250,6 +251,34 @@ CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
     INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
 END;";
 
+/// M8 — enforces at most one running timer at the database level.
+///
+/// App-level code already rejects a second start while a timer is running, but
+/// concurrent clients or a bad sync merge can still leave multiple rows with
+/// `ended_at IS NULL`. This migration:
+///
+/// 1. Stops all but the newest running entry (`ended_at = started_at`) so the
+///    index can be created on existing databases that already violate the rule.
+/// 2. Creates a partial unique index on a constant expression for rows where
+///    `ended_at IS NULL`, so `SQLite` rejects a second concurrent runner.
+pub(super) const M8: &str = "
+UPDATE time_entries
+SET ended_at = started_at
+WHERE ended_at IS NULL
+  AND id NOT IN (
+    SELECT id FROM (
+      SELECT id FROM time_entries
+      WHERE ended_at IS NULL
+      ORDER BY started_at DESC, id DESC
+      LIMIT 1
+    )
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_one_running
+ON time_entries((1))
+WHERE ended_at IS NULL;
+";
+
 /// Returns all migrations in application order.
 ///
 /// Pass the returned slice to [`rusqlite_migration::Migrations::new`].
@@ -268,5 +297,6 @@ pub(super) fn all() -> Vec<M<'static>> {
         M::up(M5),
         M::up(M6),
         M::up(M7),
+        M::up(M8),
     ]
 }

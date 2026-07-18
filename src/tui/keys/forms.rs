@@ -143,6 +143,18 @@ pub(super) fn build_create_form(app: &App) -> Option<(Form, FormContext)> {
                         options: project_options,
                         selected: 0,
                     },
+                    // DOCUMENTED-MAGIC: selected 1 = medium (default priority).
+                    // Order must stay aligned with exec_create_task match arms.
+                    FormField::Select {
+                        label: "Priority".into(),
+                        options: vec![
+                            "low".into(),
+                            "medium".into(),
+                            "high".into(),
+                            "urgent".into(),
+                        ],
+                        selected: 1,
+                    },
                 ],
             ),
             FormContext::CreateTask,
