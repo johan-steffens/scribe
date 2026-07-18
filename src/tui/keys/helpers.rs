@@ -6,9 +6,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{NaiveDateTime, TimeZone};
+use chrono::{NaiveDate, NaiveDateTime, TimeZone};
 
-use crate::domain::{Links, Task};
+use crate::domain::{Links, Task, TaskPriority};
 use crate::tui::app::App;
 use crate::tui::types::{Modal, View};
 
@@ -192,7 +192,6 @@ pub(crate) fn is_dashboard_due_task(task: &Task, today: chrono::NaiveDate) -> bo
 /// Due-today / overdue tasks for the dashboard, filtered and urgent-first.
 #[must_use]
 pub(crate) fn dashboard_due_tasks(app: &App) -> Vec<Task> {
-    use crate::domain::task::TaskPriority;
     let today = chrono::Local::now().date_naive();
     let filter = app.tasks.filter.to_lowercase();
     let mut due: Vec<Task> = app
@@ -275,6 +274,48 @@ pub(super) fn project_slugs(app: &App) -> Vec<String> {
         .filter(|p| p.archived_at.is_none())
         .map(|p| p.slug.clone())
         .collect()
+}
+
+/// Parses an optional task due date (`YYYY-MM-DD`).
+///
+/// Empty / whitespace-only input yields `None`.
+///
+/// # Errors
+///
+/// Returns an error if the string is non-empty and not a valid calendar date.
+pub(super) fn parse_due_date(s: &str) -> anyhow::Result<Option<NaiveDate>> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
+        .map(Some)
+        .map_err(|_e| anyhow::anyhow!("invalid due date '{trimmed}'; expected YYYY-MM-DD"))
+}
+
+/// Maps a priority select index to [`TaskPriority`].
+///
+/// Index order must match the Priority select options in create/edit task forms
+/// (`low`, `medium`, `high`, `urgent`).
+#[must_use]
+pub(super) fn priority_from_select(index: usize) -> TaskPriority {
+    match index {
+        0 => TaskPriority::Low,
+        1 => TaskPriority::Medium,
+        2 => TaskPriority::High,
+        _ => TaskPriority::Urgent,
+    }
+}
+
+/// Select index for a [`TaskPriority`] in create/edit task forms.
+#[must_use]
+pub(super) const fn priority_select_index(priority: TaskPriority) -> usize {
+    match priority {
+        TaskPriority::Low => 0,
+        TaskPriority::Medium => 1,
+        TaskPriority::High => 2,
+        TaskPriority::Urgent => 3,
+    }
 }
 
 /// Parses a datetime string in `YYYY-MM-DD HH:MM` or RFC 3339 format.

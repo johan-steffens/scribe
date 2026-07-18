@@ -144,7 +144,7 @@ pub(super) fn build_create_form(app: &App) -> Option<(Form, FormContext)> {
                         selected: 0,
                     },
                     // DOCUMENTED-MAGIC: selected 1 = medium (default priority).
-                    // Order must stay aligned with exec_create_task match arms.
+                    // Order must stay aligned with helpers::priority_from_select.
                     FormField::Select {
                         label: "Priority".into(),
                         options: vec![
@@ -154,6 +154,12 @@ pub(super) fn build_create_form(app: &App) -> Option<(Form, FormContext)> {
                             "urgent".into(),
                         ],
                         selected: 1,
+                    },
+                    FormField::Text {
+                        label: "Due (YYYY-MM-DD, optional)".into(),
+                        value: String::new(),
+                        placeholder: "2026-07-20".into(),
+                        cursor: 0,
                     },
                 ],
             ),
@@ -307,15 +313,39 @@ pub(super) fn build_edit_form(app: &App) -> Option<(Form, FormContext)> {
             let title = task.title.clone();
             let slug = task.slug.clone();
             let cursor = title.len();
+            let due = task
+                .due_date
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .unwrap_or_default();
+            let due_cursor = due.len();
             Some((
                 Form::new(
                     "Edit Task",
-                    vec![FormField::Text {
-                        label: "Title".into(),
-                        value: title,
-                        placeholder: String::new(),
-                        cursor,
-                    }],
+                    vec![
+                        FormField::Text {
+                            label: "Title".into(),
+                            value: title,
+                            placeholder: String::new(),
+                            cursor,
+                        },
+                        // DOCUMENTED-MAGIC: order matches helpers::priority_from_select.
+                        FormField::Select {
+                            label: "Priority".into(),
+                            options: vec![
+                                "low".into(),
+                                "medium".into(),
+                                "high".into(),
+                                "urgent".into(),
+                            ],
+                            selected: super::helpers::priority_select_index(task.priority),
+                        },
+                        FormField::Text {
+                            label: "Due (YYYY-MM-DD, empty clears)".into(),
+                            value: due,
+                            placeholder: "2026-07-20".into(),
+                            cursor: due_cursor,
+                        },
+                    ],
                 ),
                 FormContext::EditTask(slug),
             ))
