@@ -608,11 +608,11 @@ scribe inbox list --all
 
 ### Processing an inbox item
 
+**Interactive** (TTY prompts):
+
 ```sh
 scribe inbox process capture-20260331-143512
 ```
-
-The CLI enters interactive mode:
 
 ```
 Item: Look into Redis caching for the API
@@ -623,16 +623,29 @@ Item: Look into Redis caching for the API
 Choice:
 ```
 
-**Option 1 — Convert to task**: prompts for a project slug and an optional
-title. If you leave the title blank, the capture body is used verbatim.
+**Non-interactive** (scripts and AI agents) — use `--action`:
 
-**Option 2 — Convert to todo**: prompts for a project slug and an optional
-title.
+```sh
+# Discard
+scribe inbox process capture-20260331-143512 --action discard
 
-**Option 3 — Assign to project**: validates the project exists and marks the
-item processed. No task or todo is created; it is a logical association only.
+# Convert to checklist item (todo) under a project
+scribe inbox process capture-20260331-143512 --action todo --project work
 
-**Option 4 — Discard**: marks the item processed without creating anything.
+# Convert to task with optional title override
+scribe inbox process capture-20260331-143512 \
+  --action task --project work --title "Research Redis caching"
+
+# Mark processed after validating project (no entity created)
+scribe inbox process capture-20260331-143512 --action assign --project work
+```
+
+| `--action` | Requires `--project` | Effect |
+|------------|----------------------|--------|
+| `task` | yes | Create task; body becomes title unless `--title` |
+| `todo` | yes | Create checklist item |
+| `assign` | yes | Validate project; mark processed only |
+| `discard` | no | Mark processed; create nothing |
 
 In all cases the capture item is marked `processed = true` and no longer
 appears in `scribe inbox list`.
@@ -644,7 +657,7 @@ The intended pattern is:
 1. During the day, dump thoughts with `scribe capture "..."` without switching
    context.
 2. At a natural break, run `scribe inbox list` to see what accumulated.
-3. Work through items with `scribe inbox process <slug>`.
+3. Work through items with `scribe inbox process <slug>` (or `--action` for scripts).
 
 ---
 
@@ -676,7 +689,10 @@ scribe reminder add \
 | `2026-04-01T14:00:00` | ISO 8601 with T separator, local time |
 | `2026-04-01 14:00` | Space-separated, local time |
 | `2026-04-01` | Date only, midnight local time |
-| `tomorrow 09:00` | Next calendar day at the given time |
+| `tomorrow 09:00` / `tomorrow 9am` | Next calendar day at the given time |
+| `today 5pm` | Today at 17:00 local |
+| `9am` / `5:30pm` | Today at that clock time |
+| `in 1 hour` / `in 30 minutes` | Relative to now |
 | `friday 17:00` | Coming Friday at 17:00 |
 | `friday` | Coming Friday at 09:00 |
 

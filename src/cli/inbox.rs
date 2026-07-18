@@ -59,9 +59,23 @@ pub struct InboxList {
 pub struct InboxProcess {
     /// Capture item slug to process.
     pub slug: String,
+    /// Non-interactive action: `task`, `todo`, `assign`, or `discard`.
+    ///
+    /// When set, stdin prompts are skipped (scripting / agent friendly).
+    /// `task`, `todo`, and `assign` require `--project`.
+    #[arg(long, value_parser = ["task", "todo", "assign", "discard"])]
+    pub action: Option<String>,
+    /// Destination project slug (required with `--action task|todo|assign`).
+    #[arg(long)]
+    pub project: Option<String>,
+    /// Optional title override for convert-to-task / convert-to-todo.
+    #[arg(long)]
+    pub title: Option<String>,
     /// Output format.
     ///
-    /// When `json`, the raw item is returned without entering interactive mode.
+    /// When `json` **and** `--action` is omitted, the raw item is returned
+    /// without entering interactive mode. With `--action`, prints the
+    /// processed item as JSON.
     #[arg(long, default_value = "text")]
     pub output: OutputFormat,
 }
@@ -136,8 +150,18 @@ fn handle_process(
         .get(&args.slug)?
         .ok_or_else(|| anyhow::anyhow!("capture item '{}' not found", args.slug))?;
 
+    // Non-interactive process via --action (agents / scripts).
+    if let Some(ref action) = args.action {
+        let processed = ops.process(&args.slug, action_from_flags(action, args)?)?;
+        match args.output {
+            OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&processed)?),
+            OutputFormat::Text => println!("Processed: {}", processed.slug),
+        }
+        return Ok(());
+    }
+
     if args.output == OutputFormat::Json {
-        // Non-interactive: just return the raw item.
+        // Peek mode: return the raw item without processing.
         println!("{}", serde_json::to_string_pretty(&item)?);
         return Ok(());
     }
@@ -204,6 +228,44 @@ fn handle_process(
     let processed = ops.process(&args.slug, action)?;
     println!("Processed: {}", processed.slug);
     Ok(())
+}
+
+/// Builds a [`ProcessAction`] from `--action` / `--project` / `--title` flags.
+fn action_from_flags(action: &str, args: &InboxProcess) -> anyhow::Result<ProcessAction> {
+    match action {
+        "discard" => Ok(ProcessAction::Discard),
+        "task" => {
+            let project_slug = args
+                .project
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("--project is required with --action task"))?;
+            Ok(ProcessAction::ConvertToTask {
+                project_slug,
+                title: args.title.clone(),
+                priority: None,
+            })
+        }
+        "todo" => {
+            let project_slug = args
+                .project
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("--project is required with --action todo"))?;
+            Ok(ProcessAction::ConvertToTodo {
+                project_slug,
+                title: args.title.clone(),
+            })
+        }
+        "assign" => {
+            let project_slug = args
+                .project
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("--project is required with --action assign"))?;
+            Ok(ProcessAction::AssignToProject { project_slug })
+        }
+        other => Err(anyhow::anyhow!(
+            "unknown action '{other}'; use task, todo, assign, or discard"
+        )),
+    }
 }
 
 /// Delegates to [`report_handle_report`] after building a [`ReportCommand`]
