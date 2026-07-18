@@ -73,7 +73,8 @@ pub(super) fn selected_todo(app: &App) -> Option<&crate::domain::Todo> {
 
 /// Returns the currently selected visible time entry, if any.
 pub(super) fn selected_entry(app: &App) -> Option<&crate::domain::TimeEntry> {
-    app.entries.items.get(app.entries.selected)
+    let visible = visible_entries(app);
+    visible.get(app.entries.selected).copied()
 }
 
 /// Returns the currently selected visible capture item, if any.
@@ -168,6 +169,7 @@ pub(super) fn selected_task(app: &App) -> Option<Task> {
 pub(super) fn current_filter_mut(app: &mut App) -> &mut String {
     match app.active_view {
         View::Projects => &mut app.projects.filter,
+        // Dashboard reuses the tasks filter for title/project match on due list.
         View::Tasks | View::Dashboard => &mut app.tasks.filter,
         View::Todos => &mut app.todos.filter,
         View::Tracker => &mut app.entries.filter,
@@ -175,6 +177,94 @@ pub(super) fn current_filter_mut(app: &mut App) -> &mut String {
         View::Reminders => &mut app.reminders.filter,
         View::Notes => &mut app.notes.filter,
     }
+}
+
+/// Whether a task is due today or overdue and still actionable on the dashboard.
+#[must_use]
+pub(crate) fn is_dashboard_due_task(task: &Task, today: chrono::NaiveDate) -> bool {
+    use crate::domain::task::TaskStatus;
+    task.archived_at.is_none()
+        && task.status != TaskStatus::Done
+        && task.status != TaskStatus::Cancelled
+        && task.due_date.is_some_and(|d| d <= today)
+}
+
+/// Due-today / overdue tasks for the dashboard, filtered and urgent-first.
+#[must_use]
+pub(crate) fn dashboard_due_tasks(app: &App) -> Vec<Task> {
+    use crate::domain::task::TaskPriority;
+    let today = chrono::Local::now().date_naive();
+    let filter = app.tasks.filter.to_lowercase();
+    let mut due: Vec<Task> = app
+        .tasks
+        .items
+        .iter()
+        .filter(|t| is_dashboard_due_task(t, today))
+        .filter(|t| {
+            filter.is_empty()
+                || t.title.to_lowercase().contains(&filter)
+                || t.project_slug.to_lowercase().contains(&filter)
+        })
+        .cloned()
+        .collect();
+    due.sort_by_key(|t| match t.priority {
+        TaskPriority::Urgent => 0u8,
+        TaskPriority::High => 1,
+        TaskPriority::Medium => 2,
+        TaskPriority::Low => 3,
+    });
+    due
+}
+
+/// Count of tasks shown in the dashboard due list.
+#[must_use]
+pub(crate) fn dashboard_due_task_count(app: &App) -> usize {
+    dashboard_due_tasks(app).len()
+}
+
+/// The currently selected dashboard due task, if any.
+#[must_use]
+pub(super) fn selected_dashboard_task(app: &App) -> Option<Task> {
+    let due = dashboard_due_tasks(app);
+    due.get(app.dashboard_selected).cloned()
+}
+
+/// Whether a time entry matches the tracker filter string.
+fn entry_matches_filter(entry: &crate::domain::TimeEntry, filter: &str) -> bool {
+    if filter.is_empty() {
+        return true;
+    }
+    let f = filter.to_lowercase();
+    entry.slug.to_lowercase().contains(&f)
+        || entry
+            .note
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase()
+            .contains(&f)
+}
+
+/// Visible (filtered) tracker entries in list order.
+#[must_use]
+pub(crate) fn visible_entries(app: &App) -> Vec<&crate::domain::TimeEntry> {
+    let filter = app.entries.filter.to_lowercase();
+    app.entries
+        .items
+        .iter()
+        .filter(|e| entry_matches_filter(e, &filter))
+        .collect()
+}
+
+/// Truncates `s` to at most `max_chars` Unicode scalar values, appending `…`
+/// when truncated. Safe for multi-byte UTF-8 (unlike byte slicing).
+#[must_use]
+pub(crate) fn truncate_chars(s: &str, max_chars: usize) -> String {
+    let count = s.chars().count();
+    if count <= max_chars {
+        return s.to_owned();
+    }
+    let truncated: String = s.chars().take(max_chars).collect();
+    format!("{truncated}…")
 }
 
 /// Collects the slugs of all non-archived projects for select fields.

@@ -100,6 +100,8 @@ pub struct App {
     pub(super) db: Arc<Mutex<Connection>>,
     /// Default note editor from config, falling back to `$EDITOR` env var then `vim`.
     pub note_editor: Option<String>,
+    /// Cursor into the dashboard "Today's Tasks" list (not the full Tasks tree).
+    pub dashboard_selected: usize,
 }
 
 impl App {
@@ -141,6 +143,7 @@ impl App {
             summary: None,
             db,
             note_editor,
+            dashboard_selected: 0,
         };
         app.refresh();
         app
@@ -208,13 +211,21 @@ impl App {
                     .iter()
                     .map(|p| format!("{} {}", p.slug, p.name)),
             ),
-            View::Tasks | View::Dashboard => self.visible_task_count(),
+            View::Tasks => self.visible_task_count(),
+            View::Dashboard => crate::tui::keys::helpers::dashboard_due_task_count(self),
             View::Todos => Self::filter_count(
                 &self.todos.filter,
                 self.todos.items.len(),
                 self.todos.items.iter().map(|t| t.title.clone()),
             ),
-            View::Tracker => self.entries.items.len(),
+            View::Tracker => Self::filter_count(
+                &self.entries.filter,
+                self.entries.items.len(),
+                self.entries.items.iter().map(|e| {
+                    let note = e.note.as_deref().unwrap_or("");
+                    format!("{} {note}", e.slug)
+                }),
+            ),
             View::Inbox => Self::filter_count(
                 &self.captures.filter,
                 self.captures.items.len(),
@@ -253,7 +264,8 @@ impl App {
     pub(super) fn selected_mut(&mut self) -> &mut usize {
         match self.active_view {
             View::Projects => &mut self.projects.selected,
-            View::Tasks | View::Dashboard => &mut self.tasks.selected,
+            View::Tasks => &mut self.tasks.selected,
+            View::Dashboard => &mut self.dashboard_selected,
             View::Todos => &mut self.todos.selected,
             View::Tracker => &mut self.entries.selected,
             View::Inbox => &mut self.captures.selected,

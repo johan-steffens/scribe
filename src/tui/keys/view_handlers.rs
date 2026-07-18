@@ -189,7 +189,53 @@ pub(super) fn handle_space(app: &mut App) {
         View::Todos => toggle_todo_done(app),
         View::Tasks => toggle_task_done(app),
         View::Tracker => handle_tracker_space(app),
-        View::Dashboard | View::Projects | View::Inbox | View::Reminders | View::Notes => {}
+        View::Dashboard => handle_dashboard_space(app),
+        View::Projects | View::Inbox | View::Reminders | View::Notes => {}
+    }
+}
+
+/// Space on the dashboard: toggle the selected due task, or start/stop timer
+/// when the due list is empty (matches the empty-timer hint).
+fn handle_dashboard_space(app: &mut App) {
+    if super::helpers::dashboard_due_task_count(app) > 0 {
+        toggle_dashboard_task_done(app);
+    } else {
+        handle_tracker_space(app);
+    }
+}
+
+/// Toggles done status for the selected dashboard due-today task.
+fn toggle_dashboard_task_done(app: &mut App) {
+    let Some(task) = super::helpers::selected_dashboard_task(app) else {
+        return;
+    };
+    let slug = task.slug.clone();
+    let is_done = task.status == TaskStatus::Done;
+    let ops = TaskOps::new(Arc::clone(&app.db));
+    let result = if is_done {
+        ops.update_task(
+            &slug,
+            TaskPatch {
+                status: Some(TaskStatus::Todo),
+                ..Default::default()
+            },
+        )
+        .map(|_| ())
+    } else {
+        ops.mark_done(&slug).map(|_| ())
+    };
+    match result {
+        Ok(()) => {
+            app.refresh();
+            // Clamp dashboard cursor after list shrinks (task left the due set).
+            let len = super::helpers::dashboard_due_task_count(app);
+            if len == 0 {
+                app.dashboard_selected = 0;
+            } else if app.dashboard_selected >= len {
+                app.dashboard_selected = len - 1;
+            }
+        }
+        Err(e) => app.last_error = Some(e.to_string()),
     }
 }
 
@@ -209,7 +255,7 @@ fn handle_inbox_enter(app: &mut App) {
     };
     let body = capture.body.clone();
     let slug = capture.slug.clone();
-    let title = format!("Process: {}", &body[..body.len().min(40)]);
+    let title = format!("Process: {}", super::helpers::truncate_chars(&body, 40));
     let form = Form::new(
         title,
         vec![
@@ -357,7 +403,7 @@ fn toggle_task_done(app: &mut App) {
     }
 }
 
-/// Handles Space in the Tracker view: stop if running, or open start-timer form.
+/// Handles Space for timer start/stop (Tracker view, or Dashboard with no due tasks).
 fn handle_tracker_space(app: &mut App) {
     let tracker = TrackerOps::new(Arc::clone(&app.db));
     if app.active_timer.is_some() {
@@ -366,6 +412,30 @@ fn handle_tracker_space(app: &mut App) {
             Err(e) => app.last_error = Some(e.to_string()),
         }
     } else {
-        handle_new(app);
+        // Open the start-timer form explicitly — do not use `handle_new`, which
+        // keys off `active_view` and would no-op on Dashboard.
+        open_start_timer_form(app);
     }
+}
+
+/// Opens the Start Timer form (project select + optional note).
+fn open_start_timer_form(app: &mut App) {
+    let project_options = super::helpers::project_slugs(app);
+    let form = Form::new(
+        "Start Timer",
+        vec![
+            FormField::Select {
+                label: "Project".into(),
+                options: project_options,
+                selected: 0,
+            },
+            FormField::Text {
+                label: "Note (optional)".into(),
+                value: String::new(),
+                placeholder: "What are you working on?".into(),
+                cursor: 0,
+            },
+        ],
+    );
+    app.modal = Modal::Form(form, FormContext::StartTimer);
 }
