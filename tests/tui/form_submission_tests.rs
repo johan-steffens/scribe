@@ -231,6 +231,10 @@ fn test_task_form_has_required_fields() {
         buffer_contains(&buf, "Project"),
         "form should have a 'Project' field"
     );
+    assert!(
+        buffer_contains(&buf, "Priority"),
+        "form should have a 'Priority' field"
+    );
 }
 
 #[test]
@@ -273,6 +277,86 @@ fn test_task_form_creates_task_in_db() {
     assert!(
         task_exists,
         "task 'Test task' should exist in the tasks list"
+    );
+}
+
+#[test]
+fn test_task_form_creates_with_selected_priority() {
+    use scribe::domain::TaskPriority;
+
+    let mut app = make_app();
+    open_new_task_form(&mut app);
+
+    type_text(&mut app, "Urgent ship");
+    // Title → Project → Priority
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    // Default selected is medium (index 1); j twice → urgent (index 3).
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    app.refresh();
+    let task = app
+        .tasks
+        .items
+        .iter()
+        .find(|t| t.title == "Urgent ship")
+        .expect("task created");
+    assert_eq!(task.priority, TaskPriority::Urgent);
+}
+
+#[test]
+fn test_edit_todo_form_moves_project() {
+    use scribe::domain::{NewProject, ProjectStatus};
+    use scribe::ops::{ProjectOps, TodoOps};
+
+    let conn = Arc::new(Mutex::new(db::open_in_memory().expect("in-memory db")));
+    ProjectOps::new(&conn)
+        .create_project(NewProject {
+            slug: "work".to_owned(),
+            name: "Work".to_owned(),
+            description: None,
+            status: ProjectStatus::Active,
+        })
+        .expect("create work project");
+    TodoOps::new(Arc::clone(&conn))
+        .create("quick-capture", "Rehome me")
+        .expect("create todo");
+
+    let mut app = App::new(conn, None);
+
+    // Todos view → edit selected todo.
+    app.handle_key(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE));
+
+    let buf = render_to_buffer(&app, 80, 24);
+    assert!(buffer_contains(&buf, "Edit Todo"), "edit form should open");
+
+    // Title field is focused; tab to Project select (pre-filled on quick-capture).
+    app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    // Active projects list as quick-capture then work; j selects work.
+    app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    app.refresh();
+    let todo = app
+        .todos
+        .items
+        .iter()
+        .find(|t| t.title == "Rehome me")
+        .expect("todo still listed");
+    let work_id = app
+        .projects
+        .items
+        .iter()
+        .find(|p| p.slug == "work")
+        .expect("work project")
+        .id;
+    assert_eq!(
+        todo.project_id, work_id,
+        "edit-todo Project field must call move_project (got project_id {:?})",
+        todo.project_id
     );
 }
 

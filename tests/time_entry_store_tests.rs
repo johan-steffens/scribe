@@ -32,3 +32,17 @@ fn test_stop() {
     assert!(stopped.ended_at.is_some());
     assert!(s.find_running().expect("running").is_none());
 }
+
+#[test]
+fn test_create_second_running_rejected_by_db() {
+    let s = make_store();
+    s.create(new_entry("first-runner")).expect("first create");
+    let err = s
+        .create(new_entry("second-runner"))
+        .expect_err("second concurrent runner must fail");
+    let msg = err.to_string().to_lowercase();
+    assert!(
+        msg.contains("unique") || msg.contains("constraint"),
+        "expected unique-index failure, got: {err}"
+    );
+}

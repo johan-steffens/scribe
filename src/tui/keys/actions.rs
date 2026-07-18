@@ -96,9 +96,14 @@ fn exec_edit_todo(app: &App, form: &Form, slug: &str) -> anyhow::Result<()> {
     if title.is_empty() {
         return Err(anyhow::anyhow!("title cannot be empty"));
     }
-    TodoOps::new(Arc::clone(&app.db))
-        .update_title(slug, &title)
-        .map(|_| ())
+    // Field 1 is the Project select (pre-filled to the todo's current project).
+    let project_slug = form.field_value(1).to_owned();
+    let ops = TodoOps::new(Arc::clone(&app.db));
+    ops.update_title(slug, &title)?;
+    if !project_slug.is_empty() {
+        ops.move_project(slug, &project_slug)?;
+    }
+    Ok(())
 }
 
 fn exec_move_todo(app: &App, form: &Form, slug: &str) -> anyhow::Result<()> {
@@ -242,6 +247,14 @@ fn exec_create_task(app: &App, form: &Form) -> anyhow::Result<()> {
         return Err(anyhow::anyhow!("title cannot be empty"));
     }
     let project_slug = form.field_value(1).to_owned();
+    // DOCUMENTED-MAGIC: field 2 is Priority select — order matches form options
+    // (low, medium, high, urgent); default selected index is medium (1).
+    let priority = match form.select_index(2) {
+        0 => crate::domain::TaskPriority::Low,
+        1 => crate::domain::TaskPriority::Medium,
+        2 => crate::domain::TaskPriority::High,
+        _ => crate::domain::TaskPriority::Urgent,
+    };
     let p = SqliteProjects::new(Arc::clone(&app.db))
         .find_by_slug(&project_slug)?
         .ok_or_else(|| anyhow::anyhow!("project '{project_slug}' not found"))?;
@@ -252,7 +265,7 @@ fn exec_create_task(app: &App, form: &Form) -> anyhow::Result<()> {
             title,
             description: None,
             status: crate::domain::TaskStatus::Todo,
-            priority: crate::domain::TaskPriority::Medium,
+            priority,
             due_date: None,
             parent_id: None,
         })

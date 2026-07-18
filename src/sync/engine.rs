@@ -13,7 +13,7 @@
 //! | Entity type | Conflict resolution |
 //! |---|---|
 //! | `Project`, `Task`, `Todo`, `Note` | Remote `updated_at` > local → replace; otherwise keep local |
-//! | `TimeEntry` | Field-wise: stopped timer wins; later `ended_at`/`archived_at` |
+//! | `TimeEntry` | Field-wise: stopped timer wins; later `ended_at`/`archived_at`; at most one runner kept |
 //! | `Reminder` | Field-wise: `fired`/`persistent` OR; archive prefers set |
 //! | `CaptureItem` | Field-wise: `processed` OR |
 //!
@@ -325,7 +325,8 @@ impl SyncEngine {
     /// - Remote-only entities: inserted into local.
     /// - `Project`, `Task`, `Todo`, `Note`: remote wins when `updated_at` is newer.
     /// - `TimeEntry`: field-wise — stopped (`ended_at` set) wins over running;
-    ///   later `ended_at` / `archived_at` win; empty note filled from remote.
+    ///   later `ended_at` / `archived_at` win; empty note filled from remote;
+    ///   after merge, at most one entry remains running (newest `started_at`).
     /// - `Reminder`: `fired` and `persistent` are OR'd; archive prefers set.
     /// - `CaptureItem`: `processed` is OR'd (processed wins over unprocessed).
     pub fn merge_into(local: &mut StateSnapshot, remote: &StateSnapshot) {
@@ -353,6 +354,8 @@ impl SyncEngine {
             |e| &e.slug,
             combine_time_entry,
         );
+        // DB constraint (M8): at most one row may have ended_at IS NULL.
+        enforce_single_running_timer(&mut local.time_entries);
         merge_entities_combine(
             &mut local.reminders,
             &remote.reminders,
@@ -464,6 +467,31 @@ fn merge_entities_combine<T: Clone>(
             local.push(remote_entity.clone());
             local_index.insert(slug, new_idx);
         }
+    }
+}
+
+/// Stops all but the newest running timer so a merged snapshot can be written.
+///
+/// When two devices each start a timer, slug-keyed merge keeps both with
+/// `ended_at = None`. The M8 unique index rejects that on write, so we close
+/// older runners with `ended_at = started_at` (zero-duration stop) and keep
+/// only the most recently started entry open.
+fn enforce_single_running_timer(entries: &mut [TimeEntry]) {
+    let mut running: Vec<usize> = entries
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.ended_at.is_none())
+        .map(|(i, _)| i)
+        .collect();
+    if running.len() <= 1 {
+        return;
+    }
+    running.sort_by_key(|&i| (entries[i].started_at, entries[i].id.0));
+    // Drop the keep candidate (latest start); stop the rest.
+    running.pop();
+    for i in running {
+        let started = entries[i].started_at;
+        entries[i].ended_at = Some(started);
     }
 }
 

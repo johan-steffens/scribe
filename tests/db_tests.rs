@@ -307,3 +307,109 @@ fn test_m5_preserves_created_at() {
         .expect("created_at");
     assert_eq!(task_created_at, created_at);
 }
+
+// ── M8: one running timer ──────────────────────────────────────────────────
+
+/// The M8 migration SQL — identical to [`scribe::db::migrations`] M8.
+const M8_SQL: &str = "
+UPDATE time_entries
+SET ended_at = started_at
+WHERE ended_at IS NULL
+  AND id NOT IN (
+    SELECT id FROM (
+      SELECT id FROM time_entries
+      WHERE ended_at IS NULL
+      ORDER BY started_at DESC, id DESC
+      LIMIT 1
+    )
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_entries_one_running
+ON time_entries((1))
+WHERE ended_at IS NULL;
+";
+
+#[test]
+fn test_m8_rejects_second_running_timer() {
+    let conn = db::open_in_memory().expect("in-memory");
+    let now = "2026-01-01T12:00:00Z";
+    conn.execute(
+        "INSERT INTO time_entries (slug, project_id, started_at, created_at)
+         VALUES ('runner-a', 1, ?1, ?1)",
+        [now],
+    )
+    .expect("first runner");
+
+    let err = conn
+        .execute(
+            "INSERT INTO time_entries (slug, project_id, started_at, created_at)
+             VALUES ('runner-b', 1, ?1, ?1)",
+            [now],
+        )
+        .expect_err("second running timer must violate unique index");
+    let msg = err.to_string().to_lowercase();
+    assert!(
+        msg.contains("unique") || msg.contains("constraint"),
+        "expected unique constraint error, got: {err}"
+    );
+}
+
+#[test]
+fn test_m8_allows_multiple_completed_entries() {
+    let conn = db::open_in_memory().expect("in-memory");
+    for (slug, start, end) in [
+        ("done-a", "2026-01-01T10:00:00Z", "2026-01-01T11:00:00Z"),
+        ("done-b", "2026-01-01T12:00:00Z", "2026-01-01T13:00:00Z"),
+    ] {
+        conn.execute(
+            "INSERT INTO time_entries (slug, project_id, started_at, ended_at, created_at)
+             VALUES (?1, 1, ?2, ?3, ?2)",
+            [slug, start, end],
+        )
+        .expect("insert completed");
+    }
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM time_entries", [], |row| row.get(0))
+        .expect("count");
+    assert_eq!(count, 2);
+}
+
+#[test]
+fn test_m8_heals_duplicate_running_timers() {
+    let conn = db::open_in_memory().expect("in-memory");
+    // Drop the index so we can seed a dual-running state, then re-apply M8.
+    conn.execute_batch("DROP INDEX IF EXISTS idx_time_entries_one_running;")
+        .expect("drop index");
+    conn.execute(
+        "INSERT INTO time_entries (slug, project_id, started_at, created_at)
+         VALUES ('old-runner', 1, '2026-01-01T10:00:00Z', '2026-01-01T10:00:00Z')",
+        [],
+    )
+    .expect("old runner");
+    conn.execute(
+        "INSERT INTO time_entries (slug, project_id, started_at, created_at)
+         VALUES ('new-runner', 1, '2026-01-01T12:00:00Z', '2026-01-01T12:00:00Z')",
+        [],
+    )
+    .expect("new runner");
+
+    conn.execute_batch(M8_SQL).expect("re-apply M8");
+
+    let running: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM time_entries WHERE ended_at IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .expect("running count");
+    assert_eq!(running, 1);
+
+    let kept: String = conn
+        .query_row(
+            "SELECT slug FROM time_entries WHERE ended_at IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .expect("kept slug");
+    assert_eq!(kept, "new-runner");
+}

@@ -95,3 +95,35 @@ fn test_update_title() {
         .expect("update title");
     assert_eq!(updated.title, "New title");
 }
+
+#[test]
+fn test_move_project() {
+    use scribe::domain::{NewProject, ProjectStatus};
+    use scribe::ops::ProjectOps;
+    use std::sync::{Arc, Mutex};
+
+    let conn = Arc::new(Mutex::new(
+        scribe::db::open_in_memory().expect("in-memory db"),
+    ));
+    let projects = ProjectOps::new(&conn);
+    projects
+        .create_project(NewProject {
+            slug: "work".to_owned(),
+            name: "Work".to_owned(),
+            description: None,
+            status: ProjectStatus::Active,
+        })
+        .expect("create project");
+
+    let todos = scribe::ops::TodoOps::new(Arc::clone(&conn));
+    let todo = todos
+        .create("quick-capture", "Move me")
+        .expect("create todo");
+    assert_eq!(todo.project_slug, "quick-capture");
+
+    let moved = todos
+        .move_project(&todo.slug, "work")
+        .expect("move_project");
+    assert_eq!(moved.project_slug, "work");
+    assert_eq!(moved.slug, todo.slug);
+}
