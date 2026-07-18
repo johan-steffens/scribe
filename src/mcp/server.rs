@@ -861,24 +861,7 @@ impl ScribeMcpServer {
         Returns project counts, task counts, open todos, inbox items, active reminders, \
         and total time tracked.")]
     async fn report_summary(&self, Parameters(p): Parameters<ReportSummaryParams>) -> String {
-        use chrono::{DateTime, Duration, TimeZone as _, Utc};
-
-        let now = Utc::now();
-        let (since, until) = match (p.today, p.week) {
-            (Some(true), _) | (_, Some(true)) => {
-                // DOCUMENTED-MAGIC: Epoch is 0 = "all-time" lower bound; the upper bound
-                // is now+1s to include entries started in the current second.
-                let midnight = Utc
-                    .with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
-                    .single()
-                    .unwrap_or(now - Duration::hours(24));
-                (midnight, now + Duration::seconds(1))
-            }
-            _ => (
-                DateTime::from_timestamp(0, 0).unwrap_or(now - Duration::days(3650)),
-                now + Duration::seconds(1),
-            ),
-        };
+        let (since, until) = report_time_window(p.today, p.week);
 
         match self.reporting.summary_report(since, until) {
             Ok(report) => to_json(&serde_json::json!({
@@ -903,22 +886,7 @@ impl ScribeMcpServer {
         total tracked time, and completion percentage."
     )]
     async fn report_project(&self, Parameters(p): Parameters<ReportProjectParams>) -> String {
-        use chrono::{DateTime, Duration, TimeZone as _, Utc};
-
-        let now = Utc::now();
-        let (since, until) = match (p.today, p.week) {
-            (Some(true), _) | (_, Some(true)) => {
-                let midnight = Utc
-                    .with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
-                    .single()
-                    .unwrap_or(now - Duration::hours(24));
-                (midnight, now + Duration::seconds(1))
-            }
-            _ => (
-                DateTime::from_timestamp(0, 0).unwrap_or(now - Duration::days(3650)),
-                now + Duration::seconds(1),
-            ),
-        };
+        let (since, until) = report_time_window(p.today, p.week);
 
         match self.reporting.project_report(&p.slug, since, until) {
             Ok(report) => to_json(&serde_json::json!({
@@ -1092,6 +1060,54 @@ fn read_resource_contents(server: &ScribeMcpServer, uri: &str) -> ResourceConten
     };
 
     ResourceContents::text(text, uri)
+}
+
+/// Computes a report time window matching CLI `scribe report --today` / `--week`.
+///
+/// Uses **local** calendar midnight (not UTC day boundaries) so week/today
+/// windows match the CLI `report_handlers::compute_time_window` behaviour.
+///
+/// - `today = Some(true)` → local midnight → now
+/// - `week = Some(true)` → local Monday midnight → now
+/// - otherwise → unix epoch → now (all-time)
+fn report_time_window(
+    today: Option<bool>,
+    week: Option<bool>,
+) -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+    use chrono::{DateTime, Datelike, Duration, Local, Utc};
+
+    let now = Utc::now();
+    let until = now + Duration::seconds(1);
+
+    if today == Some(true) {
+        let midnight = Local::now()
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .expect("valid midnight")
+            .and_local_timezone(Local)
+            .single()
+            .expect("unique local midnight")
+            .with_timezone(&Utc);
+        return (midnight, until);
+    }
+
+    if week == Some(true) {
+        let today_date = Local::now().date_naive();
+        let days_since_monday = i64::from(today_date.weekday().num_days_from_monday());
+        let monday = today_date - Duration::days(days_since_monday);
+        let monday_dt = monday
+            .and_hms_opt(0, 0, 0)
+            .expect("valid midnight")
+            .and_local_timezone(Local)
+            .single()
+            .expect("unique local monday midnight")
+            .with_timezone(&Utc);
+        return (monday_dt, until);
+    }
+
+    // DOCUMENTED-MAGIC: Epoch is 0 = "all-time" lower bound.
+    let epoch = DateTime::from_timestamp(0, 0).unwrap_or(now - Duration::days(3650));
+    (epoch, until)
 }
 
 // ── Testing utilities ────────────────────────────────────────────────────────

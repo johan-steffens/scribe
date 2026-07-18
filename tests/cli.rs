@@ -281,6 +281,78 @@ fn test_inbox_process_interactive_discard() {
 }
 
 #[test]
+fn test_inbox_process_action_discard_noninteractive() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["capture", "Flag discard"]).success();
+
+    let output = scribe_with_db(&dir)
+        .args(["inbox", "list", "--output", "json"])
+        .output()
+        .expect("list");
+    let items: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).expect("json list");
+    let slug = items[0]["slug"].as_str().expect("slug");
+
+    run(&dir, &["inbox", "process", slug, "--action", "discard"])
+        .success()
+        .stdout(predicate::str::contains("Processed:"));
+
+    // Inbox empty after discard.
+    run(&dir, &["inbox", "list"])
+        .success()
+        .stdout(predicate::str::contains("Inbox is empty"));
+}
+
+#[test]
+fn test_inbox_process_action_todo_requires_project() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["capture", "Needs project"]).success();
+
+    let output = scribe_with_db(&dir)
+        .args(["inbox", "list", "--output", "json"])
+        .output()
+        .expect("list");
+    let items: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).expect("json list");
+    let slug = items[0]["slug"].as_str().expect("slug");
+
+    run(&dir, &["inbox", "process", slug, "--action", "todo"])
+        .failure()
+        .stderr(predicate::str::contains("--project is required"));
+}
+
+#[test]
+fn test_inbox_process_action_todo_creates_checklist() {
+    let dir = TempDir::new().expect("tempdir");
+    run(&dir, &["project", "add", "work", "--name", "Work"]).success();
+    run(&dir, &["capture", "Buy milk"]).success();
+
+    let output = scribe_with_db(&dir)
+        .args(["inbox", "list", "--output", "json"])
+        .output()
+        .expect("list");
+    let items: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).expect("json list");
+    let slug = items[0]["slug"].as_str().expect("slug");
+
+    run(
+        &dir,
+        &[
+            "inbox",
+            "process",
+            slug,
+            "--action",
+            "todo",
+            "--project",
+            "work",
+        ],
+    )
+    .success()
+    .stdout(predicate::str::contains("Processed:"));
+
+    run(&dir, &["todo", "list"])
+        .success()
+        .stdout(predicate::str::contains("Buy milk"));
+}
+
+#[test]
 fn test_mcp_cli_help() {
     let dir = TempDir::new().expect("tempdir");
     run(&dir, &["mcp", "--help"])
