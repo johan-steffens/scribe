@@ -127,10 +127,17 @@ fn render_timer_running(frame: &mut Frame, area: Rect, entry: &TimeEntry, elapse
 
 /// Renders the scrollable entry list.
 fn render_entry_list(frame: &mut Frame, area: Rect, app: &App) {
-    if app.entries.items.is_empty() {
+    let visible = crate::tui::keys::helpers::visible_entries(app);
+
+    if visible.is_empty() {
+        let text = if app.entries.filter.is_empty() {
+            "  No time entries yet."
+        } else {
+            "  No time entries match the current filter."
+        };
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
-                "  No time entries yet.",
+                text,
                 Style::default().fg(Color::DarkGray),
             ))),
             area,
@@ -138,9 +145,7 @@ fn render_entry_list(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    let rows: Vec<Vec<String>> = app
-        .entries
-        .items
+    let rows: Vec<Vec<String>> = visible
         .iter()
         .map(|e| {
             let project_slug = app
@@ -177,10 +182,7 @@ fn render_entry_list(frame: &mut Frame, area: Rect, app: &App) {
         })
         .collect();
 
-    let selected = app
-        .entries
-        .selected
-        .min(app.entries.items.len().saturating_sub(1));
+    let selected = app.entries.selected.min(visible.len().saturating_sub(1));
 
     table::render_table(
         frame,

@@ -21,7 +21,7 @@
 
 pub(super) mod actions;
 pub(super) mod forms;
-pub(super) mod helpers;
+pub(crate) mod helpers;
 pub(super) mod modal;
 pub(super) mod view_handlers;
 

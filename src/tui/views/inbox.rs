@@ -61,11 +61,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         let rows: Vec<Vec<String>> = visible
             .iter()
             .map(|c| {
-                let body = if c.body.len() > BODY_TRUNCATE {
-                    format!("{}…", &c.body[..BODY_TRUNCATE])
-                } else {
-                    c.body.clone()
-                };
+                let body = crate::tui::keys::helpers::truncate_chars(&c.body, BODY_TRUNCATE);
                 let created = c.created_at.format("%Y-%m-%d %H:%M").to_string();
                 vec![c.slug.clone(), body, created]
             })

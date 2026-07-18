@@ -9,7 +9,7 @@
 //!
 //! This is a pure rendering function; no state is mutated here.
 
-use chrono::{Duration, Local};
+use chrono::Duration;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -17,7 +17,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
 use crate::domain::task::TaskPriority;
-use crate::domain::task::TaskStatus;
 use crate::domain::{Task, TimeEntry};
 use crate::tui::app::App;
 use crate::tui::components::table;
@@ -53,22 +52,7 @@ fn render_today_tasks(frame: &mut Frame, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let today = Local::now().date_naive();
-    let mut due_tasks: Vec<&Task> = app
-        .tasks
-        .items
-        .iter()
-        .filter(|t| {
-            // Show non-archived, non-done, non-cancelled tasks due today or overdue.
-            t.archived_at.is_none()
-                && t.status != TaskStatus::Done
-                && t.status != TaskStatus::Cancelled
-                && t.due_date.is_some_and(|d| d <= today)
-        })
-        .collect();
-
-    // Sort: urgent first, then high, medium, low.
-    due_tasks.sort_by_key(|t| priority_sort_key(t.priority));
+    let due_tasks = crate::tui::keys::helpers::dashboard_due_tasks(app);
 
     if due_tasks.is_empty() {
         let msg =
@@ -89,7 +73,9 @@ fn render_today_tasks(frame: &mut Frame, area: Rect, app: &App) {
         })
         .collect();
 
-    let selected = app.tasks.selected.min(due_tasks.len().saturating_sub(1));
+    let selected = app
+        .dashboard_selected
+        .min(due_tasks.len().saturating_sub(1));
 
     table::render_table(
         frame,
@@ -170,7 +156,7 @@ fn render_no_timer(frame: &mut Frame, area: Rect) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            " Press [Space] to start a timer",
+            " [Space] due task done / start timer",
             Style::default().fg(Color::DarkGray),
         )),
     ];
@@ -263,16 +249,6 @@ const fn priority_badge(p: TaskPriority) -> &'static str {
         TaskPriority::High => "HIGH",
         TaskPriority::Medium => "MED ",
         TaskPriority::Low => "LOW ",
-    }
-}
-
-/// Returns a sort key where lower numbers sort first (urgent = 0).
-const fn priority_sort_key(p: TaskPriority) -> u8 {
-    match p {
-        TaskPriority::Urgent => 0,
-        TaskPriority::High => 1,
-        TaskPriority::Medium => 2,
-        TaskPriority::Low => 3,
     }
 }
 
